@@ -1,36 +1,46 @@
 ---
 name: grill-rc-bootstrap
-description: Create a new Research Center instance from the research-center template and set it up - private remote, provider logins, role models, budgets - then hand over to ingest and grilling. Use when the user asks to create, set up, bootstrap or configure a Research Center, or starts in the template clone.
+description: Conduct an evidence-first grilling session that creates a new Research Center (from rc-kit new or a temporary rc_template clone) or migrates existing research material into one - private remote, provider logins, role models, budgets - then hands over to ingest and topic grilling. Use when the user asks to create, set up, bootstrap, configure or migrate a Research Center.
 ---
 
-# Bootstrap a Research Center
+# Grill RC bootstrap
 
-The template (research-center) is public and holds no data. An instance is the user's own **private** repo, made from it. Keep grilling until every step below is verified, not just answered.
+First read `BOOTSTRAP.md`. Keep grilling until every step below is verified, not just answered. Ask one decision at a time, with a pick list when the choices are discrete, and recommend an option.
 
-## 1. Make the instance
+## New RC
 
-- Ask where it lives, for example `../<name>_RC` next to the template clone.
-- From the template root: `./rc bootstrap install <dir>`. It copies the tracked files, writes research-center.json, copies the default roles to catalog/agents and runs `git init`.
-- Tell the user to continue the session from the instance root. A session in the template has no research-center.json and refuses to ingest.
+1. Determine `template_root` and `target_root` as described in `BOOTSTRAP.md`. If the RC was created with `rc-kit new`, steps 1–2 are already done.
+2. Run the materialization (`./rc_template/rc bootstrap install .`); continue from `target_root`.
+3. Record the name in `research-center.json`, and set the status to `adapting`.
+4. **Purpose**: is this RC for a company (repos, Notion, Drive) or for a person (articles, papers, books)? What decisions should its research feed? This steers the ingest plan and the profile.
+5. **Private remote**: the RC commits the text of everything it ingests, so its remote must be private.
+   - The user creates the repo, or you run `gh repo create <owner>/<name> --private` after they confirm the owner and name.
+   - Then `git remote add origin <url>`.
+   - A non-GitHub remote can't be checked. The user confirms it is private, and only then do you set `"privateRemoteConfirmed": true`.
+   - No remote yet is allowed: nothing is published.
+6. **Logins and models**:
+   - `./rc doctor` shows Nix, gh and the claude, codex and cursor-agent logins. The RC stores no credentials.
+   - `./rc settings` shows each role and its pipeline slot. Ask which subscriptions the user has. Move roles off a missing provider with `./rc roles set <role> --provider ... --model ...`.
+   - Researchers need web access (claude or codex). The connector reader needs claude. Cursor roles are read-only.
+   - Notion and Drive ingest need those claude.ai connectors to be connected for the user's Claude account (`claude mcp list`).
+7. **Budgets and limits**: agree `budget.ingestCalls`, `budget.researchCalls`, `ingest.maxSourceBytes` and `research.maxSourcesPerResearcher`. A run that hits a budget stops and can resume.
+8. Replace the template README with this RC's purpose. Keep `GUIDE.md`, `install/`, `CLAUDE.md` and `.claude/skills`: they are the entry point for people and AI tools.
+9. `./rc agents sync`, `./rc check`, set the status to `ready`, and commit with the user's go-ahead.
+10. Hand over: point the RC at the user's material first (rc-ingest), or grill a topic from scratch (grill-research-topic)?
 
-## 2. Private remote
+## Migration
 
-- The instance commits source text from company repos, Notion and Drive. Its remote must be private.
-- The user creates the repo, or you run `gh repo create <owner>/<name> --private` after they confirm the owner and name. Then `git remote add origin <url>`.
-- A non-GitHub remote can't be checked. The user confirms it is private, and only then do you set `"privateRemoteConfirmed": true` in research-center.json.
+1. Do not change any files before a read-only inventory of the existing material: notes, reading lists, knowledge bases, earlier reports, bookmarks.
+2. Map each item to an ingest source kind (folder, git, url, notion, gdrive), or mark it `drop` with a reason the user agrees to.
+3. Materialize the RC next to the material, never into it, and follow the New RC steps.
+4. Bring the material in as sources with `./rc ingest add`, one slice at a time. Check each slice's digest and profile notes with the user before the next.
+5. Never copy old notes into `knowledge/` or `research/` by hand. Those folders are generated and cited.
+6. Keep the old material until the user has checked the profile built from it.
 
-## 3. Logins and models
+## Acceptance
 
-- `./rc doctor` shows Nix, gh and the provider logins (claude, codex, cursor-agent). The roles use the user's own subscriptions, and the RC stores no credentials.
-- `./rc roles` lists each role, its provider, model and pipeline slot. Ask which subscriptions the user has. Move roles off a provider they lack, for example `./rc roles set judge --provider claude --model opus`. Researchers need web access (claude or codex). The connector reader needs claude. Cursor roles are read-only.
-- Notion and Drive ingest need the claude.ai connectors to be connected for the user's Claude account. `claude mcp list` shows them.
-
-## 4. Budgets and limits
-
-Agree on `budget.ingestCalls` and `budget.researchCalls` (agent calls per run), `ingest.maxSourceBytes`, and `research.maxSourcesPerResearcher` in research-center.json. A run that hits a budget stops and can resume.
-
-## 5. Verify and hand over
-
-- `./rc agents sync`, then `./rc check`. Every check must pass.
-- Commit the instance only with the user's go-ahead.
-- Then ask: does the user want to point the RC at their material first (rc-ingest), or grill a topic from scratch (grill-research-topic)?
+- `research-center.json` is valid, with status `ready`.
+- The remote is private or absent, verified, not assumed.
+- Every pipeline role runs on a logged-in provider.
+- `./rc check` passes.
+- The RC does not depend on `rc_template`.

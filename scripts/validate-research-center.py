@@ -28,6 +28,8 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], dict[str, list[str]]]:
     return _knowledge.parse_frontmatter(Path("note.md"), text)
 
 PROVIDERS = ("claude", "codex", "cursor")
+# The same lifecycle as a Control Center's control-center.json; rc-kit list shows it.
+STATUSES = ("discovery", "adapting", "ready")
 ACCESS = ("read-only", "web-read", "connector-read")
 CONNECTORS = ("notion", "gdrive")
 SINGLE_ROLES = {
@@ -89,6 +91,8 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
         if isinstance(role, dict):
             check_role(root, path, role, errors)
             roles[path.stem] = role
+    if settings.get("status") not in STATUSES:
+        errors.append(f"{label}: status must be one of {STATUSES} (discovery when created, ready once bootstrapped)")
     for group, keys in NUMBERS.items():
         for key in keys:
             value = settings.get(group, {}).get(key)

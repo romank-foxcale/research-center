@@ -20,19 +20,52 @@ ingest (optional) → grill → plan → collect → analyze → critique → ju
 
 Ideas worth acting on leave as a [Control Center](https://github.com/romank-foxcale/command_center_template) task plan (`handoff.md`). The RC itself never touches product code.
 
-## Start
+## Install
 
-Requirements: Nix, Git, `gh` (logged in), and the CLIs of the subscriptions you use: `claude`, `codex`, `cursor-agent`. On Windows, run everything inside WSL. `rc.cmd` forwards to it.
+The same way as the Control Center kit, and it can sit next to it:
+
+- Windows: in PowerShell as administrator, run `install/windows/install.ps1 -Tools claude,codex,cursor`
+- macOS / Linux / WSL: `curl -fsSL https://raw.githubusercontent.com/romank-foxcale/research-center/main/install/install.sh | bash -s -- --tools claude,codex,cursor`
+
+Then run `rc-kit doctor`. Step-by-step instructions for every tool are in [GUIDE.md](GUIDE.md).
+
+## Creating an RC
 
 ```bash
-git clone https://github.com/romank-foxcale/research-center
-cd research-center
-./rc bootstrap install ../my_RC
+rc-kit new my-project          # ~/Projects/my-project_RC, next to my-project_CC
+rc-kit open my-project code    # or: cd ~/Projects/my-project_RC && claude
 ```
 
-Then open a coding agent (Claude Code, Codex) in `../my_RC` and say "set up my research center". The `grill-rc-bootstrap` skill takes it from there: private remote, logins, models, budgets, and your first sources or topic.
+First prompt:
 
-The template is public and holds no data. Your instance commits the text of everything you ingest, so **its remote must be private**. `./rc ingest` refuses to run otherwise.
+> Set up this Research Center. Use the grill-rc-bootstrap skill.
+
+Without the kit, the manual way is:
+
+```bash
+mkdir my-project_RC
+cd my-project_RC
+git clone https://github.com/romank-foxcale/research-center rc_template
+claude   # or codex, opencode, cursor .
+```
+
+First prompt:
+
+> Create a Research Center here. Read `rc_template/BOOTSTRAP.md`, treat `rc_template` as a read-only source and start grilling. If there is already research material here, migrate it without losing meaning.
+
+After `./rc check` passes, delete `rc_template/` and commit the RC.
+
+This template is public and holds no data. Your RC commits the text of everything you ingest, so **its remote must be private**. `./rc ingest` refuses to run otherwise.
+
+| | Control Center | Research Center |
+| --- | --- | --- |
+| Install | `install.sh` → `~/.cc-kit`, `cc-kit` | `install.sh` → `~/.rc-kit`, `rc-kit` |
+| Create | `cc-kit new <name>` → `<name>_CC` | `rc-kit new <name>` → `<name>_RC` |
+| First prompt | Use the grill-cc-bootstrap skill | Use the grill-rc-bootstrap skill |
+| Manual | `cc_template` clone + `BOOTSTRAP.md` | `rc_template` clone + `BOOTSTRAP.md` |
+| Help, settings | `/cc-help`, `./cc settings` | `/rc-help`, `./rc settings` |
+| Gate | `./cc check`, `./cc verify` | `./rc check` |
+| Live runs | `./cc watch` | `./rc watch` |
 
 ## Commands
 

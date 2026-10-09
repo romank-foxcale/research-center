@@ -60,7 +60,7 @@ def write_text(path: Path, text: str) -> list[dict[str, Any]]:
 def settings(root: Path) -> dict[str, Any]:
     path = root / SETTINGS
     if not path.is_file():
-        raise RcError(f"{SETTINGS} is missing: this is the template, not an instance; create one with ./rc bootstrap install <dir>")
+        raise RcError(f"{SETTINGS} is missing: this is the template, not an instance; create one with rc-kit new <name> (or ./rc bootstrap install <dir>)")
     return load_json(path)
 
 

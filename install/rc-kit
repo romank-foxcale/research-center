@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# rc-kit: create and open Research Centers from this kit. Installed into
+# ~/.local/bin by install/install.sh; works on macOS, Linux and WSL2.
+# Mirrors cc-kit from the Control Center kit: same commands, same layout.
+set -euo pipefail
+
+# Resolve the ~/.local/bin symlink back to the kit clone.
+self="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
+kit_root="$(cd -- "$(dirname -- "$self")/.." && pwd)"
+projects_root="${RC_PROJECTS_ROOT:-${CC_PROJECTS_ROOT:-$HOME/Projects}}"
+
+usage() {
+  printf '%s\n' \
+    'Usage: rc-kit <command> [arguments]' \
+    '' \
+    'Commands:' \
+    '  new <name>            Create ~/Projects/<name>_RC and prepare it for your AI tool' \
+    '  list                  List Research Centers under ~/Projects' \
+    '  open <name> <tool>    Open an RC in code, cursor, claude, codex or opencode' \
+    '  doctor                Check prerequisites, provider logins and AI tools' \
+    '  update                Update the kit itself (existing RCs are not changed)' \
+    '' \
+    "Projects root: $projects_root (set RC_PROJECTS_ROOT to change it)"
+}
+
+ok() { printf '  ok    %s\n' "$1"; }
+warn() { printf '  warn  %s\n' "$1"; }
+bad() { printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); }
+
+is_wsl() { grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; }
+
+rc_dir() {
+  local name="${1:?name is required}"
+  name="${name%_RC}"
+  if [[ ! "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    printf 'error: name must use lowercase letters, digits and dashes: %s\n' "$name" >&2
+    exit 2
+  fi
+  printf '%s/%s_RC' "$projects_root" "$name"
+}
+
+command_new() {
+  local target
+  target="$(rc_dir "${1:-}")"
+  if [[ -e "$target" ]] && [[ -n "$(ls -A "$target" 2>/dev/null)" ]]; then
+    printf 'error: %s already exists and is not empty.\n' "$target" >&2
+    printf 'To migrate an existing research setup, see "Migrating an existing research setup" in %s/GUIDE.md\n' "$kit_root" >&2
+    exit 1
+  fi
+  if is_wsl && [[ "$projects_root" == /mnt/* ]]; then
+    warn "$projects_root is on the Windows drive; Nix is slow and unreliable there. Use a Linux path such as ~/Projects."
+  fi
+
+  mkdir -p "$projects_root"
+  python3 "$kit_root/scripts/materialize-template.py" "$target"
+  # Nix flakes only see files git knows about, so stage everything now.
+  git -C "$target" add -A
+
+  printf '\nCreated %s\n\n' "$target"
+  printf 'It will hold the text of everything you ingest: give it a PRIVATE remote before ingesting.\n\n'
+  printf 'Next: open it in your AI tool and start the setup interview.\n'
+  printf '  VS Code:   rc-kit open %s code\n' "$(basename "$target" _RC)"
+  printf '  Cursor:    rc-kit open %s cursor\n' "$(basename "$target" _RC)"
+  printf '  CLI tools: cd %s && claude   (or codex / opencode)\n' "$target"
+  printf '  Claude desktop: see GUIDE.md, section "Claude Code desktop"\n\n'
+  printf 'First prompt:  Set up this Research Center. Use the grill-rc-bootstrap skill.\n'
+}
+
+command_list() {
+  shopt -s nullglob
+  local found=0
+  for directory in "$projects_root"/*_RC; do
+    [[ -f "$directory/research-center.json" ]] || continue
+    status="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("status","unknown"))' "$directory/research-center.json" 2>/dev/null || echo unknown)"
+    printf '%-40s %s\n' "$(basename "$directory")" "$status"
+    found=1
+  done
+  [[ $found -eq 1 ]] || printf 'No Research Centers in %s yet. Create one with: rc-kit new <name>\n' "$projects_root"
+}
+
+command_open() {
+  local target tool
+  target="$(rc_dir "${1:-}")"
+  tool="${2:?usage: rc-kit open <name> <code|cursor|claude|codex|opencode>}"
+  [[ -f "$target/research-center.json" ]] || { printf 'error: no Research Center at %s\n' "$target" >&2; exit 1; }
+  case "$tool" in
+    code | cursor)
+      command -v "$tool" >/dev/null || { printf 'error: "%s" command not found; see GUIDE.md\n' "$tool" >&2; exit 1; }
+      exec "$tool" "$target"
+      ;;
+    claude | codex | opencode)
+      command -v "$tool" >/dev/null || { printf 'error: %s is not installed; run install.sh --tools %s\n' "$tool" "$tool" >&2; exit 1; }
+      cd "$target"
+      exec "$tool"
+      ;;
+    *)
+      printf 'error: unknown tool: %s\n' "$tool" >&2
+      exit 2
+      ;;
+  esac
+}
+
+command_doctor() {
+  failures=0
+  printf 'System\n'
+  case "$(uname -s)" in
+    Darwin) ok "macOS $(sw_vers -productVersion 2>/dev/null)" ;;
+    Linux)
+      if is_wsl; then ok "WSL2 ($(. /etc/os-release && echo "$PRETTY_NAME"))"; else ok "Linux"; fi
+      ;;
+    MINGW* | MSYS* | CYGWIN*) bad "this is Git Bash on Windows; open Ubuntu (WSL) and run rc-kit there" ;;
+    *) bad "unsupported system: $(uname -s)" ;;
+  esac
+  if is_wsl && [[ "$projects_root" == /mnt/* ]]; then
+    bad "projects root is on the Windows drive ($projects_root); use a Linux path"
+  else
+    ok "projects root: $projects_root"
+  fi
+
+  printf '\nRequired\n'
+  command -v git >/dev/null && ok "git $(git --version | awk '{print $3}')" || bad "git is missing"
+  if command -v python3 >/dev/null && python3 -c 'import sys; sys.exit(sys.version_info < (3, 8))'; then
+    ok "python $(python3 -c 'import platform; print(platform.python_version())')"
+  else
+    bad "python 3.8+ is missing"
+  fi
+  if command -v nix >/dev/null; then
+    ok "$(nix --version)"
+    if nix config show experimental-features 2>/dev/null | grep -qw flakes; then
+      ok "Nix flakes enabled"
+    else
+      bad "Nix flakes are disabled; re-run install.sh"
+    fi
+  else
+    bad "Nix is missing; re-run install.sh (open a new terminal first if you just installed it)"
+  fi
+  if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+    ok "gh logged in (ingest checks that your RC's remote is private)"
+  else
+    bad "gh is missing or not logged in; run: gh auth login (ingest refuses to run without it on a GitHub remote)"
+  fi
+
+  printf '\nResearch providers (at least claude, or codex, for the researcher roles)\n'
+  local providers=0
+  if command -v claude >/dev/null; then
+    if claude auth status 2>/dev/null | grep -q '"loggedIn": *true'; then ok "claude CLI logged in"; providers=1; else warn "claude CLI not logged in: claude auth login"; fi
+  else
+    warn "claude CLI not installed (needed for Notion/Drive ingest)"
+  fi
+  if command -v codex >/dev/null; then
+    if codex login status >/dev/null 2>&1; then ok "codex CLI logged in"; providers=1; else warn "codex CLI not logged in: codex login"; fi
+  else
+    warn "codex CLI not installed"
+  fi
+  if command -v cursor-agent >/dev/null; then
+    if cursor-agent status 2>/dev/null | grep -qi 'logged in as'; then ok "cursor-agent logged in (Grok judge and sceptic)"; else warn "cursor-agent not logged in: cursor-agent login"; fi
+  else
+    warn "cursor-agent not installed (default judge and one sceptic use it; move them with ./rc roles set)"
+  fi
+  [[ $providers -eq 1 ]] || bad "no logged-in claude or codex CLI: research cannot search the web"
+
+  printf '\nOptional\n'
+  command -v opencode >/dev/null && ok "opencode CLI" || warn "opencode CLI not installed"
+  for tool in code cursor; do
+    if command -v "$tool" >/dev/null; then ok "$tool command"; else warn "$tool command not on PATH"; fi
+  done
+  printf '\nKit: %s (%s)\n' "$kit_root" "$(git -C "$kit_root" rev-parse --short HEAD 2>/dev/null || echo 'not a git clone')"
+  if [[ $failures -gt 0 ]]; then
+    printf '%d required check(s) failed.\n' "$failures"
+    return 1
+  fi
+  printf 'All required checks passed.\n'
+}
+
+command_name="${1:-help}"
+[[ $# -gt 0 ]] && shift
+case "$command_name" in
+  new) command_new "$@" ;;
+  list) command_list ;;
+  open) command_open "$@" ;;
+  doctor) command_doctor ;;
+  update)
+    git -C "$kit_root" pull --ff-only
+    printf 'Kit updated. Existing Research Centers are separate repos and were not changed.\n'
+    ;;
+  help | -h | --help) usage ;;
+  *)
+    printf 'error: unknown command: %s\n' "$command_name" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

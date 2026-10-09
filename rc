@@ -13,7 +13,7 @@ usage() {
     '  check          Evaluate and build every flake check' \
     '  validate       Validate the docs/ knowledge graph and the research center contract' \
     '  agents <sync|check>  Mirror .agents/skills into .claude/skills and the rule hooks' \
-    '  bootstrap install <dir>  Materialize a new instance from this template' \
+    '  bootstrap install [dir]  Materialize a new instance from this template (default: here)' \
     '  bootstrap validate       Validate the research center contract' \
     '  ingest add <folder|git|url|notion|gdrive> <locator...> [--id] [--include] [--exclude] [--note]' \
     '  ingest list | remove <id>' \
@@ -21,6 +21,7 @@ usage() {
     '  research new <topic> --title "..." | accept <topic> | list | show <topic>' \
     '  research run <topic> [--from plan|collect|analyze|critique|judge|apply|report] [--budget N]' \
     '  watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result' \
+    '  settings [show]  Settings as text: status, budgets, limits, agents and their models' \
     '  roles [list] | roles set <role> [--provider claude|codex|cursor] [--model M]' \
     '  plan <create|list|show|accept|archive|complete> ...  Plans for changing this RC itself'
 }
@@ -87,13 +88,13 @@ case "$command_name" in
     fi
     case "$bootstrap_command" in
       install)
-        exec python3 "$rc_root/scripts/materialize-template.py" "${1:?usage: ./rc bootstrap install <dir>}"
+        exec python3 "$rc_root/scripts/materialize-template.py" "${1:-.}"
         ;;
       validate)
         exec python3 "$rc_root/scripts/validate-research-center.py" "$rc_root"
         ;;
       *)
-        printf '%s\n' 'usage: ./rc bootstrap <install <dir>|validate>' >&2
+        printf '%s\n' 'usage: ./rc bootstrap <install [dir]|validate>' >&2
         exit 2
         ;;
     esac
@@ -109,6 +110,9 @@ case "$command_name" in
     ;;
   roles)
     exec python3 "$rc_root/scripts/roles.py" "$rc_root" "$@"
+    ;;
+  settings)
+    exec python3 "$rc_root/scripts/roles.py" "$rc_root" show
     ;;
   plan)
     exec python3 "$rc_root/scripts/plans.py" "$rc_root" "$@"

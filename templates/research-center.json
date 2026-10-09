@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "__RESEARCH_CENTER_NAME__",
+  "status": "discovery",
   "privateRemoteConfirmed": false,
   "budget": {
     "ingestCalls": 60,

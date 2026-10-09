@@ -36,6 +36,23 @@ def command_list(root: Path) -> None:
         print(f"{role['id']:<20} {role['provider']:<7} {role['model']:<18} {role['access']:<15} {', '.join(used.get(role['id'], ['unused']))}")
 
 
+def command_show(root: Path) -> None:
+    """./rc settings: the RC's settings as text, like ./cc settings show (no panel yet)."""
+    path = root / "research-center.json"
+    config = json.loads((path if path.is_file() else root / "templates" / "research-center.json").read_text(encoding="utf-8"))
+    print(f"Research Center {config.get('name')}  status {config.get('status', 'unknown')}"
+          f"{'' if path.is_file() else '  (template)'}")
+    print(f"\nBudgets   ingest {config['budget']['ingestCalls']} calls · research {config['budget']['researchCalls']} calls")
+    ingest = config["ingest"]
+    print(f"Ingest    max file {ingest['maxFileBytes']} B · max source {ingest['maxSourceBytes']} B · chunk {ingest['chunkBytes']} B")
+    print(f"Research  max {config['research']['maxSourcesPerResearcher']} sources per researcher")
+    print(f"Remote    privateRemoteConfirmed {str(config.get('privateRemoteConfirmed', False)).lower()}")
+    print("\nAgents")
+    command_list(root)
+    print("\nChange a role: ./rc roles set <role> --provider <claude|codex|cursor> --model <model>; "
+          f"other settings: edit {path.name}")
+
+
 def command_set(root: Path, args: argparse.Namespace) -> None:
     path = roles_dir(root) / f"{args.id}.json"
     if not path.is_file():
@@ -61,6 +78,7 @@ def main() -> int:
     parser.add_argument("root", type=Path)
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("list")
+    commands.add_parser("show")
     setter = commands.add_parser("set")
     setter.add_argument("id")
     setter.add_argument("--provider", choices=providers.PROVIDERS)
@@ -70,6 +88,8 @@ def main() -> int:
     try:
         if args.command == "set":
             command_set(root, args)
+        elif args.command == "show":
+            command_show(root)
         else:
             command_list(root)
     except (OSError, ValueError, KeyError) as error:

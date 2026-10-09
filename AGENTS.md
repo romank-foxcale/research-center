@@ -4,7 +4,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 
 ## Triggers
 
-- Create, set up or configure an RC: load `grill-rc-bootstrap`.
+- Create, set up, configure or migrate an RC: read `BOOTSTRAP.md`, load `grill-rc-bootstrap`, determine the mode (`new` or `migration`), and keep grilling until the state is verifiable.
 - Point the RC at folders, repos, URLs, Notion or Drive, or refresh the profile: load `rc-ingest`.
 - Research a subject, start a topic, "do an AI search on X": load `grill-research-topic`, then `rc-research`.
 - Run, follow or explain research: load `rc-research`.
