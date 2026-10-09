@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "digester",
+  "purpose": "Digests one ingested source into cited key facts",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "read-only",
+  "skills": [
+    "ingest-digest"
+  ]
+}

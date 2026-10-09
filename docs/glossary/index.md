@@ -1,0 +1,26 @@
+---
+id: glossary.index
+title: Glossary
+status: active
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, handoff.
+verified_at: 2026-10-09
+evidence:
+  - scripts/research/research.py
+  - scripts/ingest/ingest.py
+relations:
+  - docs/architecture/research-center.md
+---
+
+# Glossary
+
+- **Instance**: a private repo made from the template with `./rc bootstrap install`. Only an instance holds data.
+- **Source**: something ingested (folder, git, url, notion, gdrive), described in catalog/sources/&lt;id&gt;.json and stored as text in sources/&lt;id&gt;/.
+- **Digest**: one source's key facts, open problems and terms, every bullet cited.
+- **Profile**: atomic notes about the user or company, reduced from all digests, each with evidence.
+- **Brief**: the accepted definition of a research topic: questions Q1..Qn, scope, needs, success criteria, source preferences.
+- **Claim**: one checkable statement from a web page, with a verbatim quote. It is quote-verified when the quote is found in the stored page.
+- **Ledger**: research/&lt;topic&gt;/claims.json and claims.md: every source and claim of a run.
+- **Verdict**: HOLDS, WEAK, REFUTED or UNSUPPORTED for a claim; SURVIVES, WEAKENED or FALLS for an idea.
+- **Contested**: a claim a reviewer refuted and the judge kept. Only the user settles it.
+- **Fit ring**: ADOPT, TRIAL, ASSESS or HOLD: how an idea fits the user's repos and needs.
+- **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

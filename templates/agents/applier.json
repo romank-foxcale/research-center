@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "applier",
+  "purpose": "Assesses how each surviving idea fits the user's repos and needs",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "research-apply"
+  ]
+}

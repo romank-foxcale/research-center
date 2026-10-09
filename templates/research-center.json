@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "name": "__RESEARCH_CENTER_NAME__",
+  "privateRemoteConfirmed": false,
+  "budget": {
+    "ingestCalls": 60,
+    "researchCalls": 24
+  },
+  "ingest": {
+    "maxFileBytes": 262144,
+    "maxSourceBytes": 20971520,
+    "chunkBytes": 150000
+  },
+  "research": {
+    "maxSourcesPerResearcher": 15
+  },
+  "pipeline": {
+    "connectorReader": "connector-reader",
+    "digester": "digester",
+    "profiler": "profiler",
+    "sourcePlanner": "source-planner",
+    "researchers": ["researcher-claude", "researcher-gpt"],
+    "analyst": "analyst",
+    "sceptics": ["sceptic-claude", "sceptic-gpt", "sceptic-grok"],
+    "judge": "judge",
+    "applier": "applier",
+    "reporter": "reporter"
+  }
+}

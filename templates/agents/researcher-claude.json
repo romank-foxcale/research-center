@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "researcher-claude",
+  "purpose": "Searches the web along the source plan and returns sources and quoted claims",
+  "provider": "claude",
+  "model": "opus",
+  "access": "web-read",
+  "skills": [
+    "research-collect"
+  ]
+}

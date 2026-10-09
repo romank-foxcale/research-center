@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "analyst",
+  "purpose": "Answers the brief's questions and compares ideas from the claims ledger",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "research-analyze"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "researcher-gpt",
+  "purpose": "Searches the web along the source plan and returns sources and quoted claims",
+  "provider": "codex",
+  "model": "gpt-6.1-sol",
+  "access": "web-read",
+  "skills": [
+    "research-collect"
+  ]
+}

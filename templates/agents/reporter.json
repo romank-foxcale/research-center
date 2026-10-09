@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "reporter",
+  "purpose": "Writes the cited report from the analysis, judgement and fit",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "research-report"
+  ]
+}

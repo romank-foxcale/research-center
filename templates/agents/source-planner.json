@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "source-planner",
+  "purpose": "Plans where and how to search for a research brief",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "research-plan-sources"
+  ]
+}

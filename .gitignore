@@ -1,0 +1,15 @@
+# Local run state: event streams, agent logs, reviewer mappings, git clone cache. Never committed.
+/.rc-local/
+
+# Local and derived artifacts.
+/result
+/result-*
+/.direnv/
+/docs/.obsidian/
+__pycache__/
+
+# Personal AI tool settings: each person uses their own account and preferences.
+/.claude/settings.local.json
+/CLAUDE.local.md
+/AGENTS.override.md
+/.cursor/*.local.*

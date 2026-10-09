@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "sceptic-claude",
+  "purpose": "Tries to disprove each claim the analysis relies on",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "research-sceptic"
+  ]
+}

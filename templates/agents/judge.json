@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "judge",
+  "purpose": "Settles claims and ideas from anonymous reviews",
+  "provider": "cursor",
+  "model": "grok-4.7-high",
+  "access": "read-only",
+  "skills": [
+    "research-judge"
+  ]
+}

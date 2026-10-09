@@ -1,0 +1,37 @@
+---
+id: index
+title: Research Center knowledge index
+status: active
+summary: Entry point to the RC's own architecture, decisions, rules, glossary and debt. Read only the notes a task needs.
+verified_at: 2026-10-09
+evidence:
+  - AGENTS.md
+  - rc
+relations:
+  - docs/architecture/research-center.md
+---
+
+# Research Center knowledge index
+
+## Architecture
+
+- [Research Center architecture](architecture/research-center.md): stages, files, roles and how they connect.
+
+## Decisions
+
+- [0001 Template, private instances, no product code](decisions/0001-template-and-instances.md)
+- [0002 Committed extracted sources with redaction](decisions/0002-committed-extracted-sources.md)
+- [0003 Read-only agents and copied provider code](decisions/0003-read-only-agents.md)
+- [0004 Research pipeline and citation contract](decisions/0004-research-pipeline.md)
+- [0005 Rule hooks](decisions/0005-rule-hooks.md)
+- [0006 Call budgets and resumable runs](decisions/0006-budgets-and-resume.md)
+
+## Rules
+
+- [Knowledge layout](rules/knowledge-layout.md)
+
+## Glossary, debt and hacks
+
+- [Glossary](glossary/index.md)
+- [Tech debt](debt/index.md)
+- [Hacks](hacks/index.md)

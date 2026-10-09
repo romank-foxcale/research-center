@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "connector-reader",
+  "purpose": "Reads Notion pages and Drive documents verbatim through the user's claude.ai connectors",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "connector-read",
+  "skills": [
+    "ingest-connector"
+  ],
+  "connectors": ["notion", "gdrive"]
+}

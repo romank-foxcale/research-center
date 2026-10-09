@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "profiler",
+  "purpose": "Reduces every digest into the cited profile of the user or company",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "ingest-profile"
+  ]
+}

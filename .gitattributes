@@ -1,0 +1,7 @@
+# Keep Unix line endings even when cloned on Windows: bash, Nix and Python
+# scripts break with CRLF. PowerShell and cmd scripts are the exceptions.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.cmd text eol=crlf
