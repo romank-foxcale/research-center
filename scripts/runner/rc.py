@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -32,6 +33,14 @@ class RcError(RuntimeError):
 
 class BudgetExceeded(RcError):
     pass
+
+
+# What a check raises on a reply that is malformed rather than wrong: a retry can fix both.
+REJECTED = (ValueError, TypeError, AttributeError, KeyError)
+
+
+def describe(error: BaseException) -> str:
+    return str(error) if isinstance(error, ValueError) else f"malformed reply ({type(error).__name__}: {error})"
 
 
 def today() -> str:
@@ -76,10 +85,34 @@ def skill_text(root: Path, name: str) -> str:
     return re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.DOTALL).strip()
 
 
+FENCE = re.compile(r"^(`{3,})\s*(\S*)\s*$")
+
+
+def fenced_blocks(reply: str) -> list[tuple[str, str]]:
+    """Every fenced block of a reply as (language, body). A fence closes only on a bare fence of at least the
+    opening length, so a ```python block before the ```json one does not shift the pairing."""
+    blocks: list[tuple[str, str]] = []
+    opening, language, body = "", "", []
+    for line in reply.splitlines():
+        match = FENCE.match(line.strip())
+        if not opening:
+            if match:
+                opening, language, body = match.group(1), match.group(2).lower(), []
+        elif match and not match.group(2) and len(match.group(1)) >= len(opening):
+            blocks.append((language, "\n".join(body)))
+            opening = ""
+        else:
+            body.append(line)
+    return blocks
+
+
 def extract_json(reply: str) -> Any:
-    """The last fenced ```json block of a reply, or the whole reply when it is bare JSON."""
-    blocks = re.findall(r"```(?:json)?\s*\n(.*?)\n```", reply, flags=re.DOTALL)
-    for candidate in reversed(blocks):
+    """The last parseable fenced ```json block of a reply, else the last parseable untagged block, else the whole
+    reply when it is bare JSON."""
+    blocks = fenced_blocks(reply)
+    tagged = [body for language, body in blocks if language == "json"]
+    untagged = [body for language, body in blocks if not language]
+    for candidate in [*reversed(tagged), *reversed(untagged)]:
         try:
             return json.loads(candidate)
         except json.JSONDecodeError:
@@ -102,6 +135,8 @@ class Session:
         self.lock = threading.Lock()
         self.active: dict[str, Path] = {}
         self.watchdog = events.Watchdog(self.events, self.activity)
+        # Where call_checked keeps accepted replies so a failed or interrupted stage resumes per call; None keeps nothing.
+        self.replies: Path | None = None
 
     def activity(self) -> dict[str, tuple[float, str]]:
         with self.lock:
@@ -153,20 +188,44 @@ class Session:
         return reply
 
     def call_checked(self, role_id: str, body: str, label: str, check: Callable[[str], Any]) -> Any:
-        """call(), then check(reply); on a ValueError the role gets one retry with the problems listed."""
+        """call(), then check(reply); a reply that fails the check gets one retry with the problems listed.
+
+        A wrong shape (a list where an object was asked, a missing key) is a rejected reply like any other.
+        With self.replies set, an accepted reply is kept there at once and reused by a later run with the same
+        prompt, so a sibling's failure or an interruption never costs a paid call twice."""
+        cache = self.replies / f"{label}.json" if self.replies else None
+        digest = hashlib.sha256(f"{role_id}\n{body}".encode()).hexdigest()
+        if cache and cache.is_file():
+            kept = load_json(cache)
+            if kept.get("prompt") == digest:
+                try:
+                    result = check(kept["reply"])
+                    self.events.emit("agent", f"{label}: reusing the accepted reply of an earlier run")
+                    return result
+                except REJECTED:
+                    pass  # the checks changed since; ask again
         reply = self.call(role_id, body, label)
         try:
-            return check(reply)
-        except ValueError as error:
-            self.events.emit("warn", f"{label}: reply rejected ({error}); retrying once")
+            result = check(reply)
+        except REJECTED as error:
+            problem = describe(error)
+            self.events.emit("warn", f"{label}: reply rejected ({problem}); retrying once")
             retry = (
-                f"{body}\n\n# Your previous reply was rejected\n\n{error}\n\n"
+                f"{body}\n\n# Your previous reply was rejected\n\n{problem}\n\n"
                 f"Previous reply:\n\n{reply[:20000]}\n\nAnswer again, fixing exactly these problems."
             )
-            return check(self.call(role_id, retry, f"{label}-retry"))
+            reply = self.call(role_id, retry, f"{label}-retry")
+            try:
+                result = check(reply)
+            except REJECTED as error:
+                raise ValueError(f"{label}: reply rejected twice: {describe(error)}") from error
+        if cache:
+            write_json(cache, {"prompt": digest, "reply": reply})
+        return result
 
     def parallel(self, jobs: list[tuple[str, Callable[[], Any]]], workers: int = 4) -> dict[str, Any]:
-        """Run labelled jobs at once; the first failure is raised after every job ended."""
+        """Run labelled jobs at once; the first failure is raised after every job ended. Jobs that finished
+        keep their accepted replies through call_checked, so a re-run repeats only the failed ones."""
         results: dict[str, Any] = {}
         errors: list[BaseException] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:

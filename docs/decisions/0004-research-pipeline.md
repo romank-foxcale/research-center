@@ -3,7 +3,7 @@ id: decision.0004-research-pipeline
 title: Research is a fixed seven-stage pipeline with a claims ledger every later stage must cite
 status: accepted
 summary: plan, collect, analyze, critique, judge, apply and report each commit an output under research/<topic>; claims carry a stored page and a checked quote, sceptics review independently, the judge sees anonymous labels, and the report may only cite claims judged HOLDS or WEAK.
-verified_at: 2026-10-09
+verified_at: 2026-10-10
 evidence:
   - scripts/research/research.py
   - scripts/research/research_test.py
@@ -23,7 +23,7 @@ The user wants a system that decides where to look, how to store and analyze wha
 ## Decision
 
 - **plan**: one role turns the brief into search avenues, each with a reason and the questions it serves.
-- **collect**: the researchers (Claude and GPT by default) work in parallel and independently. The runner merges sources by URL and downloads every cited page into `sources/web-<topic>/`. A claim's quote is verified when it, or 80% of its five-word runs, is found in the stored text.
+- **collect**: the researchers (Claude and GPT by default) work in parallel and independently. The runner merges sources by URL and downloads every cited page into `sources/web-<topic>/`. A claim's quote of at least six words is verified when it is found in the stored text as whole words, or when 80% of its five-word runs are found and every run holding a number or a negation is among them. Sources past `maxSourcesPerResearcher` are dropped together with the claims citing them.
 - **analyze**: answers per question and an ideas list. Cited claim ids must exist.
 - **critique**: sceptics (Claude, GPT, Grok) judge every cited claim as HOLDS, WEAK, REFUTED or UNSUPPORTED, with the burden of proof on the claim. Committed reviews are named review-a, review-b, ... in shuffled order. Which role wrote which stays in `.rc-local`.
 - **judge**: sees only Review A, B, C, and settles claims and ideas (SURVIVES, WEAKENED, FALLS). A claim refuted by any reviewer but kept by the judge is recorded as contested and shown in the report.

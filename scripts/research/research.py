@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import random
 import re
@@ -52,9 +53,18 @@ RINGS = ("ADOPT", "TRIAL", "ASSESS", "HOLD")
 EFFORTS = ("S", "M", "L")
 SECTIONS = ("Topic", "Questions", "Scope", "Out of scope", "Our needs", "Success criteria", "Source preferences")
 QUESTION = re.compile(r"^- (Q\d+):\s*(\S.*)$", re.MULTILINE)
-CLAIM_REF = re.compile(r"\[(C\d+)\]")
+# One bracket may cite several claims: [C3], [C3, C7] and [C3; C7] all count.
+CLAIM_REF = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 IDEA_ID = re.compile(r"I\d+")
 SOURCE_KINDS = ("paper", "docs", "blog", "repo", "news", "forum", "talk", "other")
+MIN_QUOTE_WORDS = 6
+# Words a quote must never lose or gain in a fuzzy match: they flip or change what it says.
+NEGATIONS = frozenset({"not", "no", "never", "none", "nor", "without", "cannot", "t"})
+
+
+def claim_refs(text: str) -> list[str]:
+    """Every claim id cited in text, in order of appearance."""
+    return [claim for group in CLAIM_REF.findall(text) for claim in re.split(r"\s*[,;]\s*", group)]
 
 
 # Topics and briefs ----------------------------------------------------------------------------------------
@@ -213,15 +223,19 @@ def normalized(text: str) -> str:
 
 
 def quote_found(quote: str, text: str) -> bool:
-    """True when the quote is in the stored page: whole, or 80% of its five-word runs (conversion reflows text)."""
-    needle, haystack = normalized(quote), normalized(text)
-    if not needle:
-        return False
-    if needle in haystack:
-        return True
+    """True when a quote of at least MIN_QUOTE_WORDS words is in the stored page as whole words: entirely, or
+    80% of its five-word runs (conversion reflows text). In the fuzzy case every run holding a number or a
+    negation must match, so "improved by 7 points" never verifies against a page that says 2."""
+    needle, haystack = normalized(quote), f" {normalized(text)} "
     words = needle.split()
-    runs = [" ".join(words[index:index + 5]) for index in range(max(1, len(words) - 4))]
-    return len(words) >= 5 and sum(run in haystack for run in runs) >= 0.8 * len(runs)
+    if len(words) < MIN_QUOTE_WORDS:
+        return False
+    if f" {needle} " in haystack:
+        return True
+    runs = [words[index:index + 5] for index in range(len(words) - 4)]
+    found = [f" {' '.join(run)} " in haystack for run in runs]
+    critical = [hit for run, hit in zip(runs, found) if any(word.isdigit() or word in NEGATIONS for word in run)]
+    return all(critical) and sum(found) >= 0.8 * len(runs)
 
 
 def canonical_url(url: str) -> str:
@@ -234,20 +248,29 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
     limit = config["research"]["maxSourcesPerResearcher"]
 
     def check(data: Any) -> dict[str, Any]:
-        if not isinstance(data, dict) or not data.get("sources") or not data.get("claims"):
+        if not isinstance(data, dict) or not isinstance(data.get("sources"), list) or not isinstance(data.get("claims"), list) \
+                or not data["sources"] or not data["claims"]:
             raise ValueError("expected {\"sources\": [...], \"claims\": [...]} with at least one of each")
-        refs = {source.get("ref") for source in data["sources"]}
+        # Sources past the limit are dropped with the claims citing them before anything else is checked, so
+        # the merge below never meets a claim whose source is gone.
+        kept = data["sources"][:limit]
+        refs = {source.get("ref") for source in kept}
+        everything = {source.get("ref") for source in data["sources"]}
+        unknown = [claim for claim in data["claims"] if claim.get("source") not in everything]
+        if unknown:
+            raise ValueError(f"claim {unknown[0].get('text', '')[:60]!r} cites unknown source {unknown[0].get('source')}")
+        data = {**data, "sources": kept, "claims": [claim for claim in data["claims"] if claim.get("source") in refs],
+                "overLimit": len(data["sources"]) - len(kept)}
+        if not data["claims"]:
+            raise ValueError(f"no claim cites one of the first {limit} sources; list at most {limit} sources")
         for source in data["sources"]:
             if not str(source.get("url", "")).startswith(("http://", "https://")):
                 raise ValueError(f"source {source.get('ref')} needs an http(s) url")
         for claim in data["claims"]:
-            if claim.get("source") not in refs:
-                raise ValueError(f"claim {claim.get('text', '')[:60]!r} cites unknown source {claim.get('source')}")
             if not claim.get("text") or not claim.get("quote"):
                 raise ValueError(f"claim {claim.get('text', '')[:60]!r} needs text and a verbatim quote")
             if set(claim.get("questions", [])) - known:
                 raise ValueError(f"claim {claim.get('text', '')[:60]!r} refers to unknown questions")
-        data["sources"] = data["sources"][:limit]
         return data
 
     body = (
@@ -264,6 +287,8 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
     claims: list[dict[str, Any]] = []
     for role_id in researchers:
         reply = replies[role_id]
+        if reply["overLimit"]:
+            session.say(f"collect-{role_id}: {reply['overLimit']} sources past the limit of {limit} dropped with their claims", "warn")
         local = {}
         for source in reply["sources"]:
             key = canonical_url(source["url"])
@@ -285,7 +310,8 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
     for entry in merged.values():
         try:
             stored, text, extractor, data = ingest.url_document(entry["url"])
-        except (extract.Skip, urllib.error.URLError, OSError, ValueError) as reason:
+        # One unreadable page is recorded and skipped; it never fails a stage whose replies are already paid for.
+        except (extract.Skip, urllib.error.URLError, http.client.HTTPException, subprocess.TimeoutExpired, OSError, ValueError) as reason:
             entry["fetch"] = f"failed: {str(reason)[:160]}"
             entry["stored"] = None
             skipped.append({"origin": entry["url"], "reason": entry["fetch"]})
@@ -344,7 +370,7 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
         if not isinstance(ideas, dict) or not ideas.get("ideas"):
             raise ValueError("end with a ```json block {\"ideas\": [{\"id\": \"I1\", \"name\", \"summary\", \"claims\": [...]}]}")
         markdown = re.sub(r"```json\s*\n.*?\n```\s*\Z", "", reply.strip(), flags=re.DOTALL).strip()
-        unknown = set(CLAIM_REF.findall(markdown)) - claim_ids
+        unknown = set(claim_refs(markdown)) - claim_ids
         for idea in ideas["ideas"]:
             if not IDEA_ID.fullmatch(str(idea.get("id", ""))) or not idea.get("name"):
                 raise ValueError(f"idea {idea} needs an id like I1 and a name")
@@ -365,7 +391,7 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
 
 def cited_claims(root: Path, topic: str) -> list[str]:
     directory = topic_dir(root, topic)
-    cited = set(CLAIM_REF.findall((directory / "analysis.md").read_text(encoding="utf-8")))
+    cited = set(claim_refs((directory / "analysis.md").read_text(encoding="utf-8")))
     for idea in rc.load_json(directory / "ideas.json")["ideas"]:
         cited |= set(idea.get("claims", []))
     return sorted(cited, key=lambda value: int(value[1:]))
@@ -485,7 +511,7 @@ def stage_apply(session: rc.Session, root: Path, topic: str) -> None:
                 problems.append(f"{fit.get('idea')}: sources {sorted(unknown)} are not ingested sources")
             text = json.dumps(fit)
             problems += [f"{fit.get('idea')}: cites missing {path}" for path in ingest.CITATION.findall(text) if not (root / path).is_file()]
-            problems += [f"{fit.get('idea')}: cites unknown claim {claim}" for claim in set(CLAIM_REF.findall(text)) - claim_ids]
+            problems += [f"{fit.get('idea')}: cites unknown claim {claim}" for claim in set(claim_refs(text)) - claim_ids]
             if not fit.get("rationale"):
                 problems.append(f"{fit.get('idea')}: rationale is empty")
         if problems:
@@ -556,7 +582,7 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
 
     def check(reply: str) -> str:
         markdown = re.sub(r"\A---\n.*?\n---\n", "", reply.strip(), flags=re.DOTALL).strip()
-        cited = set(CLAIM_REF.findall(markdown))
+        cited = set(claim_refs(markdown))
         problems = [f"cites {claim}, which is not in the ledger" for claim in sorted(cited) if claim not in {c["id"] for c in led["claims"]}]
         problems += [f"relies on {claim}, judged {verdicts[claim]}: drop it or name it as refuted outside a [C#] citation"
                      for claim in sorted(cited) if verdicts.get(claim) in ("REFUTED", "UNSUPPORTED")]
@@ -574,7 +600,7 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
     markdown = session.call_checked(config["pipeline"]["reporter"], body, "report", check)
     sources = {source["id"]: source for source in led["sources"]}
     claims = {claim["id"]: claim for claim in led["claims"]}
-    used = sorted(set(CLAIM_REF.findall(markdown)), key=lambda value: int(value[1:]))
+    used = sorted(set(claim_refs(markdown)), key=lambda value: int(value[1:]))
     appendix = ["", "## Evidence", "", "| Claim | Verdict | Quote verified | Source |", "| --- | --- | --- | --- |"]
     for claim_id in used:
         claim, source = claims[claim_id], sources[claims[claim_id]["source"]]
@@ -603,7 +629,14 @@ RUNNERS = {
 }
 
 
-def clear_from(root: Path, topic: str, stage: str) -> None:
+def replies_dir(root: Path, topic: str, stage: str) -> Path:
+    """Accepted replies of a stage that has not finished yet (ignored run state; see Session.replies)."""
+    return root / ".rc-local" / "research" / topic / "replies" / stage
+
+
+def clear_from(root: Path, topic: str, stage: str, keep_replies: bool = False) -> None:
+    """Remove the outputs of stage and every later one, and their kept replies. keep_replies spares the replies
+    of stage itself: a stage that stopped half way resumes from the calls it already paid for."""
     directory = topic_dir(root, topic)
     for later in STAGES[STAGES.index(stage):]:
         for name in OUTPUTS[later]:
@@ -612,6 +645,8 @@ def clear_from(root: Path, topic: str, stage: str) -> None:
                 shutil.rmtree(path)
             else:
                 path.unlink(missing_ok=True)
+        if not (keep_replies and later == stage):
+            shutil.rmtree(replies_dir(root, topic, later), ignore_errors=True)
 
 
 def run_research(root: Path, topic: str, start: str | None, budget: int | None) -> int:
@@ -629,11 +664,14 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
         return 0
     # Later stages read earlier outputs, so a gap means everything after it is redone.
     first = STAGES.index(todo[0])
-    clear_from(root, topic, STAGES[first])
+    clear_from(root, topic, STAGES[first], keep_replies=True)
     with rc.Session(root, f"research-{topic}", budget or config["budget"]["researchCalls"]) as session:
         for stage in STAGES[first:]:
             session.say(f"stage {stage} ({STAGES.index(stage) + 1}/{len(STAGES)})")
+            session.replies = replies_dir(root, topic, stage)
             RUNNERS[stage](session, root, topic)
+            # The committed outputs now hold what the replies said.
+            shutil.rmtree(session.replies, ignore_errors=True)
         session.say(f"report ready: research/{topic}/report.md ({session.calls} agent calls); review, then commit research/ and sources/", "gate")
     return 0
 
@@ -667,7 +705,7 @@ def main() -> int:
             command_show(root, args)
         else:
             return run_research(root, args.topic, args.start, args.budget)
-    except (rc.RcError, OSError, subprocess.CalledProcessError, ValueError, KeyError) as error:
+    except (rc.RcError, rc.providers.ProviderError, OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0

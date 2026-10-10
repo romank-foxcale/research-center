@@ -28,6 +28,7 @@ import research  # noqa: E402
 PAPER = "https://example.org/paper"
 BLOG = "https://www.example.org/paper/"  # the same page as PAPER once canonical
 DEAD = "https://dead.example.org/post"
+EXTRA = "https://extra.example.org/post"  # past the source limit of 2
 PAGE = "Hybrid retrieval combines lexical and dense signals and improves recall on every benchmark we tried in production."
 CALLS: list[str] = []
 SEEN_PROMPTS: dict[str, str] = {}
@@ -57,13 +58,19 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                  {"text": "Hybrid retrieval is production ready.", "source": "S1", "questions": ["Q1"],
                                   "quote": "a sentence that is nowhere on the page at all, really"}]})
     if role_id == "researcher-gpt":
+        # The first reply is malformed (a claim that is a bare string): a wrong shape is retried like a wrong answer.
+        malformed = [] if retry else ["dense is better"]
         return block({"sources": [{"ref": "A", "url": BLOG, "title": "Same paper", "kind": "blog"},
-                                  {"ref": "B", "url": DEAD, "title": "Dead post", "kind": "forum"}],
+                                  {"ref": "B", "url": DEAD, "title": "Dead post", "kind": "forum"},
+                                  {"ref": "C", "url": EXTRA, "title": "Over the limit", "kind": "blog"}],
                       "claims": [{"text": "Dense retrieval alone is always better.", "source": "B", "questions": ["Q1"],
-                                  "quote": "dense always wins"}]})
+                                  "quote": "dense always wins"},
+                                 {"text": "A claim on a source past the limit.", "source": "C", "questions": ["Q1"],
+                                  "quote": "this source is dropped with its claim"}, *malformed]})
     if role_id == "analyst":
         cite = "C99" if not retry else "C2"
-        return f"## Summary\n\nHybrid wins.\n\n## Q1: Which retrieval?\n\nHybrid [C1] [{cite}]. Not dense [C3].\n\n" + block(
+        python = "```python\nprint('a code sample before the JSON block')\n```\n\n"
+        return f"## Summary\n\nHybrid wins.\n\n{python}## Q1: Which retrieval?\n\nHybrid [{cite}]. Not dense [C1; C3].\n\n" + block(
             {"ideas": [{"id": "I1", "name": "Hybrid retrieval", "summary": "BM25 plus dense.", "claims": ["C1"]},
                        {"id": "I2", "name": "Dense only", "summary": "Embeddings only.", "claims": ["C3"]}]})
     if role_id.startswith("sceptic-"):
@@ -81,7 +88,7 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
         return block({"fits": [{"idea": "I1", "ring": "TRIAL", "sources": ["git-api"], "replaces": "keyword | search", "effort": "M",
                                 "risks": "embedding cost", "rationale": "Recall matters for us [C1].", "nextStep": "Shadow-run it."}]})
     if role_id == "reporter":
-        cite = "[C3]" if not retry else "the dense-only claim"
+        cite = "[C1, C3]" if not retry else "the dense-only claim"
         return f"# Retrieval\n\n## TL;DR\n\n- Hybrid [C1].\n\n## Q1: Which retrieval?\n\nHybrid [C1], weakly [C2]; not {cite}.\n"
     raise AssertionError(f"unexpected role {role_id}")
 
@@ -93,6 +100,7 @@ def make_instance(base: Path) -> Path:
     shutil.copytree(REPO / ".agents", root / ".agents")
     shutil.copytree(REPO / "templates", root / "templates")
     settings = json.loads((REPO / "templates" / "research-center.json").read_text())
+    settings["research"]["maxSourcesPerResearcher"] = 2
     (root / "research-center.json").write_text(json.dumps({**settings, "name": "test"}))
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     # An ingested repo read from a local path: handoffs must name its remote, not the path.
@@ -142,8 +150,19 @@ def main() -> int:
     ingest.url_document = fake_page
     ingest.guard = lambda root, lookup=None: None
 
-    assert research.quote_found("tried in production", PAGE) and not research.quote_found("never said", PAGE)
+    assert research.quote_found("recall on every benchmark we tried in production", PAGE)
+    assert not research.quote_found("never said anything like this at all", PAGE)
     assert research.quote_found("lexical and dense signals and improves recall on every", "x " + PAGE.replace(" and ", "\nand "))
+    assert not research.quote_found("tried in production", PAGE), "a quote shorter than six words never verifies"
+    assert not research.quote_found("ok", "look at this"), "whole words only"
+    seven = "The hybrid model improved exact match by 7 points over the dense baseline on all three of our internal benchmarks"
+    assert research.quote_found(seven, "Intro. " + seven + " More.")
+    assert not research.quote_found(seven, seven.replace(" 7 ", " 2 ")), "a changed number never verifies"
+    negated = "Hybrid retrieval does not improve recall on the benchmarks we ran in production this year at all"
+    assert not research.quote_found(negated, negated.replace(" not ", " ")), "a lost negation never verifies"
+    assert research.claim_refs("Yes [C3, C7] and [C1; C2] and [C9].") == ["C3", "C7", "C1", "C2", "C9"]
+    assert rc.extract_json('Code:\n```python\nx = 1\n```\n\nData:\n```json\n{"a": 1}\n```') == {"a": 1}
+    assert rc.extract_json('```\n{"b": 2}\n```\n\n```mermaid\ngraph TD\n```') == {"b": 2}
     assert research.canonical_url(PAPER) == research.canonical_url(BLOG)
 
     with tempfile.TemporaryDirectory() as directory:
@@ -162,6 +181,8 @@ def main() -> int:
         assert json.loads((root / "catalog" / "sources" / "web-retrieval.json").read_text())["origin"] == "research:retrieval"
 
         assert CALLS.count("analyst") == 2 and CALLS.count("reporter") == 2, f"one retry each: {CALLS}"
+        assert CALLS.count("researcher-gpt") == 2, f"a malformed reply is retried: {CALLS}"
+        assert EXTRA not in json.dumps(ledger), "a source past the limit is dropped with its claim"
         assert "C99" in SEEN_PROMPTS["analyst"], "the retry names the problem"
 
         reviews = sorted(path.name for path in (topic / "critique").glob("*.json"))
@@ -215,6 +236,13 @@ def main() -> int:
         except rc.BudgetExceeded:
             pass
         assert (topic / "analysis.md").is_file() and not (topic / "report.md").exists()
+        # The sceptics that answered before the budget ran out are not paid for again.
+        replies = root / ".rc-local" / "research" / "retrieval" / "replies"
+        assert len(list((replies / "critique").glob("*.json"))) == 2, list(replies.rglob("*"))
+        CALLS.clear()
+        quiet(research.run_research, root, "retrieval", None, None)
+        assert sum(call.startswith("sceptic-") for call in CALLS) == 1 and CALLS[-1] == "reporter", CALLS
+        assert not any(replies.rglob("*.json")), "finished stages keep no replies"
     print("research test passed")
     return 0
 
