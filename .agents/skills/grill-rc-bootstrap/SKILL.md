@@ -23,10 +23,15 @@ First read `BOOTSTRAP.md`. Keep grilling until every step below is verified, not
    - `./rc settings` shows each role and its pipeline slot. Ask which subscriptions the user has. Move roles off a missing provider with `./rc roles set <role> --provider ... --model ...`.
    - Researchers need web access (claude or codex). The connector reader needs claude. Cursor roles are read-only.
    - Notion and Drive ingest need those claude.ai connectors to be connected for the user's Claude account (`claude mcp list`).
-7. **Budgets and limits**: agree `budget.ingestCalls`, `budget.researchCalls`, `ingest.maxSourceBytes` and `research.maxSourcesPerResearcher`. A run that hits a budget stops and can resume.
-8. Replace the template README with this RC's purpose. Keep `GUIDE.md`, `install/`, `CLAUDE.md` and `.claude/skills`: they are the entry point for people and AI tools.
-9. `./rc agents sync`, `./rc check`, set the status to `ready`, and commit with the user's go-ahead.
-10. Hand over: point the RC at the user's material first (rc-ingest), or grill a topic from scratch (grill-research-topic)?
+7. **Budgets and limits**: agree `budget.ingestCalls`, `budget.researchCalls`, `budget.refreshCalls`, `ingest.maxSourceBytes`, `research.maxSourcesPerResearcher`, `research.resultsPerQuery` and `research.snowballDepth` (0 turns snowballing off). A run that hits a budget stops and can resume.
+8. **Sources**:
+   - `./rc sources list` shows the adapters every topic can use.
+   - `./rc sources packs` shows the domain packs. Enable the ones the RC's purpose calls for (`./rc sources enable medicine`, `software`).
+   - OpenAlex and Crossref serve requests faster when they know a contact email. Ask whether the user wants to share one, and set `research.contactEmail` only if they say yes. The default is none.
+9. **Living topics**: explain that a topic with a cadence is refreshed with `./rc research refresh --due`. Offer to schedule it (cron or Task Scheduler, GUIDE.md) once the first living topic exists.
+10. Replace the template README with this RC's purpose. Keep `GUIDE.md`, `install/`, `CLAUDE.md` and `.claude/skills`: they are the entry point for people and AI tools.
+11. `./rc agents sync`, `./rc check`, set the status to `ready`, and commit with the user's go-ahead.
+12. Hand over: point the RC at the user's material first (rc-ingest), or grill a topic from scratch (grill-research-topic)?
 
 ## Migration
 

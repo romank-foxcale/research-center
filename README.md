@@ -1,6 +1,6 @@
 # Research Center
 
-An AI research assistant you run with your own Claude, ChatGPT and Cursor subscriptions. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, critiqued by sceptics and fitted to your own projects.
+An AI research assistant you run with your own Claude, ChatGPT and Cursor subscriptions, on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
 
 ```text
 ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
@@ -14,11 +14,11 @@ ingest (optional) → grill → plan → search → screen → collect → analy
 | search | The runner queries the adapters (scholarly works, books, news, feeds, watched pages); every query logged | `searches.json` |
 | screen | Each result included or excluded against the criteria, with a reason; references and citations of the key works followed and screened too; retractions dropped | `screening.md` |
 | collect | Claude and GPT read the included records and search the web in parallel; every cited page is stored and every quote checked against it | `claims.md`, `sources/web-<topic>/` |
-| analyze | Each question answered from the claims ledger, ideas compared | `analysis.md` |
-| critique | Claude, GPT and Grok try to disprove every claim the analysis uses | `critique/` |
-| judge | Grok settles the anonymous reviews; contested claims are flagged for you | `judgement.md` |
+| analyze | Each question answered from the claims ledger; competing hypotheses weighed in a matrix; key assumptions named | `analysis.md` |
+| critique | Claude, GPT and Grok try to disprove every claim and assumption the analysis uses | `critique/` |
+| judge | Grok settles the anonymous reviews, grades each claim's credibility and each answer's certainty; contested claims are flagged for you | `judgement.md` |
 | apply | Surviving ideas ranked ADOPT, TRIAL, ASSESS or HOLD against your repos and needs | `fit.md`, `handoff.md` |
-| report | The answer, citing only claims that survived | `report.md` |
+| report | The answer, citing only claims that survived, with calibrated likelihood words, the certainty of each answer and how the sources were found | `report.md` |
 
 A brief with a cadence makes the topic **living**: `./rc research refresh` re-runs its searches, screens only what is new, re-derives the conclusions when new verified evidence arrives, and writes a delta of what changed and what needs your review.
 
@@ -81,9 +81,9 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc ingest add folder /mnt/c/Users/me/Papers --include '*.pdf'
 ./rc ingest add notion https://www.notion.so/... --depth 2
 ./rc ingest run                               fetch, digest, profile
-./rc research new agent-memory --title "Long-term memory for coding agents"
-./rc research accept agent-memory             after grilling
-./rc research run agent-memory                then ./rc watch
+./rc research new four-day-week --title "Does a four-day week keep output stable?"
+./rc research accept four-day-week            after grilling
+./rc research run four-day-week               then ./rc watch
 ./rc research refresh --due                   keep living topics current (schedule it)
 ./rc sources list                             adapters beyond web search
 ./rc sources search openalex "four-day work week" --since 2023-01-01
