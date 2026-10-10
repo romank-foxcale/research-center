@@ -46,8 +46,8 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 | Practice | Point adopted | RC mechanism | WP |
 | --- | --- | --- | --- |
 | Living systematic review | Saved searches re-run on a fixed cadence | `watch.json` with queries per adapter and question, `cadence`, `lastChecked` | WP4 |
-| Living systematic review | Screen only what is new since the last search | `seen.json` keyed by DOI, canonical URL or adapter id, with first-seen date and decision | WP4 |
-| Living systematic review | Update the conclusion only on material change | Refresh re-runs analyze, apply and report only when a verdict, an answer's certainty or a fit ring would change; otherwise the delta says "no material change" | WP4 |
+| Living systematic review | Screen only what is new since the last search | screening.json is the seen set: every record keyed by DOI or canonical URL, with its decision and when it was added | WP4 |
+| Living systematic review | Update the conclusion only on material change | Refresh re-derives the conclusions only when new quote-verified evidence entered the ledger (predicting a verdict change costs the same as re-deriving); otherwise the delta says "no material change" | WP4 |
 | Living systematic review | Explicit living status and retirement criteria | Brief section `Living`: cadence, retire-when; topic status `living`, `paused`, `retired` | WP4 |
 | Living systematic review | Version every published state | Each refresh commits `delta/<date>.md`; the report header shows version, last checked and last changed; git holds history | WP4 |
 | PRISMA 2020 | Flow of identified, duplicates, screened, excluded with reasons, included | `screening.json` per candidate; the report appendix prints the flow counts | WP2 |
@@ -92,7 +92,7 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 - **Budgets.** A new `budget.refreshCalls` (default 8). Screening is batched (up to 40 records per call). A refresh that would exceed the budget stops in a resumable state, as in `docs/decisions/0006-budgets-and-resume.md`.
 - **No silent widening.** An adapter that errors or hits its rate limit is reported in the run and in `searches.json` (status, count 0). Its earlier records are kept, never deleted.
 - **Tests never touch the network.** Each adapter ships recorded responses under `scripts/sources/fixtures/`, and its tests replay them. The Nix sandbox has no network anyway.
-- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, then living topics and refresh, and evidence grading and certainty.
+- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, 0009 living topics, then evidence grading and certainty.
 
 ## Open questions
 

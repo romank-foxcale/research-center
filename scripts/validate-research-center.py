@@ -116,6 +116,9 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
             errors.append(f"{label}: pipeline.{slot} names role {identifier!r}, which is not in {roles_dir.relative_to(root)}")
         elif roles[identifier].get("access") != access:
             errors.append(f"{label}: pipeline.{slot} needs {access} access; role {identifier} has {roles[identifier].get('access')}")
+    refresh = settings.get("budget", {}).get("refreshCalls", 16)
+    if not isinstance(refresh, int) or isinstance(refresh, bool) or refresh <= 0:
+        errors.append(f"{label}: budget.refreshCalls must be a positive integer")
     for key in COUNTS:
         value = settings.get("research", {}).get(key, 0)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:

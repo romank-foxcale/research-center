@@ -24,6 +24,7 @@ import ingest  # noqa: E402
 import kit  # noqa: E402
 import providers  # noqa: E402
 import rc  # noqa: E402
+import living  # noqa: E402
 import research  # noqa: E402
 import sources_test  # noqa: E402  (its fixture transport answers the adapter searches)
 
@@ -48,8 +49,10 @@ PLAN = {
     ],
 }
 PAGE = "Hybrid retrieval combines lexical and dense signals and improves recall on every benchmark we tried in production."
+NEW = "https://doi.org/10.5555/w700"  # the record a refresh finds: hybrid retrieval loses in a new trial
 CALLS: list[str] = []
 SEEN_PROMPTS: dict[str, str] = {}
+PHASE = {"refresh": False}  # after the refresh finds NEW, the analysis cites C5 and the judge weakens C1
 
 
 def fake_page(url: str):
@@ -78,6 +81,12 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
             {"id": item["id"], "decision": "exclude", "criterion": "X1", "reason": "an older release"} if "2024" in item["url"]
             else {"id": item["id"], "decision": "include", "questions": ["Q1"], "reason": "bears on recall"}
             for item in candidates]})
+    if role_id.startswith("researcher-") and "A refresh of research" in prompt:
+        assert NEW in prompt and "Do not search the web" in prompt, "a refresh shows only the new records"
+        quote = "Hybrid retrieval lost recall to dense retrieval in our new production trial" if role_id == "researcher-claude" \
+            else "lost recall to dense retrieval in our new production trial"
+        return block({"sources": [{"ref": "N", "url": NEW, "title": "New trial", "kind": "paper"}],
+                      "claims": [{"text": f"In a new trial hybrid lost recall ({role_id}).", "source": "N", "questions": ["Q1"], "quote": quote}]})
     if role_id == "researcher-claude":
         return block({"sources": [{"ref": "S1", "url": PAPER, "title": "Paper | Site", "published": "2026-01-01", "kind": "paper"}],
                       "claims": [{"text": "Hybrid retrieval improves recall.", "source": "S1", "questions": ["Q1"], "type": "benchmark",
@@ -101,18 +110,22 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
     if role_id == "analyst":
         cite = "C99" if not retry else "C2"
         python = "```python\nprint('a code sample before the JSON block')\n```\n\n"
-        return f"## Summary\n\nHybrid wins.\n\n{python}## Q1: Which retrieval?\n\nHybrid [{cite}]. Not dense [C1; C3].\n\n" + block(
+        update = " A new trial disagrees [C5]." if PHASE["refresh"] else ""
+        return f"## Summary\n\nHybrid wins.\n\n{python}## Q1: Which retrieval?\n\nHybrid [{cite}]. Not dense [C1; C3].{update}\n\n" + block(
             {"ideas": [{"id": "I1", "name": "Hybrid retrieval", "summary": "BM25 plus dense.", "claims": ["C1"]},
                        {"id": "I2", "name": "Dense only", "summary": "Embeddings only.", "claims": ["C3"]}]})
     if role_id.startswith("sceptic-"):
         refute = role_id == "sceptic-grok"
+        update = [{"claim": "C5", "verdict": "HOLDS", "reason": "in the new trial's abstract"}] if PHASE["refresh"] else []
         return block({"claims": [{"claim": "C1", "verdict": "HOLDS", "reason": "on the page"},
                                  {"claim": "C2", "verdict": "REFUTED" if refute else "WEAK", "reason": "not on the page"},
-                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "page not stored"}], "analysis": []})
+                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "page not stored"}, *update], "analysis": []})
     if role_id == "judge":
-        return block({"claims": [{"claim": "C1", "verdict": "HOLDS", "reason": "all agree"},
+        refreshed = PHASE["refresh"]
+        update = [{"claim": "C5", "verdict": "HOLDS", "reason": "the new trial"}] if refreshed else []
+        return block({"claims": [{"claim": "C1", "verdict": "WEAK" if refreshed else "HOLDS", "reason": "a new trial disagrees" if refreshed else "all agree"},
                                  {"claim": "C2", "verdict": "WEAK", "reason": "kept as weak"},
-                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "no page"}],
+                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "no page"}, *update],
                       "ideas": [{"idea": "I1", "verdict": "SURVIVES", "reason": "C1 holds"},
                                 {"idea": "I2", "verdict": "FALLS", "reason": "C3 unsupported"}]})
     if role_id == "applier":
@@ -164,6 +177,7 @@ def write_brief(root: Path) -> None:
         "Our needs": "No profile.",
         "Success criteria": "A choice between the approaches.",
         "Source preferences": "Papers and engineering blogs.",
+        "Living": "Cadence: monthly\nRetire when: we have chosen a retrieval approach.",
     }
     text = path.read_text().split("\n## ")[0]
     text += "".join(f"\n## {name}\n\n{body}\n" for name, body in filled.items())
@@ -175,6 +189,97 @@ def write_brief(root: Path) -> None:
         assert "draft" in str(error)
     quiet(research.command_accept, root, argparse.Namespace(topic="retrieval"))
     assert "Status: accepted" in path.read_text()
+
+
+def test_living(root: Path, topic: Path) -> None:
+    """A topic with a cadence becomes living; refresh costs nothing when nothing is new, and with one new contradicting
+    record it adds the next claim ids, re-derives the conclusions, and flags the flipped verdict for review."""
+    assert "Status: living" in (topic / "brief.md").read_text(encoding="utf-8")
+    watch = json.loads((topic / "watch.json").read_text(encoding="utf-8"))
+    assert watch["cadenceDays"] == 30 and watch["retireWhen"] == "we have chosen a retrieval approach."
+    assert [query["adapter"] for query in watch["queries"]] == ["openalex", "crossref", "feed", "gdelt"], "web avenues are not watched"
+    version = watch["version"]
+    assert f"· Version {version} · Checked {rc.today()}" in (topic / "report.md").read_text(encoding="utf-8")
+    claims_before = json.loads((topic / "claims.json").read_text(encoding="utf-8"))["claims"]
+    stored_before = [row["stored"] for row in json.loads((topic / "screening.json").read_text(encoding="utf-8"))["records"] if row.get("stored")]
+
+    # Nothing new: no agent call, no new version.
+    CALLS.clear()
+    delta = quiet(living.refresh, root, "retrieval")
+    assert CALLS == [] and not delta["material"] and delta["summary"] == "no material change: nothing new was found", (CALLS, delta)
+    first = topic / "delta" / f"{rc.today()}.md"
+    assert first.is_file() and "No material change: nothing new was found." in first.read_text(encoding="utf-8")
+    assert json.loads((topic / "watch.json").read_text(encoding="utf-8"))["version"] == version
+    searches = json.loads((topic / "delta" / f"{rc.today()}-searches.json").read_text(encoding="utf-8"))
+    assert {entry["since"] for entry in searches} == {rc.today()}, "saved queries search since the last check"
+
+    # One new record that contradicts the report.
+    sources_test.ROUTES.insert(0, ("search=hybrid", "openalex-refresh.json", "application/json"))
+    PHASE["refresh"] = True
+    # The budget stops it during collect: the screening is kept and the refresh resumes where it stopped.
+    CALLS.clear()
+    raises(rc.BudgetExceeded, living.refresh, root, "retrieval", 2)
+    assert CALLS.count("screener") == 1 and json.loads((topic / "watch.json").read_text(encoding="utf-8"))["pending"]["step"] == "screened"
+    CALLS.clear()
+    delta = quiet(living.refresh, root, "retrieval")
+    assert "screener" not in CALLS and sum(call.startswith("researcher-") for call in CALLS) == 1 and CALLS[-1] == "reporter", \
+        f"the screening and the researcher that answered are not paid for again: {CALLS}"
+    assert "# Previous version" in SEEN_PROMPTS["analyst"] and "I1: Hybrid retrieval" in SEEN_PROMPTS["analyst"]
+    claims = json.loads((topic / "claims.json").read_text(encoding="utf-8"))["claims"]
+    assert claims[:4] == claims_before, "existing claims keep their ids and text"
+    assert [(claim["id"], claim["quoteVerified"], claim["addedIn"]) for claim in claims[4:]] == [("C5", True, version + 1), ("C6", True, version + 1)]
+    judgement = json.loads((topic / "judgement.json").read_text(encoding="utf-8"))
+    first_claim = next(item for item in judgement["claims"] if item["claim"] == "C1")
+    assert [(entry["version"], entry["verdict"]) for entry in first_claim["history"]][-2:] == [(version, "HOLDS"), (version + 1, "WEAK")]
+    fit = json.loads((topic / "fit.json").read_text(encoding="utf-8"))["fits"][0]
+    assert [entry["ring"] for entry in fit["history"]][-2:] == ["TRIAL", "TRIAL"]
+    assert delta["material"] and delta["flips"] == [{"claim": "C1", "from": "HOLDS", "to": "WEAK"}] and not delta["moves"]
+    second = (topic / "delta" / f"{rc.today()}-2.md").read_text(encoding="utf-8")
+    assert "## Needs your review" in second and "- C1: HOLDS → WEAK" in second and "| C5 |" in second
+    watch = json.loads((topic / "watch.json").read_text(encoding="utf-8"))
+    assert watch["version"] == version + 1 and watch["pending"] is None and watch["lastChanged"] == rc.today()
+    assert f"· Version {version + 1} ·" in (topic / "report.md").read_text(encoding="utf-8")
+    screening = json.loads((topic / "screening.json").read_text(encoding="utf-8"))
+    added = [row for row in screening["records"] if row.get("addedAt")]
+    assert [(row["url"], row["decision"]) for row in added] == [(NEW, "include")] and (root / added[0]["stored"]).is_file()
+    assert all((root / path).is_file() for path in stored_before), "a refresh appends stored records, never replaces them"
+    validator = __import__("importlib.util").util
+    spec = validator.spec_from_file_location("validate_rc", REPO / "scripts" / "validate-research-center.py")
+    module = validator.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.validate(root) == [], module.validate(root)
+
+    # Cadence, pause and retire.
+    assert living.due(root) == [], "just checked"
+    watch["lastChecked"] = "2026-01-01"
+    rc.write_json(topic / "watch.json", watch)
+    assert living.due(root) == ["retrieval"]
+    quiet(research.command_status, root, "retrieval", "pause")
+    assert living.due(root) == [] and "resume" in raises(rc.RcError, living.refresh, root, "retrieval")
+    quiet(research.command_status, root, "retrieval", "resume")
+
+    # An amended brief is not refreshed; the next run redoes it from plan (claim ids start over, so C5 is gone).
+    PHASE["refresh"] = False
+    sources_test.ROUTES.pop(0)
+    brief = topic / "brief.md"
+    brief.write_text(brief.read_text(encoding="utf-8").replace("Which retrieval approach", "Which retrieval method"))
+    assert "amended" in raises(rc.RcError, living.refresh, root, "retrieval")
+    CALLS.clear()
+    quiet(research.run_research, root, "retrieval", None, None)
+    assert CALLS[0] == "source-planner", CALLS
+    assert json.loads((topic / "watch.json").read_text(encoding="utf-8"))["version"] == version + 2
+
+    quiet(research.command_status, root, "retrieval", "retire")
+    assert "retired" in raises(rc.RcError, living.refresh, root, "retrieval")
+    assert "retired" in raises(rc.RcError, research.run_research, root, "retrieval", None, None)
+
+
+def raises(error: type[BaseException], function, *args) -> str:
+    try:
+        quiet(function, *args)
+    except error as caught:
+        return str(caught)
+    raise AssertionError(f"{function.__name__} did not raise {error.__name__}")
 
 
 def main() -> int:
@@ -332,6 +437,8 @@ def main() -> int:
         quiet(research.run_research, root, "retrieval", None, None)
         assert sum(call.startswith("sceptic-") for call in CALLS) == 1 and CALLS[-1] == "reporter", CALLS
         assert not any(replies.rglob("*.json")), "finished stages keep no replies"
+
+        test_living(root, topic)
     print("research test passed")
     return 0
 

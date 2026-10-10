@@ -147,12 +147,29 @@ Read `research/<topic>/report.md`. Ideas ranked ADOPT or TRIAL come with `resear
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |
 | `./rc research list` / `show <topic>` | Topics and their stages |
 | `./rc research run <topic> --from judge` | Redo a stage and everything after it |
+| `./rc research refresh <topic>` | Re-search a living topic and write what changed to `research/<topic>/delta/<date>.md` |
+| `./rc research refresh --due` | Refresh every living topic whose cadence has elapsed |
+| `./rc research pause\|resume\|retire <topic>` | Stop refreshing for a while, start again, or for good |
 | `./rc plan list` | Plans for changing the RC itself |
 | `./rc agents sync` | After editing a skill in `.agents/skills/`, copy it to `.claude/skills/` |
 
 **From Windows without opening Ubuntu:** the `rc.cmd` launcher runs the same commands inside WSL. In PowerShell type `.\rc check`, in cmd `rc check`. With several distributions installed, set `RC_WSL_DISTRO`.
 
-**Budgets:** each run has a cap on agent calls (`budget.ingestCalls`, `budget.researchCalls` in `research-center.json`). Reaching it stops the run and keeps the finished work; running again resumes it.
+**Budgets:** each run has a cap on agent calls (`budget.ingestCalls`, `budget.researchCalls`, `budget.refreshCalls` in `research-center.json`). Reaching it stops the run and keeps the finished work; running again resumes it.
+
+**Keep a topic living.** A brief whose `## Living` section has a cadence (weekly, monthly, quarterly, or derived from the plan's horizon) becomes living after its first run. Each refresh re-runs the saved adapter searches since the last check and screens only what is new. A refresh that finds nothing costs no agent call. When new quote-verified evidence arrives, the analysis, critique, judgement, fit and report are re-derived and the version goes up. Read `delta/<date>.md`: its **Needs your review** section lists flipped verdicts, moved rings and newly contested claims. Refreshes run your own logged-in CLIs, so the machine must be on. Schedule `--due` daily or weekly; it skips topics that are not due, paused or retired:
+
+```bash
+# WSL / Linux / macOS: crontab -e
+0 7 * * 1  cd ~/Projects/my-project_RC && ./rc research refresh --due >> .rc-local/refresh.log 2>&1
+```
+
+```powershell
+# Windows Task Scheduler
+schtasks /create /sc weekly /d MON /st 07:00 /tn rc-refresh /tr "wsl -d Ubuntu -- bash -lc 'cd ~/Projects/my-project_RC && ./rc research refresh --due'"
+```
+
+Changing a living brief's questions, scope or needs stops its refreshes: log the change under `## Amendments`, and `./rc research run <topic>` redoes the research from plan as the next version.
 
 ---
 

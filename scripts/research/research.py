@@ -17,8 +17,9 @@ judge    the judge reads the reviews as anonymous labels      -> judgement.json
 apply    applier fits surviving ideas to the user's repos     -> fit.json, fit.md, handoff.md
 report   reporter writes the answer; the runner checks it     -> report.md (with the screening flow)
 
-Each stage's output is committed under research/<topic>/; a run resumes at the first missing output.
-See docs/decisions/0004-research-pipeline.md and 0008-search-and-screen.md.
+Each stage's output is committed under research/<topic>/; a run resumes at the first missing output. A topic whose
+brief has a cadence stays living afterwards: ./rc research refresh (living.py) keeps it current.
+See docs/decisions/0004-research-pipeline.md, 0008-search-and-screen.md and 0009-living-topics.md.
 """
 
 from __future__ import annotations
@@ -64,7 +65,11 @@ CLAIM_VERDICTS = ("HOLDS", "WEAK", "REFUTED", "UNSUPPORTED")
 IDEA_VERDICTS = ("SURVIVES", "WEAKENED", "FALLS")
 RINGS = ("ADOPT", "TRIAL", "ASSESS", "HOLD")
 EFFORTS = ("S", "M", "L")
-SECTIONS = ("Topic", "Questions", "Scope", "Out of scope", "Our needs", "Success criteria", "Source preferences")
+SECTIONS = ("Topic", "Questions", "Scope", "Out of scope", "Our needs", "Success criteria", "Source preferences", "Living")
+# How often a living topic is refreshed, in days; derived follows the plan's horizon (living.py). none is one-shot.
+CADENCES = {"none": 0, "weekly": 7, "monthly": 30, "quarterly": 91, "derived": -1}
+# draft -> accepted -> living (after the first full run of a topic with a cadence) <-> paused; retired is final.
+TOPIC_STATUSES = ("draft", "accepted", "living", "paused", "retired")
 QUESTION = re.compile(r"^- (Q\d+):\s*(\S.*)$", re.MULTILINE)
 # One bracket may cite several claims: [C3], [C3, C7] and [C3; C7] all count.
 CLAIM_REF = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
@@ -113,12 +118,42 @@ def brief_problems(text: str) -> list[str]:
             problems.append(f"section '## {name}' still holds a <placeholder>")
     if not QUESTION.findall(text):
         problems.append("'## Questions' needs at least one line '- Q1: ...'")
+    if found.get("Living") and not re.search(r"<[^>\n]+>", found["Living"]):
+        living = brief_living(text)
+        if living["cadence"] not in CADENCES:
+            problems.append(f"'## Living' needs a line 'Cadence: ...', one of {', '.join(CADENCES)}")
+        elif living["cadence"] != "none" and not living["retireWhen"]:
+            problems.append("'## Living' needs a line 'Retire when: ...': when this topic stops being worth refreshing")
     return problems
+
+
+def brief_living(text: str) -> dict[str, str]:
+    """The brief's Living section: how often to refresh and when to stop."""
+    body = sections(text).get("Living", "")
+    cadence = re.search(r"^Cadence:\s*(\S+)", body, flags=re.MULTILINE)
+    retire = re.search(r"^Retire when:\s*(\S.*)$", body, flags=re.MULTILINE)
+    return {"cadence": cadence.group(1).lower() if cadence else "none", "retireWhen": retire.group(1).strip() if retire else ""}
+
+
+def brief_hash(text: str) -> str:
+    """What the research was built on: the brief without its Status line and its Amendments log, so changing the
+    status or logging an amendment does not count, but changing any question, scope or need does."""
+    body = re.sub(r"^Status:.*$", "", text, count=1, flags=re.MULTILINE)
+    body = re.sub(r"^## Amendments\n.*?(?=^## |\Z)", "", body, flags=re.MULTILINE | re.DOTALL)
+    return hashlib.sha256(" ".join(body.split()).encode("utf-8")).hexdigest()
 
 
 def brief_status(text: str) -> str:
     match = re.search(r"^Status:\s*(\S+)", text, flags=re.MULTILINE)
     return match.group(1) if match else "unknown"
+
+
+def set_status(root: Path, topic: str, status: str) -> None:
+    if status not in TOPIC_STATUSES:
+        raise rc.RcError(f"status must be one of {TOPIC_STATUSES}")
+    path = topic_dir(root, topic) / "brief.md"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(re.sub(r"^Status:\s*\S+", f"Status: {status}", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n")
 
 
 def command_new(root: Path, args: argparse.Namespace) -> None:
@@ -138,7 +173,7 @@ def command_accept(root: Path, args: argparse.Namespace) -> None:
     problems = brief_problems(text)
     if problems:
         raise rc.RcError("brief is not ready:\n" + "\n".join(f"- {problem}" for problem in problems))
-    path.write_text(re.sub(r"^Status:\s*\S+", "Status: accepted", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n")
+    set_status(root, args.topic, "accepted")
     print(f"accepted research/{args.topic}/brief.md; run it with ./rc research run {args.topic}")
 
 
@@ -150,12 +185,26 @@ def stage_done(directory: Path, stage: str) -> bool:
     return all((directory / name).exists() for name in OUTPUTS[stage])
 
 
+def command_status(root: Path, topic: str, action: str) -> None:
+    """pause and resume a living topic's refreshes, or retire it for good."""
+    if not (topic_dir(root, topic) / "brief.md").is_file():
+        raise rc.RcError(f"no topic {topic}; ./rc research list shows them")
+    status = brief_status((topic_dir(root, topic) / "brief.md").read_text(encoding="utf-8"))
+    allowed = {"pause": ("living",), "resume": ("paused",), "retire": ("accepted", "living", "paused")}
+    if status not in allowed[action]:
+        raise rc.RcError(f"research/{topic} is {status}; {action} needs one of {allowed[action]}")
+    set_status(root, topic, {"pause": "paused", "resume": "living", "retire": "retired"}[action])
+    print(f"research/{topic} is now {'paused' if action == 'pause' else 'living' if action == 'resume' else 'retired'}")
+
+
 def command_list(root: Path, _: argparse.Namespace) -> None:
     for brief in sorted((root / "research").glob("*/brief.md")):
         directory = brief.parent
         done = [stage for stage in STAGES if stage_done(directory, stage)]
         title = brief.read_text(encoding="utf-8").splitlines()[0].lstrip("# ")
-        print(f"{directory.name:<32} {brief_status(brief.read_text(encoding='utf-8')):<9} {len(done)}/{len(STAGES)} stages  {title}")
+        watch = rc.load_json(directory / "watch.json") if (directory / "watch.json").is_file() else None
+        living = (f"  v{watch['version']}, checked {watch['lastChecked']}, every {watch['cadenceDays']} days" if watch else "")
+        print(f"{directory.name:<32} {brief_status(brief.read_text(encoding='utf-8')):<9} {len(done)}/{len(STAGES)} stages  {title}{living}")
 
 
 def command_show(root: Path, args: argparse.Namespace) -> None:
@@ -281,6 +330,8 @@ def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
     data = session.call_checked(config["pipeline"]["sourcePlanner"], body, "plan", json_reply(check))
     data["exclusions"] = [OFF_TOPIC, *data.get("exclusions", [])]
     directory = topic_dir(root, topic)
+    # Everything after this plan was built on this brief; a later amendment makes it all stale (run_research).
+    data["briefHash"] = brief_hash((directory / "brief.md").read_text(encoding="utf-8"))
     rc.write_json(directory / "source-plan.json", data)
     lines = [f"# Source plan: {topic}\n", f"Horizon: {data['horizon']}\n", "## Hypotheses\n"]
     lines += [f"- {item['id']}: {item['statement']}" for item in data["hypotheses"]]
@@ -348,7 +399,7 @@ def record_text(item: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def store_included(root: Path, topic: str, included: list[dict[str, Any]]) -> None:
+def store_included(root: Path, topic: str, included: list[dict[str, Any]], append: bool = False) -> None:
     """Commit the text of every included record under sources/search-<topic>/: scholarly records and books as
     metadata and abstract (abstracts in v1), everything else as the fetched page, falling back to the metadata."""
     source_id = f"search-{topic}"[:60].strip("-")
@@ -371,7 +422,7 @@ def store_included(root: Path, topic: str, included: list[dict[str, Any]]) -> No
         "origin": f"research:{topic}", "addedAt": rc.today(),
     }
     rc.write_json(ingest.source_path(root, source_id), descriptor)
-    ingest.store(root, descriptor, entries, texts, [], {})
+    store_appending(root, descriptor, entries, texts, [], append)
 
 
 def screen_check(batch: list[dict[str, Any]], criteria: dict[str, Any], known: set[str]):
@@ -514,7 +565,7 @@ def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
     stored = {item["id"]: item["stored"] for item in included}
     rows = [{"id": item["id"], "key": item["key"], "title": item["title"], "url": item["url"], "doi": item["doi"],
              "foundBy": item["foundBy"], "hop": item["hop"], "via": item["via"], "evidenceType": item["evidenceType"],
-             **decisions[item["id"]], "stored": stored.get(item["id"])} for item in records]
+             "fingerprint": item["extra"].get("sha256"), **decisions[item["id"]], "stored": stored.get(item["id"])} for item in records]
     excluded_by: dict[str, int] = {}
     for row in rows:
         if row["decision"] == "exclude":
@@ -545,7 +596,8 @@ def flow_text(flow: dict[str, Any], criteria: list[dict[str, Any]]) -> str:
 def render_screening(topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]],
                      checks: list[str]) -> str:
     def found(row: dict[str, Any]) -> str:
-        return f"hop {row['hop']}: {', '.join(row['via'])}" if row["hop"] else f"search: {', '.join(row['foundBy'])}"
+        how = f"hop {row['hop']}: {', '.join(row['via'])}" if row["hop"] else f"search: {', '.join(row['foundBy'])}"
+        return how + (f" (refresh {row['addedAt']}{', changed page' if row.get('changed') else ''})" if row.get("addedAt") else "")
 
     lines = [f"# Screening: {topic}\n", flow_text(flow, criteria), "", f"Retraction check: {'; '.join(checks)}.", "", "## Included\n",
              "Read these first: each record's text is stored at the path given.\n",
@@ -606,7 +658,10 @@ def included_records(root: Path, topic: str) -> dict[str, dict[str, Any]]:
     return {row["key"]: row for row in rc.load_json(path)["records"] if row["decision"] == "include" and row.get("stored")}
 
 
-def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
+def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Researchers read the included records and search the web; the runner stores every cited page and checks
+    every quote. With only (a refresh), they read just those new records, without web search, and the sources
+    and claims are appended to the ledger: existing ids never change. Returns the claims added."""
     config = rc.settings(root)
     known = set(questions(root, topic))
     limit = config["research"]["maxSourcesPerResearcher"]
@@ -640,20 +695,31 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
                 raise ValueError(f"claim {claim.get('text', '')[:60]!r} refers to unknown questions")
         return data
 
-    body = (
-        f"# Task\n\nCollect evidence for research/{topic}. First read the included records listed in research/{topic}/screening.md "
-        f"(their text is stored at the paths given) and extract claims from them, citing each by its URL. Then search the web along "
-        f"the `web` avenues of research/{topic}/source-plan.md for what the records leave open. At most {limit} web sources; "
-        f"included records do not count.\n\n{context(root, topic)}"
-    )
+    if only is None:
+        body = (
+            f"# Task\n\nCollect evidence for research/{topic}. First read the included records listed in research/{topic}/screening.md "
+            f"(their text is stored at the paths given) and extract claims from them, citing each by its URL. Then search the web along "
+            f"the `web` avenues of research/{topic}/source-plan.md for what the records leave open. At most {limit} web sources; "
+            f"included records do not count.\n\n{context(root, topic)}"
+        )
+    else:
+        listing = "\n".join(f"- {row['id']}: {row['title']} | {row['url']} | stored at {row['stored']}" for row in only)
+        body = (
+            f"# Task\n\nA refresh of research/{topic} found new records. Read only these, extract claims from them and cite each by "
+            f"its URL. Do not search the web: the existing ledger (research/{topic}/claims.md) already covers the rest; note where a new "
+            f"record contradicts or updates it.\n\nNew records:\n{listing}\n\n{context(root, topic)}"
+        )
     researchers = config["pipeline"]["researchers"]
     replies = session.parallel([
         (role_id, lambda role_id=role_id: session.call_checked(role_id, body, f"collect-{role_id}", json_reply(check)))
         for role_id in researchers
     ])
 
-    # Merge sources across researchers by URL, then store each page so every claim has committed evidence.
-    merged: dict[str, dict[str, Any]] = {}
+    # Merge sources across researchers (and with the existing ledger on a refresh) by key, then store each new page
+    # so every claim has committed evidence.
+    existing = ledger(root, topic) if only is not None else {"sources": [], "claims": []}
+    merged: dict[str, dict[str, Any]] = {source_key(source["url"]): source for source in existing["sources"]}
+    version = topic_version(topic_dir(root, topic))
     claims: list[dict[str, Any]] = []
     for role_id in researchers:
         reply = replies[role_id]
@@ -665,7 +731,7 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
             entry = merged.setdefault(key, {
                 "id": f"S{len(merged) + 1}", "url": source["url"], "title": source.get("title", ""),
                 "published": source.get("published", "unknown"),
-                "kind": source.get("kind") if source.get("kind") in SOURCE_KINDS else "other", "foundBy": [],
+                "kind": source.get("kind") if source.get("kind") in SOURCE_KINDS else "other", "foundBy": [], "addedIn": version,
             })
             if key in records:
                 entry.update({"record": records[key]["id"], "evidenceType": records[key]["evidenceType"]})
@@ -674,12 +740,14 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
         for claim in reply["claims"]:
             claims.append({
                 "text": " ".join(claim["text"].split()), "source": local[claim["source"]], "quote": " ".join(claim["quote"].split()),
-                "questions": claim.get("questions", []), "type": claim.get("type", "fact"), "foundBy": role_id,
+                "questions": claim.get("questions", []), "type": claim.get("type", "fact"), "foundBy": role_id, "addedIn": version,
             })
 
     source_id = f"web-{topic}"[:60].strip("-")
     entries, texts, skipped = {}, {}, []
     for entry in merged.values():
+        if "fetch" in entry:
+            continue  # stored by an earlier version of this topic
         if entry.get("record"):
             # Already screened in and stored; the claim is checked against that text, not a second download.
             entry["fetch"], entry["stored"] = "ok", records[source_key(entry["url"])]["stored"]
@@ -702,20 +770,37 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
         "origin": f"research:{topic}", "addedAt": rc.today(),
     }
     rc.write_json(ingest.source_path(root, source_id), descriptor)
-    ingest.store(root, descriptor, entries, texts, skipped, {})
+    store_appending(root, descriptor, entries, texts, skipped, append=only is not None)
 
     sources_by_id = {entry["id"]: entry for entry in merged.values()}
-    for number, claim in enumerate(claims, 1):
+    for number, claim in enumerate(claims, len(existing["claims"]) + 1):
         claim["id"] = f"C{number}"
         stored = sources_by_id[claim["source"]].get("stored")
         claim["quoteVerified"] = bool(stored) and quote_found(claim["quote"], (root / stored).read_text(encoding="utf-8"))
-    ledger = {"topic": topic, "sources": list(merged.values()), "claims": [{"id": claim.pop("id"), **claim} for claim in claims]}
+    added = [{"id": claim.pop("id"), **claim} for claim in claims]
+    led = {"topic": topic, "sources": list(merged.values()), "claims": [*existing["claims"], *added]}
     directory = topic_dir(root, topic)
-    rc.write_json(directory / "claims.json", ledger)
-    rc.write_text(directory / "claims.md", render_ledger(ledger))
-    fetched = sum(entry["fetch"] == "ok" for entry in merged.values())
-    verified = sum(claim["quoteVerified"] for claim in ledger["claims"])
-    session.say(f"collect: {len(ledger['claims'])} claims from {len(merged)} sources ({fetched} stored); {verified} quotes verified")
+    rc.write_json(directory / "claims.json", led)
+    rc.write_text(directory / "claims.md", render_ledger(led))
+    fetched = sum(entry.get("fetch") == "ok" for entry in merged.values())
+    verified = sum(claim["quoteVerified"] for claim in added)
+    session.say(f"collect: {len(added)} claims added, {len(led['claims'])} in the ledger from {len(merged)} sources ({fetched} stored); "
+                f"{verified} of the new quotes verified")
+    return added
+
+
+def store_appending(root: Path, descriptor: dict[str, Any], entries: dict[str, Any], texts: dict[str, str],
+                    skipped: list[dict[str, str]], append: bool) -> None:
+    """ingest.store, which replaces a source's files; with append, the files an earlier version stored are kept."""
+    if append:
+        previous = ingest.read_manifest(root, descriptor["id"]).get("files", {})
+        text_root = root / "sources" / descriptor["id"] / "text"
+        for stored, entry in previous.items():
+            if stored not in entries and (text_root / stored).is_file():
+                entries[stored] = {key: value for key, value in entry.items() if key != "redactions"}
+                texts[stored] = (text_root / stored).read_text(encoding="utf-8")
+        descriptor["locators"] = sorted(set(descriptor["locators"]) | {entry["origin"] for entry in entries.values()})
+    ingest.store(root, descriptor, entries, texts, skipped, {})
 
 
 def render_ledger(ledger: dict[str, Any]) -> str:
@@ -759,6 +844,12 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
         return markdown, ideas
 
     body = f"# Task\n\nAnswer the brief's questions from research/{topic}/claims.md.\n\n{context(root, topic)}"
+    if (topic_dir(root, topic) / "ideas.json").is_file():
+        # A refresh: the ledger grew. Keep the ids of ideas that are still the same idea, so their history continues.
+        previous = rc.load_json(topic_dir(root, topic) / "ideas.json")["ideas"]
+        body += ("\n\n# Previous version\n\nThe ledger has new claims since the last analysis. Its ideas were:\n"
+                 + "\n".join(f"- {idea['id']}: {idea['name']}" for idea in previous)
+                 + "\nKeep an idea's id when it is still the same idea, even if the evidence now weakens it; give new ideas new ids.")
     markdown, ideas = session.call_checked(config["pipeline"]["analyst"], body, "analyze", check)
     directory = topic_dir(root, topic)
     rc.write_text(directory / "analysis.md", markdown)
@@ -845,14 +936,37 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
         if refuted_by and item["verdict"] in ("HOLDS", "WEAK"):
             contested.append({"claim": item["claim"], "refutedBy": [f"Review {label}" for label in refuted_by]})
     data["contested"] = contested
+    previous = rc.load_json(directory / "judgement.json") if (directory / "judgement.json").is_file() else {}
+    data["claims"] = with_history(data["claims"], previous.get("claims", []), "claim", "verdict", topic_version(directory))
+    data["ideas"] = with_history(data["ideas"], previous.get("ideas", []), "idea", "verdict", topic_version(directory))
     rc.write_json(directory / "judgement.json", data)
     lines = [f"# Judgement: {topic}\n", "| Claim | Verdict | Reason |", "| --- | --- | --- |"]
-    lines += [f"| {item['claim']} | {item['verdict']} | {cell(item.get('reason', ''))} |" for item in data["claims"]]
+    lines += [f"| {item['claim']} | {item['verdict']}{' (earlier version)' if item.get('carried') else ''} | {cell(item.get('reason', ''))} |"
+              for item in data["claims"]]
     lines += ["", "| Idea | Verdict | Reason |", "| --- | --- | --- |"]
     lines += [f"| {item['idea']} | {item['verdict']} | {cell(item.get('reason', ''))} |" for item in data["ideas"]]
     if contested:
         lines += ["", "## Contested", ""] + [f"- {item['claim']}: refuted by {', '.join(item['refutedBy'])}, kept by the judge" for item in contested]
     rc.write_text(directory / "judgement.md", "\n".join(lines))
+
+
+def topic_version(directory: Path) -> int:
+    """The version a run or refresh is producing: watch.json's, or 1 for a topic that is not living (yet)."""
+    path = directory / "watch.json"
+    return rc.load_json(path)["version"] if path.is_file() else 1
+
+
+def with_history(items: list[dict[str, Any]], previous: list[dict[str, Any]], key: str, field: str, version: int) -> list[dict[str, Any]]:
+    """items, each carrying its earlier history plus today's value; earlier items not settled this time are kept
+    as they were, marked carried. A full re-run starts over (ids change), a refresh continues the history."""
+    before = {item[key]: item for item in previous}
+    result = []
+    for item in items:
+        history = [entry for entry in before.get(item[key], {}).get("history", []) if entry.get("version") != version]
+        result.append({**item, "history": [*history, {"version": version, "date": rc.today(), field: item[field]}]})
+    settled = {item[key] for item in items}
+    result += [{**item, "carried": True} for item in previous if item[key] not in settled]
+    return result
 
 
 def surviving_ideas(root: Path, topic: str) -> list[dict[str, Any]]:
@@ -900,6 +1014,8 @@ def stage_apply(session: rc.Session, root: Path, topic: str) -> None:
         f"Analysis: research/{topic}/analysis.md. Judgement: research/{topic}/judgement.md.\n\n{context(root, topic)}"
     )
     data = session.call_checked(config["pipeline"]["applier"], body, "apply", json_reply(check))
+    previous = rc.load_json(directory / "fit.json")["fits"] if (directory / "fit.json").is_file() else []
+    data["fits"] = [fit for fit in with_history(data["fits"], previous, "idea", "ring", topic_version(directory)) if not fit.get("carried")]
     rc.write_json(directory / "fit.json", data)
     names = {idea["id"]: idea["name"] for idea in ideas}
     lines = [f"# Fit: {topic}\n", "| Idea | Ring | Effort | Sources touched | Replaces |", "| --- | --- | --- | --- | --- |"]
@@ -1036,9 +1152,16 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
     config = rc.settings(root)
     directory = topic_dir(root, topic)
     text = (directory / "brief.md").read_text(encoding="utf-8")
-    if brief_status(text) != "accepted":
+    if brief_status(text) == "retired":
+        raise rc.RcError(f"research/{topic} is retired; its report stays as it is")
+    if brief_status(text) not in ("accepted", "living", "paused"):
         raise rc.RcError(f"research/{topic}/brief.md is {brief_status(text)}; grill it, then ./rc research accept {topic}")
     ingest.guard(root)
+    plan_path = directory / "source-plan.json"
+    if not start and plan_path.is_file() and rc.load_json(plan_path).get("briefHash") not in (None, brief_hash(text)):
+        # The brief was amended after the plan: every output built on the old brief is stale.
+        print(f"research/{topic}/brief.md changed since the plan was made; redoing everything from plan")
+        start = "plan"
     if start:
         clear_from(root, topic, start)
     todo = [stage for stage in STAGES if not stage_done(directory, stage)]
@@ -1048,6 +1171,8 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
     # Later stages read earlier outputs, so a gap means everything after it is redone.
     first = STAGES.index(todo[0])
     clear_from(root, topic, STAGES[first], keep_replies=True)
+    import living  # living.py builds on this module, so it is imported where it is used
+    living.begin_run(root, topic)
     with rc.Session(root, f"research-{topic}", budget or config["budget"]["researchCalls"]) as session:
         for stage in STAGES[first:]:
             session.say(f"stage {stage} ({STAGES.index(stage) + 1}/{len(STAGES)})")
@@ -1055,6 +1180,9 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
             RUNNERS[stage](session, root, topic)
             # The committed outputs now hold what the replies said.
             shutil.rmtree(session.replies, ignore_errors=True)
+        watch = living.after_run(root, topic)
+        if watch:
+            session.say(f"living topic, version {watch['version']}: refreshed every {watch['cadenceDays']} days with ./rc research refresh {topic}")
         session.say(f"report ready: research/{topic}/report.md ({session.calls} agent calls); review, then commit research/ and sources/", "gate")
     return 0
 
@@ -1075,10 +1203,24 @@ def main() -> int:
     run.add_argument("topic")
     run.add_argument("--from", dest="start", choices=STAGES)
     run.add_argument("--budget", type=int)
+    fresh = commands.add_parser("refresh")
+    target = fresh.add_mutually_exclusive_group(required=True)
+    target.add_argument("topic", nargs="?")
+    target.add_argument("--due", action="store_true", help="refresh every living topic whose cadence has elapsed")
+    fresh.add_argument("--budget", type=int)
+    for name in ("pause", "resume", "retire"):
+        commands.add_parser(name).add_argument("topic")
     args = parser.parse_args()
     root = args.root.resolve()
     try:
-        if args.command == "new":
+        import living  # living.py builds on this module, so it is imported where it is used
+        if args.command == "refresh":
+            if args.due:
+                return living.refresh_due(root, args.budget)
+            living.refresh(root, args.topic, args.budget)
+        elif args.command in ("pause", "resume", "retire"):
+            command_status(root, args.topic, args.command)
+        elif args.command == "new":
             command_new(root, args)
         elif args.command == "accept":
             command_accept(root, args)

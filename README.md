@@ -20,6 +20,8 @@ ingest (optional) → grill → plan → search → screen → collect → analy
 | apply | Surviving ideas ranked ADOPT, TRIAL, ASSESS or HOLD against your repos and needs | `fit.md`, `handoff.md` |
 | report | The answer, citing only claims that survived | `report.md` |
 
+A brief with a cadence makes the topic **living**: `./rc research refresh` re-runs its searches, screens only what is new, re-derives the conclusions when new verified evidence arrives, and writes a delta of what changed and what needs your review.
+
 Ideas worth acting on leave as a [Control Center](https://github.com/romank-foxcale/command_center_template) task plan (`handoff.md`). The RC itself never touches product code.
 
 ## Install
@@ -82,6 +84,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc research new agent-memory --title "Long-term memory for coding agents"
 ./rc research accept agent-memory             after grilling
 ./rc research run agent-memory                then ./rc watch
+./rc research refresh --due                   keep living topics current (schedule it)
 ./rc sources list                             adapters beyond web search
 ./rc sources search openalex "four-day work week" --since 2023-01-01
 ./rc roles set judge --provider claude --model opus

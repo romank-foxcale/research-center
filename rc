@@ -20,6 +20,8 @@ usage() {
     '  ingest run [id...] [--budget N] [--profile|--no-profile]  Fetch, digest, profile' \
     '  research new <topic> --title "..." | accept <topic> | list | show <topic>' \
     '  research run <topic> [--from plan|search|screen|collect|analyze|critique|judge|apply|report] [--budget N]' \
+    '  research refresh <topic> | refresh --due [--budget N]  Re-search a living topic; write research/<topic>/delta/<date>.md' \
+    '  research pause|resume|retire <topic>' \
     '  sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward' \
     '  watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result' \
     '  settings [show]  Settings as text: status, budgets, limits, agents and their models' \

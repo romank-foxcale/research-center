@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, handoff.
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -31,4 +31,7 @@ relations:
 - **Candidate**: a record the adapter searches found (R1..), before screening. **Included** candidates are stored and read by the researchers.
 - **Snowballing**: following the references (backward) and the citing works (forward) of the key included records, one hop per research.snowballDepth, each hop screened again.
 - **Screening flow**: identified, duplicates, screened, excluded by criterion, included (PRISMA-style), shown in screening.md and the report.
+- **Living topic**: a topic whose brief has a cadence; refreshed with ./rc research refresh, versioned, its searches saved in watch.json.
+- **Refresh**: re-running a living topic's saved searches since the last check, screening only new records, collecting claims from them with the next ids, and re-deriving the conclusions when new verified evidence arrived.
+- **Delta**: research/&lt;topic&gt;/delta/&lt;date&gt;.md, what one refresh changed; its Needs your review section lists flipped verdicts, moved rings and newly contested claims.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

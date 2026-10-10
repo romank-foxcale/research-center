@@ -1,0 +1,116 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W100",
+   "doi": "https://doi.org/10.5555/WT.2025.1",
+   "display_name": "Productivity under a four-day week",
+   "publication_date": "2025-06-09",
+   "type": "article",
+   "language": "en",
+   "cited_by_count": 12,
+   "is_retracted": false,
+   "primary_location": {
+    "landing_page_url": "https://doi.org/10.5555/wt.2025.1",
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Working Time"
+    }
+   },
+   "open_access": {
+    "oa_url": "https://repository.example.org/wt-2025-1.pdf"
+   },
+   "authorships": [
+    {
+     "author": {
+      "display_name": "Ada Example"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Ben Sample"
+     }
+    }
+   ],
+   "abstract_inverted_index": {
+    "Output": [
+     0
+    ],
+    "per": [
+     1
+    ],
+    "hour": [
+     2
+    ],
+    "rose": [
+     3
+    ],
+    "by": [
+     4
+    ],
+    "7": [
+     5
+    ],
+    "percent.": [
+     6
+    ]
+   }
+  },
+  {
+   "id": "https://openalex.org/W700",
+   "doi": "https://doi.org/10.5555/w700",
+   "display_name": "Hybrid retrieval falls behind in a new production trial",
+   "publication_date": "2026-10-01",
+   "type": "article",
+   "primary_location": {
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Search"
+    }
+   },
+   "authorships": [
+    {
+     "author": {
+      "display_name": "Cy Newcomer"
+     }
+    }
+   ],
+   "cited_by_count": 0,
+   "abstract_inverted_index": {
+    "Hybrid": [
+     0
+    ],
+    "retrieval": [
+     1,
+     6
+    ],
+    "lost": [
+     2
+    ],
+    "recall": [
+     3
+    ],
+    "to": [
+     4
+    ],
+    "dense": [
+     5
+    ],
+    "in": [
+     7
+    ],
+    "our": [
+     8
+    ],
+    "new": [
+     9
+    ],
+    "production": [
+     10
+    ],
+    "trial.": [
+     11
+    ]
+   }
+  }
+ ]
+}

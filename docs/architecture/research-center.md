@@ -10,6 +10,7 @@ evidence:
   - scripts/research/research.py
   - templates/research-center.json
   - scripts/sources/sources.py
+  - scripts/research/living.py
 relations:
   - docs/decisions/0001-template-and-instances.md
   - docs/decisions/0003-read-only-agents.md
@@ -29,7 +30,7 @@ relations:
 | sources/&lt;id&gt;/ | extracted text, manifest (origin, sha256, extractor), redactions | ingest runner |
 | knowledge/digests/ | one cited digest per user source, with the manifest fingerprint | ingest runner (digester role) |
 | knowledge/profile/ | atomic cited notes about the user or company, and an index | ingest runner (profiler role) |
-| research/&lt;topic&gt;/ | brief, source plan, claims ledger, analysis, critique, judgement, fit, report, handoff | grilling session, research runner |
+| research/&lt;topic&gt;/ | brief, source plan, searches, screening, claims ledger, analysis, critique, judgement, fit, report, handoff; for a living topic watch.json and delta/ | grilling session, research runner |
 | .rc-local/ | event streams, agent logs, git clone cache, reviewer mapping (ignored) | runners |
 
 ## Flow
@@ -37,6 +38,7 @@ relations:
 1. **Ingest** (`scripts/ingest/ingest.py`): each source is fetched by kind. Folders and repos are read by the runner, URLs are downloaded, and Notion and Drive are read by the connector role. Text is extracted (`extract.py`), redacted (`secrets_scan.py`) and stored with a manifest. A source whose manifest fingerprint changed is digested in chunks; then the profiler rebuilds the profile from all digests.
 2. **Grill**: an interactive session follows `grill-research-topic`, reads the profile, and writes and accepts the brief.
 3. **Research** (`scripts/research/research.py`): nine stages, each committing its output. Search runs the planned adapter queries without an agent; screen includes or excludes every result with a logged reason (docs/decisions/0008-search-and-screen.md). The runner checks every reply against the stage's contract and gives the role one retry with the problems listed.
+4. **Refresh** (`scripts/research/living.py`): a living topic's saved searches re-run since the last check; only new records are screened and collected, and the conclusions are re-derived when new verified evidence arrives (docs/decisions/0009-living-topics.md).
 
 ## Runtime
 

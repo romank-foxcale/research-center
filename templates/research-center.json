@@ -5,7 +5,8 @@
   "privateRemoteConfirmed": false,
   "budget": {
     "ingestCalls": 60,
-    "researchCalls": 32
+    "researchCalls": 32,
+    "refreshCalls": 16
   },
   "ingest": {
     "maxFileBytes": 262144,

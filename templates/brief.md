@@ -30,3 +30,12 @@ Status: draft
 ## Source preferences
 
 <Trusted and distrusted kinds of sources, recency window, languages, paywalls to skip.>
+
+## Living
+
+Cadence: <none, weekly, monthly, quarterly or derived: how often new evidence is searched for and screened>
+Retire when: <the event or date after which refreshing stops paying off, such as the decision being made>
+
+## Amendments
+
+None. Log here every change made to the questions, scope or needs after acceptance, with its date; a changed brief redoes the research from plan.

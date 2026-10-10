@@ -23,10 +23,11 @@ Use a pick list when the choices are discrete. Recommend an option and say why. 
 
 1. **Why now**: the decision this research feeds, and who will act on it.
 2. **Questions**: three to seven, each answerable from evidence. Split vague ones ("is X good?") into measurable ones ("how does X compare to Y on latency and cost at our scale?"). Number them Q1, Q2, ...
-3. **Scope and out of scope**: technologies, vendors, the time window (default: the last 18 months for fast-moving AI topics), depth.
+3. **Scope and out of scope**: technologies, vendors, the time window (match it to how fast the subject moves: months for news or fast-moving technology, years or decades for settled science, law or history), depth.
 4. **Our needs**: the stack, constraints and problems the answer must fit, cited from the profile as `knowledge/profile/<note>.md`. For an individual: what they want to learn or build.
 5. **Success criteria**: what the report must enable, such as a choice between options, a go/no-go, or a reading list.
 6. **Source preferences**: trusted and distrusted sources, languages, paywalls.
+7. **Living**: should the RC keep this topic current? Recommend a cadence from how fast the evidence moves (`weekly` for news-driven topics, `monthly` for active fields, `quarterly` for slow ones, `derived` to follow the plan's horizon, `none` for a one-off question). Agree on `Retire when:`: the decision, date or event after which refreshing stops paying off.
 
 Challenge answers that would make the research unfalsifiable or unbounded. Point out questions the profile shows are already settled.
 
@@ -34,6 +35,6 @@ Challenge answers that would make the research unfalsifiable or unbounded. Point
 
 - Edit research/<topic-id>/brief.md: replace every `<placeholder>` and keep the section headings.
 - Show the user the brief. Change it until they agree.
-- `./rc research accept <topic-id>` checks it (every section filled, at least one `- Q1:` line) and marks it accepted. Then offer to run it with the rc-research skill.
+- `./rc research accept <topic-id>` checks it (every section filled, at least one `- Q1:` line, a valid cadence) and marks it accepted. Then offer to run it with the rc-research skill.
 
 Never start a research run on a brief the user has not accepted.

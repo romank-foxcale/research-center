@@ -14,6 +14,16 @@ description: Run, resume, follow and present a Research Center research run with
    - **Provider logged out or a CLI error**: tell the user which login to fix (`./rc doctor`). The RC never falls back to another model.
    - **Redo a stage**, for example after editing the brief or swapping a model: `--from <stage>`. It clears that stage and every later one.
 
+## Keep it living
+
+A topic whose brief has a cadence becomes `living` after its first run (`./rc research list` shows its version and last check).
+
+- `./rc research refresh <topic>` re-runs the saved searches since the last check and screens only what is new. Follow it with `./rc watch` like a run. It writes `research/<topic>/delta/<date>.md`.
+- Present a delta by its **Needs your review** section first: flipped claim verdicts, ideas that weakened or fell, moved fit rings, newly contested claims. Then the new records and claims. "No material change" is a normal result; say so in one line.
+- `./rc research refresh --due` refreshes every topic whose cadence has elapsed. Offer to schedule it (GUIDE.md shows cron and Task Scheduler lines); the user's machine and logins must be available.
+- `pause`, `resume` and `retire` change the topic's status. Remind the user of the brief's `Retire when:` when a delta suggests it has happened.
+- To change a living topic's questions, scope or needs: edit the brief, log the change under `## Amendments`, and `./rc research run <topic>`. A refresh refuses an amended brief, and the run redoes everything from plan as the next version.
+
 ## Present
 
 Read research/<topic>/report.md, judgement.md and fit.md, then give the user:

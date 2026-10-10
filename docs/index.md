@@ -27,6 +27,7 @@ relations:
 - [0006 Call budgets and resumable runs](decisions/0006-budgets-and-resume.md)
 - [0007 Source adapters](decisions/0007-source-adapters.md)
 - [0008 Search, screen and disconfirming searches](decisions/0008-search-and-screen.md)
+- [0009 Living topics, refresh and deltas](decisions/0009-living-topics.md)
 
 ## Rules
 
