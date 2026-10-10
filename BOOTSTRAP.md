@@ -28,11 +28,11 @@ If the mode is unclear, do not write to the target folder until it is clarified.
 
 ```text
 Projects/
-├── project1_CC/
-├── project1_RC/        ← the Research Center, its own private repo
-├── repos/              ← shared base clones (CCs); an RC may ingest them as git sources
-└── worktrees/
+├── project1_CC/        ← a Control Center, with its own repos/ and worktrees/ inside
+└── project1_RC/        ← the Research Center, its own private repo
 ```
+
+Nothing is shared between projects. To ingest a repo, give the RC its URL (`./rc ingest add git <url>`): it clones it into its own ignored `.rc-local/cache/`. A local path into a CC's `repos/` works too, but the RC then depends on that CC's folder.
 
 Relative to any `<project>_RC`:
 

@@ -76,11 +76,11 @@ This creates `~/Projects/my-project_RC/`, its own git repo, next to your Control
 
 ```
 ~/Projects/
-├── my-project_CC/        ← code: build, test, councils
-├── my-project_RC/        ← knowledge: ingest, research, reports
-├── repos/                ← base clones; an RC can ingest them as git sources
-└── worktrees/
+├── my-project_CC/        ← code: build, test, councils (its repos/ and worktrees/ inside)
+└── my-project_RC/        ← knowledge: ingest, research, reports
 ```
+
+Each project keeps everything it uses inside its own folder; nothing is shared between them. To ingest a repo, give the RC its URL.
 
 `rc-kit list` shows your RCs and their status (`discovery` → `adapting` → `ready`).
 
