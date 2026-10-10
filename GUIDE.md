@@ -147,6 +147,8 @@ Read `research/<topic>/report.md`. Ideas ranked ADOPT or TRIAL come with `resear
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |
 | `./rc research list` / `show <topic>` | Topics and their stages |
 | `./rc research run <topic> --from judge` | Redo a stage and everything after it |
+| `./rc sources packs` / `enable <pack>` | Domain packs: medicine (PubMed), software (GitHub) |
+| `./rc sources new <id> --family F --evidence-type T` | Scaffold your own adapter for a site or API; `./rc sources test <id>` checks it |
 | `./rc research refresh <topic>` | Re-search a living topic and write what changed to `research/<topic>/delta/<date>.md` |
 | `./rc research refresh --due` | Refresh every living topic whose cadence has elapsed |
 | `./rc research pause\|resume\|retire <topic>` | Stop refreshing for a while, start again, or for good |

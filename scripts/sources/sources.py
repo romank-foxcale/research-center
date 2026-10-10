@@ -4,6 +4,9 @@
   list                                   the adapters, what each covers and its filters
   search <adapter> <query> [--filter k=v] [--since YYYY-MM-DD] [--limit N] [--json] [--log PATH]
   related <adapter> <id> --direction backward|forward [--limit N] [--json]
+  packs | enable <pack> | disable <pack>  domain packs (medicine, software, ...) an instance turns on as topics need them
+  new <adapter> --family F --evidence-type T  scaffold your own adapter for a site or API, ready to edit and test
+  test [<adapter>]                       replay adapters' fixtures offline
 
 Adapters run here, in the runner, never inside an agent (docs/decisions/0007-source-adapters.md). Each search is
 appended to a searches log (research/<topic>/searches.json in a run) with its exact query, filters, date and
@@ -15,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import importlib
+import importlib.util
 import json
 import os
 import re
@@ -48,10 +52,129 @@ def descriptor(root: Path, identifier: str) -> dict[str, Any]:
     return known[identifier]
 
 
-def module(spec: dict[str, Any]):
+def module(spec: dict[str, Any], root: Path | None = None):
+    """An adapter's code: scripts/sources/adapters/<module>.py, or the instance's own catalog/adapters/code/<module>.py."""
     if not ID.fullmatch(spec["module"].replace("_", "-")):
         raise ValueError(f"adapter {spec['id']}: module {spec['module']!r} is not a plain module name")
-    return importlib.import_module(spec["module"])
+    if (HERE / "adapters" / f"{spec['module']}.py").is_file() or root is None:
+        return importlib.import_module(spec["module"])
+    path = root / "catalog" / "adapters" / "code" / f"{spec['module']}.py"
+    if not path.is_file():
+        raise ValueError(f"adapter {spec['id']}: no module {spec['module']} in scripts/sources/adapters or catalog/adapters/code")
+    loaded = importlib.util.spec_from_file_location(f"rc_adapter_{spec['module']}", path)
+    code = importlib.util.module_from_spec(loaded)
+    loaded.loader.exec_module(code)
+    return code
+
+
+# Packs and your own adapters --------------------------------------------------------------------------------
+
+PACKS = HERE.parent.parent / "templates" / "packs"
+TEMPLATE = HERE.parent.parent / "templates" / "adapter-template"
+
+
+def packs() -> dict[str, dict[str, Any]]:
+    """Domain packs: adapters an instance enables when its topics need them (templates/packs/<pack>/)."""
+    found = {}
+    for path in sorted(PACKS.glob("*/pack.json")):
+        pack = json.loads(path.read_text(encoding="utf-8"))
+        pack["descriptors"] = {item.stem: json.loads(item.read_text(encoding="utf-8")) for item in sorted((path.parent / "adapters").glob("*.json"))}
+        found[pack["id"]] = pack
+    return found
+
+
+def instance_only(root: Path) -> None:
+    if not (root / "research-center.json").is_file():
+        raise ValueError("this changes an instance's catalog/adapters; run it in an instance, not the template")
+
+
+def set_pack(root: Path, identifier: str, enabled: bool) -> list[str]:
+    """Enable a pack (copy its adapter descriptors into catalog/adapters) or disable it (remove them)."""
+    instance_only(root)
+    known = packs()
+    if identifier not in known:
+        raise ValueError(f"unknown pack {identifier}; packs: {', '.join(known)}")
+    target = adapters_dir(root)
+    target.mkdir(parents=True, exist_ok=True)
+    for name, spec in known[identifier]["descriptors"].items():
+        if enabled:
+            (target / f"{name}.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+        else:
+            (target / f"{name}.json").unlink(missing_ok=True)
+    return list(known[identifier]["descriptors"])
+
+
+def scaffold(root: Path, identifier: str, family: str, evidence: str) -> list[Path]:
+    """Your own adapter for a site or API no adapter covers: a descriptor, a module to edit and a fixture its test
+    replays, all in the instance (catalog/adapters/, catalog/adapters/code/). It passes ./rc sources test as made."""
+    instance_only(root)
+    if not ID.fullmatch(identifier):
+        raise ValueError(f"adapter id {identifier!r} must be lowercase hyphen-case")
+    name = identifier.replace("-", "_")
+    taken = set(descriptors(root)) | {path.stem for path in (HERE / "adapters").glob("*.py")} | {
+        adapter for pack in packs().values() for adapter in pack["descriptors"]}
+    if identifier in taken or name in taken:
+        raise ValueError(f"{identifier} is already an adapter id or module name")
+    if family not in kit.FAMILIES or evidence not in kit.EVIDENCE_TYPES:
+        raise ValueError(f"family must be one of {kit.FAMILIES} and the evidence type one of {kit.EVIDENCE_TYPES}")
+    code = root / "catalog" / "adapters" / "code"
+    code.mkdir(parents=True, exist_ok=True)
+    written = []
+    for source, target in (("adapter.json", adapters_dir(root) / f"{identifier}.json"), ("adapter.py", code / f"{name}.py"),
+                           ("adapter.fixture.json", code / f"{identifier}.fixture.json")):
+        text = (TEMPLATE / source).read_text(encoding="utf-8")
+        for placeholder, value in (("__ID__", identifier), ("__MODULE__", name), ("__FAMILY__", family), ("__EVIDENCE__", evidence)):
+            text = text.replace(placeholder, value)
+        target.write_text(text, encoding="utf-8", newline="\n")
+        written.append(target)
+    return written
+
+
+def fixture_path(root: Path, identifier: str) -> Path:
+    own = root / "catalog" / "adapters" / "code" / f"{identifier}.fixture.json"
+    return own if own.is_file() else HERE / "fixtures" / f"{identifier}.fixture.json"
+
+
+def testable(root: Path) -> dict[str, dict[str, Any]]:
+    """Every adapter there is here, with packs included in the template, keyed by id."""
+    found = dict(descriptors(root))
+    if not (root / "research-center.json").is_file():
+        for pack in packs().values():
+            found.update(pack["descriptors"])
+    return found
+
+
+def run_fixture(root: Path, identifier: str) -> list[str]:
+    """Replay an adapter's declarative fixture offline: its canned responses answer the requests, and the records
+    must match what the fixture expects. Returns the problems; empty means it passed."""
+    spec = testable(root).get(identifier)
+    path = fixture_path(root, identifier)
+    if spec is None or not path.is_file():
+        return [f"{identifier}: no adapter, or no fixture at {path.name}"]
+    fixture = json.loads(path.read_text(encoding="utf-8"))
+
+    def transport(url: str) -> tuple[bytes, str]:
+        for response in fixture["responses"]:
+            if response["match"] in url:
+                body = response["body"]
+                return (body if isinstance(body, str) else json.dumps(body)).encode("utf-8"), response.get("contentType", "application/json")
+        raise kit.AdapterError(f"the fixture has no response for {url}")
+
+    previous, kit.TRANSPORT = kit.TRANSPORT, transport
+    try:
+        found = module(spec, root).search(fixture["query"], fixture.get("filters", {}), fixture.get("since"), fixture.get("limit", 20),
+                                          {"interval": 0, "contactEmail": None})
+    except (kit.AdapterError, KeyError, TypeError, ValueError) as error:
+        return [f"{identifier}: {type(error).__name__}: {error}"]
+    finally:
+        kit.TRANSPORT = previous
+    expect, problems = fixture["expect"], []
+    if "count" in expect and len(found) != expect["count"]:
+        problems.append(f"{identifier}: expected {expect['count']} records, got {len(found)}")
+    for field, key in (("titles", "title"), ("evidenceTypes", "evidenceType"), ("keys", "key"), ("dates", "date")):
+        if field in expect and [item[key] for item in found] != expect[field]:
+            problems.append(f"{identifier}: {field} {[item[key] for item in found]} != {expect[field]}")
+    return problems
 
 
 def options(root: Path, spec: dict[str, Any]) -> dict[str, Any]:
@@ -93,7 +216,7 @@ def search(root: Path, identifier: str, query: str, filters: dict[str, str] | No
     entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
              "query": query, "filters": filters, "since": since, "limit": limit}
     try:
-        found = module(spec).search(query, filters, since, limit, options(root, spec))
+        found = module(spec, root).search(query, filters, since, limit, options(root, spec))
     except kit.AdapterError as error:
         log_search(log, {**entry, "status": "error", "count": 0, "error": str(error)[:300]})
         raise
@@ -112,7 +235,7 @@ def related(root: Path, identifier: str, item: dict[str, Any], direction: str, l
     entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
              "related": item["key"], "direction": direction, "limit": limit}
     try:
-        found = module(spec).related(item, direction, limit, options(root, spec))
+        found = module(spec, root).related(item, direction, limit, options(root, spec))
     except kit.AdapterError as error:
         log_search(log, {**entry, "status": "error", "count": 0, "error": str(error)[:300]})
         raise
@@ -132,7 +255,7 @@ def retractions(root: Path, dois: list[str], log: Path | None = None) -> dict[st
         entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
                  "retractionCheck": len(dois)}
         try:
-            result = module(spec).retracted(dois, options(root, spec))
+            result = module(spec, root).retracted(dois, options(root, spec))
         except kit.AdapterError as error:
             log_search(log, {**entry, "status": "error", "count": 0, "error": str(error)[:300]})
             raise
@@ -193,11 +316,42 @@ def main() -> int:
     follow.add_argument("--direction", choices=kit.DIRECTIONS, required=True)
     follow.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
     follow.add_argument("--json", action="store_true")
+    commands.add_parser("packs")
+    for name in ("enable", "disable"):
+        commands.add_parser(name).add_argument("pack")
+    new = commands.add_parser("new")
+    new.add_argument("adapter")
+    new.add_argument("--family", required=True, choices=kit.FAMILIES)
+    new.add_argument("--evidence-type", required=True, choices=kit.EVIDENCE_TYPES)
+    check = commands.add_parser("test")
+    check.add_argument("adapter", nargs="?", help="default: every adapter with a fixture")
     args = parser.parse_args()
     root = args.root.resolve()
     # Titles come in every script; a console that cannot show one prints a placeholder instead of crashing.
     sys.stdout.reconfigure(errors="replace")
     try:
+        if args.command == "packs":
+            active = set(descriptors(root))
+            for identifier, pack in packs().items():
+                state = "enabled" if set(pack["descriptors"]) <= active else "available"
+                print(f"{identifier:<12} {state:<10} {', '.join(pack['descriptors'])}: {pack['description']}")
+            return 0
+        if args.command in ("enable", "disable"):
+            names = set_pack(root, args.pack, args.command == "enable")
+            print(f"{args.command}d pack {args.pack}: {', '.join(names)} in catalog/adapters")
+            return 0
+        if args.command == "new":
+            for path in scaffold(root, args.adapter, args.family, args.evidence_type):
+                print(f"wrote {path.relative_to(root).as_posix()}")
+            print(f"edit the module and its fixture, then ./rc sources test {args.adapter}")
+            return 0
+        if args.command == "test":
+            targets = [args.adapter] if args.adapter else [identifier for identifier in testable(root) if fixture_path(root, identifier).is_file()]
+            problems = [problem for identifier in targets for problem in run_fixture(root, identifier)]
+            for problem in problems:
+                print(f"fail: {problem}", file=sys.stderr)
+            print(f"{len(targets) - len({problem.split(':')[0] for problem in problems})} of {len(targets)} adapter fixtures passed")
+            return 1 if problems else 0
         if args.command == "list":
             for identifier, spec in descriptors(root).items():
                 print(f"{identifier:<12} {spec['family']:<10} {spec['covers']}")

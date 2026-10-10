@@ -167,8 +167,9 @@ def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
         if unknown or not spec.get("evidenceTypes"):
             errors.append(f"{name}: evidenceTypes must be a non-empty subset of {kit.EVIDENCE_TYPES}")
         module = str(spec.get("module", ""))
-        if not re.fullmatch(r"[a-z0-9_]+", module) or not (HERE / "sources" / "adapters" / f"{module}.py").is_file():
-            errors.append(f"{name}: module {module!r} is not in scripts/sources/adapters/")
+        own = root / "catalog" / "adapters" / "code" / f"{module}.py"
+        if not re.fullmatch(r"[a-z0-9_]+", module) or not ((HERE / "sources" / "adapters" / f"{module}.py").is_file() or own.is_file()):
+            errors.append(f"{name}: module {module!r} is neither in scripts/sources/adapters/ nor in catalog/adapters/code/")
         if not isinstance(spec.get("retractions", False), bool):
             errors.append(f"{name}: retractions must be true or false")
         if spec.get("needsKeyEnv") is not None and not re.fullmatch(r"[A-Z][A-Z0-9_]*", str(spec["needsKeyEnv"])):
@@ -261,6 +262,13 @@ def validate(root: Path) -> list[str]:
             check_settings(root, template, root / "templates" / "agents", errors, "templates/research-center.json")
         check_adapters(root, root / "templates" / "adapters", errors)
         check_evidence_types(root, root / "templates" / "evidence-types.json", errors)
+        for pack in sorted((root / "templates" / "packs").glob("*/pack.json")):
+            data = load(pack, errors, root)
+            if not isinstance(data, dict) or data.get("id") != pack.parent.name or not data.get("description"):
+                errors.append(f"{pack.relative_to(root).as_posix()}: id must equal the folder name, with a description")
+            if not any((pack.parent / "adapters").glob("*.json")):
+                errors.append(f"{pack.relative_to(root).as_posix()}: a pack ships at least one adapter in adapters/")
+            check_adapters(root, pack.parent / "adapters", errors)
         if not any((root / "templates" / "adapters").glob("*.json")):
             errors.append("templates/adapters/: the template must ship the default source adapters")
         for folder in DATA_DIRS:

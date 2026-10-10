@@ -27,7 +27,8 @@ Use a pick list when the choices are discrete. Recommend an option and say why. 
 4. **Our needs**: the stack, constraints and problems the answer must fit, cited from the profile as `knowledge/profile/<note>.md`. For an individual: what they want to learn or build.
 5. **Success criteria**: what the report must enable, such as a choice between options, a go/no-go, or a reading list.
 6. **Source preferences**: trusted and distrusted sources, languages, paywalls.
-7. **Living**: should the RC keep this topic current? Recommend a cadence from how fast the evidence moves (`weekly` for news-driven topics, `monthly` for active fields, `quarterly` for slow ones, `derived` to follow the plan's horizon, `none` for a one-off question). Agree on `Retire when:`: the decision, date or event after which refreshing stops paying off.
+7. **Sources**: `./rc sources list` shows the adapters this RC searches, and `./rc sources packs` the domain packs it could. Recommend enabling a pack that fits the topic (medicine for health questions, software for tools and libraries) with `./rc sources enable <pack>`. When a key source has a feed or a page worth watching, put it in Source preferences so the planner uses the feed or page-watch adapter. When a key source needs an API no adapter covers, `./rc sources new` scaffolds one for the user to finish.
+8. **Living**: should the RC keep this topic current? Recommend a cadence from how fast the evidence moves (`weekly` for news-driven topics, `monthly` for active fields, `quarterly` for slow ones, `derived` to follow the plan's horizon, `none` for a one-off question). Agree on `Retire when:`: the decision, date or event after which refreshing stops paying off.
 
 Challenge answers that would make the research unfalsifiable or unbounded. Point out questions the profile shows are already settled.
 

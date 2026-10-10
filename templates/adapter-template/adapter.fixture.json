@@ -1,0 +1,39 @@
+{
+  "query": "example",
+  "since": "2025-01-01",
+  "responses": [
+    {
+      "match": "api.example.org/search",
+      "body": {
+        "results": [
+          {
+            "title": "An example result",
+            "url": "https://example.org/items/1",
+            "date": "2026-02-01",
+            "authors": [
+              "A. Writer"
+            ],
+            "summary": "What it says."
+          },
+          {
+            "title": "An older result",
+            "url": "https://example.org/items/0",
+            "date": "2019-05-01"
+          },
+          {
+            "title": "No URL"
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "count": 1,
+    "titles": [
+      "An example result"
+    ],
+    "evidenceTypes": [
+      "__EVIDENCE__"
+    ]
+  }
+}

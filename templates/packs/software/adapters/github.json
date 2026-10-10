@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "github",
+  "module": "github",
+  "family": "code",
+  "covers": "Public GitHub repositories: open-source projects, libraries and tools, with description, last activity, stars, language and topics. Follow a project's releases with the feed adapter on https://github.com/<owner>/<repo>/releases.atom.",
+  "evidenceTypes": [
+    "documentation"
+  ],
+  "queryHelp": "GitHub repository search: keywords, in:readme, topic:<name>, org:<name>.",
+  "filters": {
+    "language": "Programming language, e.g. python",
+    "minStars": "Only repositories with at least this many stars",
+    "sort": "stars or updated; default best match"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 6.0
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "__ID__",
+  "module": "__MODULE__",
+  "family": "__FAMILY__",
+  "covers": "Say in plain words what this source holds, for which subjects, from when: the planner chooses adapters by this sentence.",
+  "evidenceTypes": [
+    "__EVIDENCE__"
+  ],
+  "queryHelp": "How to write a query for this source.",
+  "filters": {},
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 1.0
+}

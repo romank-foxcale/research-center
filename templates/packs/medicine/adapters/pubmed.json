@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "pubmed",
+  "module": "pubmed",
+  "family": "scholarly",
+  "covers": "Biomedical, health and life-science literature indexed by the US National Library of Medicine: clinical trials, systematic reviews and meta-analyses, guidelines, case reports, with abstracts and retraction flags.",
+  "evidenceTypes": [
+    "review",
+    "peer-reviewed",
+    "report",
+    "preprint",
+    "dataset",
+    "commentary",
+    "journalism"
+  ],
+  "queryHelp": "PubMed search syntax: keywords, quoted phrases, AND/OR/NOT, field tags such as [tiab] or [mh] (MeSH).",
+  "filters": {
+    "type": "PubMed publication type, e.g. Randomized Controlled Trial, Meta-Analysis, Systematic Review, Practice Guideline"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 0.4
+}

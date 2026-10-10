@@ -222,6 +222,56 @@ def test_contract(log: Path) -> None:
         assert all(word in joined for word in ("module", "evidenceTypes", "watchable", "needsKeyEnv")), errors
 
 
+def test_packs_and_own_adapters() -> None:
+    """Packs are enabled per instance without touching code; an adapter made with `new` passes its own fixture test;
+    every shipped fixture passes."""
+    assert sources.run_fixture(REPO, "pubmed") == [] and sources.run_fixture(REPO, "github") == []
+    assert "pubmed" not in sources.descriptors(REPO), "a pack is not active until an instance enables it"
+    previous, kit.TRANSPORT = kit.TRANSPORT, None
+    try:
+        fixture = json.loads((FIXTURES / "pubmed.fixture.json").read_text(encoding="utf-8"))
+        responses = fixture["responses"]
+        kit.TRANSPORT = lambda url: next(((json.dumps(item["body"]) if not isinstance(item["body"], str) else item["body"]).encode(),
+                                          item.get("contentType", "application/json")) for item in responses if item["match"] in url)
+        found = sources.module(sources.packs()["medicine"]["descriptors"]["pubmed"]).search("x", {"type": "Meta-Analysis"}, "2024-01-01", 5,
+                                                                                             {"interval": 0})
+        assert [item["extra"]["retracted"] for item in found] == [False, True], "a Retracted Publication type flags the record"
+        assert found[0]["abstract"] == "Long hours harm health. Wellbeing rose with no loss of output."
+        assert found[0]["authors"] == ["Example A"], "collective names are not authors"
+    finally:
+        kit.TRANSPORT = previous
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        # File by file: under Nix the template is read-only, and copytree would carry that over to the directory.
+        (root / "catalog" / "adapters").mkdir(parents=True)
+        for path in (REPO / "templates" / "adapters").glob("*.json"):
+            shutil.copyfile(path, root / "catalog" / "adapters" / path.name)
+        (root / "research-center.json").write_text((REPO / "templates" / "research-center.json").read_text(encoding="utf-8"), encoding="utf-8")
+        assert sources.set_pack(root, "medicine", True) == ["pubmed"] and "pubmed" in sources.descriptors(root)
+        sources.set_pack(root, "medicine", False)
+        assert "pubmed" not in sources.descriptors(root)
+        raises(ValueError, sources.set_pack, root, "astrology", True)
+        raises(ValueError, sources.set_pack, REPO, "medicine", True)
+
+        written = sources.scaffold(root, "city-council", "regulatory", "regulation")
+        assert [path.name for path in written] == ["city-council.json", "city_council.py", "city-council.fixture.json"]
+        assert sources.run_fixture(root, "city-council") == [], sources.run_fixture(root, "city-council")
+        text = "".join(path.read_text(encoding="utf-8") for path in written)
+        assert not any(token in text for token in ("__ID__", "__MODULE__", "__FAMILY__", "__EVIDENCE__")), "every placeholder is filled"
+        raises(ValueError, sources.scaffold, root, "openalex", "scholarly", "peer-reviewed")
+        raises(ValueError, sources.scaffold, root, "Bad Name", "web", "unknown")
+        validator = __import__("importlib.util").util
+        spec = validator.spec_from_file_location("validate_rc", REPO / "scripts" / "validate-research-center.py")
+        checker = validator.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        errors: list[str] = []
+        checker.check_adapters(root, root / "catalog" / "adapters", errors)
+        assert errors == [], errors
+        broken = root / "catalog" / "adapters" / "code" / "city-council.fixture.json"
+        broken.write_text(broken.read_text(encoding="utf-8").replace('"count": 1', '"count": 3'), encoding="utf-8")
+        assert "expected 3 records, got 1" in " ".join(sources.run_fixture(root, "city-council"))
+
+
 def test_rate_limit() -> None:
     slept: list[float] = []
     clock, sleep = kit.time.monotonic, kit.time.sleep
@@ -239,6 +289,8 @@ def main() -> int:
     kit.TRANSPORT = transport
     test_keys_and_dates()
     test_rate_limit()
+    test_packs_and_own_adapters()
+    kit.TRANSPORT = transport
     with tempfile.TemporaryDirectory() as directory:
         log = Path(directory) / "searches.json"
         test_scholarly(log)

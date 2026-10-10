@@ -22,7 +22,7 @@ usage() {
     '  research run <topic> [--from plan|search|screen|collect|analyze|critique|judge|apply|report] [--budget N]' \
     '  research refresh <topic> | refresh --due [--budget N]  Re-search a living topic; write research/<topic>/delta/<date>.md' \
     '  research pause|resume|retire <topic>' \
-    '  sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward' \
+    '  sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward' \n    '  sources packs | enable <pack> | disable <pack> | new <adapter> --family F --evidence-type T | test [<adapter>]' \
     '  watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result' \
     '  settings [show]  Settings as text: status, budgets, limits, agents and their models' \
     '  roles [list] | roles set <role> [--provider claude|codex|cursor] [--model M]' \

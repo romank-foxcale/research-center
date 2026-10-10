@@ -1,0 +1,49 @@
+{
+  "query": "living systematic review",
+  "filters": {
+    "language": "python",
+    "minStars": "5"
+  },
+  "since": "2025-01-01",
+  "responses": [
+    {
+      "match": "api.github.com/search/repositories",
+      "body": {
+        "items": [
+          {
+            "full_name": "lab/lsr-tools",
+            "html_url": "https://github.com/lab/lsr-tools",
+            "description": "Tools for living reviews",
+            "pushed_at": "2026-04-06T10:00:00Z",
+            "stargazers_count": 42,
+            "language": "Python",
+            "topics": [
+              "systematic-review"
+            ],
+            "owner": {
+              "login": "lab"
+            },
+            "license": {
+              "spdx_id": "MIT"
+            }
+          },
+          {
+            "full_name": "broken"
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "count": 1,
+    "titles": [
+      "lab/lsr-tools"
+    ],
+    "evidenceTypes": [
+      "documentation"
+    ],
+    "dates": [
+      "2026-04-06"
+    ]
+  }
+}

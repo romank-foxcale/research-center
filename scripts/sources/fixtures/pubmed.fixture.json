@@ -1,0 +1,94 @@
+{
+  "query": "reduced working hours",
+  "filters": {
+    "type": "Randomized Controlled Trial"
+  },
+  "since": "2024-01-01",
+  "responses": [
+    {
+      "match": "esearch.fcgi",
+      "body": {
+        "esearchresult": {
+          "idlist": [
+            "111",
+            "222"
+          ]
+        }
+      }
+    },
+    {
+      "match": "esummary.fcgi",
+      "body": {
+        "result": {
+          "uids": [
+            "111",
+            "222"
+          ],
+          "111": {
+            "title": "Reduced working hours and wellbeing: a randomized controlled trial.",
+            "sortpubdate": "2025/03/04 00:00",
+            "fulljournalname": "Journal of Occupational Health",
+            "pubtype": [
+              "Journal Article",
+              "Randomized Controlled Trial"
+            ],
+            "authors": [
+              {
+                "name": "Example A",
+                "authtype": "Author"
+              },
+              {
+                "name": "Trial Group",
+                "authtype": "CollectiveName"
+              }
+            ],
+            "articleids": [
+              {
+                "idtype": "pubmed",
+                "value": "111"
+              },
+              {
+                "idtype": "doi",
+                "value": "10.5555/joh.111"
+              }
+            ]
+          },
+          "222": {
+            "title": "Shorter weeks: a retracted study.",
+            "sortpubdate": "2024/01/10 00:00",
+            "pubtype": [
+              "Journal Article",
+              "Retracted Publication"
+            ],
+            "authors": [],
+            "articleids": []
+          }
+        }
+      }
+    },
+    {
+      "match": "efetch.fcgi",
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE PubmedArticleSet PUBLIC \"-//NLM//DTD PubMedArticle//EN\" \"https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_240101.dtd\">\n<PubmedArticleSet><PubmedArticle><MedlineCitation><PMID>111</PMID><Article><Abstract><AbstractText Label=\"BACKGROUND\">Long hours harm health.</AbstractText><AbstractText Label=\"RESULTS\">Wellbeing rose with <i>no</i> loss of output.</AbstractText></Abstract></Article></MedlineCitation></PubmedArticle></PubmedArticleSet>",
+      "contentType": "text/xml"
+    }
+  ],
+  "expect": {
+    "count": 2,
+    "titles": [
+      "Reduced working hours and wellbeing: a randomized controlled trial",
+      "Shorter weeks: a retracted study"
+    ],
+    "evidenceTypes": [
+      "peer-reviewed",
+      "peer-reviewed"
+    ],
+    "keys": [
+      "doi:10.5555/joh.111",
+      "url:https://pubmed.ncbi.nlm.nih.gov/222"
+    ],
+    "dates": [
+      "2025-03-04",
+      "2024-01-10"
+    ]
+  }
+}
