@@ -1,0 +1,27 @@
+{
+ "docs": [
+  {
+   "key": "/works/OL1W",
+   "title": "The four-day week",
+   "author_name": [
+    "Old Author"
+   ],
+   "first_publish_year": 1972,
+   "isbn": [
+    "9780000000001"
+   ]
+  },
+  {
+   "key": "/works/OL2W",
+   "title": "Case for a four day week",
+   "author_name": [
+    "New Author",
+    "Second Author"
+   ],
+   "first_publish_year": 2020
+  },
+  {
+   "title": "No key"
+  }
+ ]
+}

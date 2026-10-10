@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE), str(HERE / "ingest"), str(HERE / "runner")]
+sys.path[:0] = [str(HERE), str(HERE / "ingest"), str(HERE / "runner"), str(HERE / "sources")]
+import kit  # noqa: E402
 import secrets_scan  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("validate_knowledge", HERE / "validate-knowledge.py")
@@ -50,7 +51,9 @@ NUMBERS = {
 }
 DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
-CLAIM = re.compile(r"\[(C\d+)\]")
+CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
+ADAPTER_FIELDS = {"schemaVersion": int, "id": str, "module": str, "family": str, "covers": str, "evidenceTypes": list,
+                  "queryHelp": str, "filters": dict, "watchable": bool, "related": bool, "rateLimit": (int, float)}
 NOTE_FIELDS = ("id", "title", "status", "summary", "verified_at")
 
 
@@ -111,6 +114,35 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
             errors.append(f"{label}: pipeline.{slot} names role {identifier!r}, which is not in {roles_dir.relative_to(root)}")
         elif roles[identifier].get("access") != access:
             errors.append(f"{label}: pipeline.{slot} needs {access} access; role {identifier} has {roles[identifier].get('access')}")
+    email = settings.get("research", {}).get("contactEmail", "")
+    if not isinstance(email, str) or (email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)):
+        errors.append(f"{label}: research.contactEmail must be empty or an email address the user chose to share")
+
+
+def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
+    """Every adapter descriptor names an existing module and only known families and evidence types."""
+    for path in sorted(directory.glob("*.json")):
+        name = path.relative_to(root).as_posix()
+        spec = load(path, errors, root)
+        if not isinstance(spec, dict):
+            continue
+        for field, kind in ADAPTER_FIELDS.items():
+            value = spec.get(field)
+            # bool is an int in Python; a flag where a number belongs (or the reverse) is still wrong.
+            if not isinstance(value, kind) or isinstance(value, bool) != (kind is bool):
+                errors.append(f"{name}: {field} must be {kind.__name__ if isinstance(kind, type) else 'a number'}")
+        if spec.get("id") != path.stem:
+            errors.append(f"{name}: id must equal the file name")
+        if spec.get("family") not in kit.FAMILIES:
+            errors.append(f"{name}: family must be one of {kit.FAMILIES}")
+        unknown = set(spec.get("evidenceTypes") or []) - set(kit.EVIDENCE_TYPES)
+        if unknown or not spec.get("evidenceTypes"):
+            errors.append(f"{name}: evidenceTypes must be a non-empty subset of {kit.EVIDENCE_TYPES}")
+        module = str(spec.get("module", ""))
+        if not re.fullmatch(r"[a-z0-9_]+", module) or not (HERE / "sources" / "adapters" / f"{module}.py").is_file():
+            errors.append(f"{name}: module {module!r} is not in scripts/sources/adapters/")
+        if spec.get("needsKeyEnv") is not None and not re.fullmatch(r"[A-Z][A-Z0-9_]*", str(spec["needsKeyEnv"])):
+            errors.append(f"{name}: needsKeyEnv must be null or an environment variable name; keys are never stored")
 
 
 def check_sources(root: Path, errors: list[str]) -> None:
@@ -165,7 +197,8 @@ def check_reports(root: Path, errors: list[str]) -> None:
         known = {claim["id"] for claim in claims.get("claims", [])}
         verdicts = {item["claim"]: item["verdict"] for item in judgement.get("claims", [])}
         body = report.read_text(encoding="utf-8").split("\n## Evidence\n", 1)[0]
-        for claim in sorted(set(CLAIM.findall(body))):
+        cited = {claim for group in CLAIM.findall(body) for claim in re.split(r"\s*[,;]\s*", group)}
+        for claim in sorted(cited):
             if claim not in known:
                 errors.append(f"{name}/report.md: cites {claim}, which is not in claims.json")
             elif verdicts.get(claim) in ("REFUTED", "UNSUPPORTED"):
@@ -179,6 +212,7 @@ def validate(root: Path) -> list[str]:
         settings = load(settings_path, errors, root)
         if isinstance(settings, dict):
             check_settings(root, settings, root / "catalog" / "agents", errors, "research-center.json")
+        check_adapters(root, root / "catalog" / "adapters", errors)
         check_sources(root, errors)
         check_notes(root, errors)
         check_reports(root, errors)
@@ -187,6 +221,9 @@ def validate(root: Path) -> list[str]:
         template = load(root / "templates" / "research-center.json", errors, root)
         if isinstance(template, dict):
             check_settings(root, template, root / "templates" / "agents", errors, "templates/research-center.json")
+        check_adapters(root, root / "templates" / "adapters", errors)
+        if not any((root / "templates" / "adapters").glob("*.json")):
+            errors.append("templates/adapters/: the template must ship the default source adapters")
         for folder in DATA_DIRS:
             if any(path.is_file() and path.name != ".gitkeep" for path in (root / folder).rglob("*")):
                 errors.append(f"{folder}/: the template ships no data; ingest and research only in an instance")

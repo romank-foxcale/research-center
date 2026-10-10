@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "openlibrary",
+  "module": "openlibrary",
+  "family": "books",
+  "covers": "Books on any subject, any era: titles, authors, first publication year, ISBNs and subjects.",
+  "evidenceTypes": [
+    "book"
+  ],
+  "queryHelp": "Keywords, a title or an author name.",
+  "filters": {
+    "language": "MARC language code, e.g. eng, ger, fre"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 1.0
+}

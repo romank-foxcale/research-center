@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "gdelt",
+  "module": "gdelt",
+  "family": "news",
+  "covers": "Worldwide online news in more than 60 languages from the last three months, newest first: events, announcements, public debate and local coverage.",
+  "evidenceTypes": [
+    "journalism"
+  ],
+  "queryHelp": "Keywords; quote exact phrases (\"four-day week\"); OR between alternatives in parentheses.",
+  "filters": {
+    "language": "Source language name, e.g. english, german",
+    "country": "Source country name, e.g. france, japan"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 5.0
+}

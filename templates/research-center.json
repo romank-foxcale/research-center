@@ -13,7 +13,8 @@
     "chunkBytes": 150000
   },
   "research": {
-    "maxSourcesPerResearcher": 15
+    "maxSourcesPerResearcher": 15,
+    "contactEmail": ""
   },
   "pipeline": {
     "connectorReader": "connector-reader",

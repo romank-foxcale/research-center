@@ -1,0 +1,84 @@
+{
+ "meta": {
+  "count": 3
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W100",
+   "doi": "https://doi.org/10.5555/WT.2025.1",
+   "display_name": "Productivity under a four-day week",
+   "publication_date": "2025-06-09",
+   "type": "article",
+   "language": "en",
+   "cited_by_count": 12,
+   "is_retracted": false,
+   "primary_location": {
+    "landing_page_url": "https://doi.org/10.5555/wt.2025.1",
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Working Time"
+    }
+   },
+   "open_access": {
+    "oa_url": "https://repository.example.org/wt-2025-1.pdf"
+   },
+   "authorships": [
+    {
+     "author": {
+      "display_name": "Ada Example"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Ben Sample"
+     }
+    }
+   ],
+   "abstract_inverted_index": {
+    "Output": [
+     0
+    ],
+    "per": [
+     1
+    ],
+    "hour": [
+     2
+    ],
+    "rose": [
+     3
+    ],
+    "by": [
+     4
+    ],
+    "7": [
+     5
+    ],
+    "percent.": [
+     6
+    ]
+   }
+  },
+  {
+   "id": "https://openalex.org/W200",
+   "doi": null,
+   "display_name": "Working paper on compressed weeks",
+   "publication_year": 2024,
+   "type": "article",
+   "primary_location": {
+    "landing_page_url": "https://papers.example.org/wp-200",
+    "source": {
+     "type": "repository",
+     "display_name": "Example Repository"
+    }
+   },
+   "authorships": [],
+   "is_retracted": true
+  },
+  {
+   "id": "https://openalex.org/W300",
+   "doi": null,
+   "display_name": null,
+   "type": "article"
+  }
+ ]
+}

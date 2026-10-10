@@ -79,6 +79,11 @@ def materialize(source: Path, target: Path) -> None:
     for path in sorted((source / "templates" / "agents").glob("*.json")):
         shutil.copy2(path, target / "catalog" / "agents" / path.name)
 
+    # Default source adapters; an instance may add, remove or tune its own (docs/decisions/0007-source-adapters.md).
+    (target / "catalog" / "adapters").mkdir(parents=True, exist_ok=True)
+    for path in sorted((source / "templates" / "adapters").glob("*.json")):
+        shutil.copy2(path, target / "catalog" / "adapters" / path.name)
+
     for relative in (
         "catalog/sources",
         "sources",

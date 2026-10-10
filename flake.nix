@@ -57,6 +57,7 @@
               ${python} -B ${self}/scripts/ingest/ingest_test.py
             '';
             research = check "research" "${python} -B ${self}/scripts/research/research_test.py";
+            sources = check "sources" "${python} -B ${self}/scripts/sources/sources_test.py";
           };
 
           apps = {

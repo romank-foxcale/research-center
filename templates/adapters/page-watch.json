@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "page-watch",
+  "module": "page_watch",
+  "family": "web",
+  "covers": "One web page fingerprinted so later refreshes notice changes: pricing, policies, consolidated laws, standards status pages, dataset landing pages, product documentation.",
+  "evidenceTypes": [
+    "documentation",
+    "regulation",
+    "vendor",
+    "official-statistics",
+    "standard",
+    "unknown"
+  ],
+  "queryHelp": "The page's http(s) URL.",
+  "filters": {
+    "evidenceType": "What the page is, one of the evidence types; default unknown"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 1.0
+}

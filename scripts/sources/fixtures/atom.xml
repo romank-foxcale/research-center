@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Lab blog</title>
+<entry><title>Pilot results</title><link rel="related" href="https://lab.example.org/data.csv"/><link href="https://lab.example.org/pilot"/>
+<updated>2026-09-30T12:00:00Z</updated><author><name>Dr. Lab</name></author><summary>Results of the pilot.</summary></entry>
+</feed>

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "wikipedia",
+  "module": "wikipedia",
+  "family": "reference",
+  "covers": "Encyclopedia articles on almost any subject in many languages: orientation, terminology, history and the references the articles cite. A starting point, never evidence by itself.",
+  "evidenceTypes": [
+    "reference"
+  ],
+  "queryHelp": "A subject name or keywords.",
+  "filters": {
+    "lang": "Wikipedia language code, default en"
+  },
+  "watchable": false,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 0.5
+}

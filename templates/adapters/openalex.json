@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "openalex",
+  "module": "openalex",
+  "family": "scholarly",
+  "covers": "Scholarly works of every discipline (sciences, medicine, social sciences, humanities, engineering, law, economics): journal articles, preprints, books, reports, datasets and theses, with citation counts and retraction flags.",
+  "evidenceTypes": [
+    "peer-reviewed",
+    "preprint",
+    "review",
+    "book",
+    "report",
+    "dataset",
+    "thesis",
+    "standard",
+    "commentary"
+  ],
+  "queryHelp": "Plain keywords, as in a library catalogue; quote phrases. Searches titles, abstracts and full text where available.",
+  "filters": {
+    "type": "OpenAlex work type: article, review, preprint, book, dataset, report, dissertation",
+    "language": "ISO 639-1 code, e.g. en, de",
+    "oa": "true keeps only open-access works"
+  },
+  "watchable": true,
+  "related": true,
+  "needsKeyEnv": null,
+  "rateLimit": 0.2
+}

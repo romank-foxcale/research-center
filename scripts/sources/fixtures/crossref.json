@@ -1,0 +1,74 @@
+{
+ "status": "ok",
+ "message": {
+  "items": [
+   {
+    "DOI": "10.5555/WT.2025.1",
+    "type": "journal-article",
+    "title": [
+     "Productivity under a four-day week"
+    ],
+    "author": [
+     {
+      "given": "Ada",
+      "family": "Example"
+     }
+    ],
+    "published": {
+     "date-parts": [
+      [
+       2025,
+       6,
+       9
+      ]
+     ]
+    },
+    "URL": "https://doi.org/10.5555/wt.2025.1",
+    "container-title": [
+     "Journal of Working Time"
+    ],
+    "publisher": "Example Press",
+    "abstract": "<jats:p>Output per hour <jats:italic>rose</jats:italic>.</jats:p>",
+    "is-referenced-by-count": 12
+   },
+   {
+    "DOI": "10.5555/conv.1",
+    "type": "posted-content",
+    "subtype": "other",
+    "title": [
+     "Will a four-day week work for teachers?"
+    ],
+    "author": [
+     {
+      "name": "Editorial Team"
+     }
+    ],
+    "posted": {
+     "date-parts": [
+      [
+       2025,
+       12
+      ]
+     ]
+    },
+    "resource": {
+     "primary": {
+      "URL": "https://news.example.org/four-day-teachers"
+     }
+    },
+    "URL": "https://doi.org/10.5555/conv.1",
+    "updated-by": [
+     {
+      "type": "retraction",
+      "DOI": "10.5555/conv.1.retraction"
+     }
+    ]
+   },
+   {
+    "DOI": "10.5555/untitled",
+    "type": "journal-article",
+    "URL": "https://doi.org/10.5555/untitled"
+   }
+  ]
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "articles": [
+  {
+   "url": "https://news.example.org/a?id=1&utm_source=x",
+   "title": "Trial ends",
+   "seendate": "20261002T043000Z",
+   "domain": "news.example.org",
+   "language": "English",
+   "sourcecountry": "United Kingdom"
+  },
+  {
+   "url": "https://news.example.org/a?id=2",
+   "title": "Trial extended",
+   "seendate": "20261001T031500Z"
+  }
+ ]
+}

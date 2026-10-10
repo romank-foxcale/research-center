@@ -3,12 +3,13 @@ id: architecture.research-center
 title: Research Center architecture
 status: active
 summary: The RC is a runner that drives read-only agent roles through ingest (fetch, digest, profile) and research (plan, collect, analyze, critique, judge, apply, report); every file is written by the runner and every fact is traced to stored text.
-verified_at: 2026-10-09
+verified_at: 2026-10-10
 evidence:
   - scripts/runner/rc.py
   - scripts/ingest/ingest.py
   - scripts/research/research.py
   - templates/research-center.json
+  - scripts/sources/sources.py
 relations:
   - docs/decisions/0001-template-and-instances.md
   - docs/decisions/0003-read-only-agents.md
@@ -23,6 +24,7 @@ relations:
 | --- | --- | --- |
 | research-center.json | budgets, ingest limits, which role fills which pipeline slot | the user (bootstrap) |
 | catalog/agents/ | one JSON per role: provider, model, access, skills | the user (`./rc roles set`) |
+| catalog/adapters/ | one JSON per source adapter: family, what it covers, filters, rate limit | the template (seeded), the user |
 | catalog/sources/ | one JSON per source: kind, locators, include/exclude, note | `./rc ingest add`, research collect |
 | sources/&lt;id&gt;/ | extracted text, manifest (origin, sha256, extractor), redactions | ingest runner |
 | knowledge/digests/ | one cited digest per user source, with the manifest fingerprint | ingest runner (digester role) |
@@ -40,4 +42,5 @@ relations:
 
 - `scripts/runner/rc.py`: settings, roles, the call budget, checked and parallel calls, and the event stream `./rc watch` follows.
 - `scripts/runner/providers.py`: one headless CLI call per role, with access enforced by flags.
+- `scripts/sources/`: source adapters the runner searches besides the web (`./rc sources`), one record shape keyed by DOI or canonical URL, every search logged (docs/decisions/0007-source-adapters.md).
 - `nix/tools.nix`: pandoc, pdftotext, python-pptx and openpyxl for ingest and collect. It is built from that file alone, so a large instance is not copied into the store on every command.

@@ -2,8 +2,8 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, handoff.
-verified_at: 2026-10-09
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, handoff.
+verified_at: 2026-10-10
 evidence:
   - scripts/research/research.py
   - scripts/ingest/ingest.py
@@ -23,4 +23,7 @@ relations:
 - **Verdict**: HOLDS, WEAK, REFUTED or UNSUPPORTED for a claim; SURVIVES, WEAKENED or FALLS for an idea.
 - **Contested**: a claim a reviewer refuted and the judge kept. Only the user settles it.
 - **Fit ring**: ADOPT, TRIAL, ASSESS or HOLD: how an idea fits the user's repos and needs.
+- **Adapter**: a runner-side search over one kind of source (scholarly works, news, books, a feed, a watched page), described in catalog/adapters/&lt;id&gt;.json.
+- **Record**: one adapter result: title, authors, date, URL, DOI, evidence type, abstract; keyed by DOI, else canonical URL.
+- **Evidence type**: what kind of evidence a record is (peer-reviewed, preprint, journalism, regulation, book, ...), independent of the subject.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

@@ -20,6 +20,7 @@ usage() {
     '  ingest run [id...] [--budget N] [--profile|--no-profile]  Fetch, digest, profile' \
     '  research new <topic> --title "..." | accept <topic> | list | show <topic>' \
     '  research run <topic> [--from plan|collect|analyze|critique|judge|apply|report] [--budget N]' \
+    '  sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward' \
     '  watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result' \
     '  settings [show]  Settings as text: status, budgets, limits, agents and their models' \
     '  roles [list] | roles set <role> [--provider claude|codex|cursor] [--model M]' \
@@ -104,6 +105,9 @@ case "$command_name" in
     ;;
   research)
     with_tools "$rc_root/scripts/research/research.py" "$rc_root" "$@"
+    ;;
+  sources)
+    exec python3 "$rc_root/scripts/sources/sources.py" "$rc_root" "$@"
     ;;
   watch)
     exec python3 "$rc_root/scripts/runner/events.py" "$rc_root" "$@"

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "crossref",
+  "module": "crossref",
+  "family": "scholarly",
+  "covers": "DOI metadata deposited by publishers of every field: articles, books, reports, conference papers, standards, preprints; includes retraction, correction and withdrawal notices.",
+  "evidenceTypes": [
+    "peer-reviewed",
+    "preprint",
+    "book",
+    "report",
+    "dataset",
+    "standard",
+    "thesis",
+    "reference",
+    "commentary"
+  ],
+  "queryHelp": "Free text matched against bibliographic metadata (titles, authors, venues).",
+  "filters": {
+    "type": "Crossref type: journal-article, posted-content, book, report, proceedings-article, dataset, standard"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 0.5
+}

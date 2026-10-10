@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "feed",
+  "module": "feed",
+  "family": "feed",
+  "covers": "The latest items of any RSS or Atom feed the user or the planner names: journal tables of contents, regulators, agencies, labs, company blogs, newsrooms, arXiv queries.",
+  "evidenceTypes": [
+    "peer-reviewed",
+    "preprint",
+    "journalism",
+    "commentary",
+    "vendor",
+    "regulation",
+    "official-statistics",
+    "documentation",
+    "unknown"
+  ],
+  "queryHelp": "The feed's http(s) URL.",
+  "filters": {
+    "evidenceType": "What the feed publishes, one of the evidence types; default unknown"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": null,
+  "rateLimit": 1.0
+}

@@ -80,6 +80,8 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc research new agent-memory --title "Long-term memory for coding agents"
 ./rc research accept agent-memory             after grilling
 ./rc research run agent-memory                then ./rc watch
+./rc sources list                             adapters beyond web search
+./rc sources search openalex "four-day work week" --since 2023-01-01
 ./rc roles set judge --provider claude --model opus
 ./rc check
 ```

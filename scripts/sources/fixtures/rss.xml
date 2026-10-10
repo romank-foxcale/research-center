@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>Agency news</title>
+<item><title><![CDATA[New working time statistics]]></title><link>https://agency.example.org/stats/2026</link>
+<description><![CDATA[<p>Average hours <b>fell</b>.</p>]]></description><pubDate>Fri, 02 Oct 2026 09:00:00 GMT</pubDate><dc:creator>Statistics Office</dc:creator></item>
+<item><title>Older release</title><link>https://agency.example.org/stats/2024</link><pubDate>Mon, 01 Jan 2024 09:00:00 GMT</pubDate></item>
+<item><title>No link at all</title></item>
+</channel></rss>
