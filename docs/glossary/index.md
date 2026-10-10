@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, screening flow, handoff.
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -29,5 +29,6 @@ relations:
 - **Hypothesis**: an answer the planner expects (H1..). Each one gets at least one disconfirming search.
 - **Exclusion criterion**: a numbered reason (X1..) taken from the brief for which the screener drops a record; X0 is "bears on no question".
 - **Candidate**: a record the adapter searches found (R1..), before screening. **Included** candidates are stored and read by the researchers.
+- **Snowballing**: following the references (backward) and the citing works (forward) of the key included records, one hop per research.snowballDepth, each hop screened again.
 - **Screening flow**: identified, duplicates, screened, excluded by criterion, included (PRISMA-style), shown in screening.md and the report.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

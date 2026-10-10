@@ -16,6 +16,9 @@
     "maxSourcesPerResearcher": 15,
     "resultsPerQuery": 20,
     "screenBatch": 40,
+    "snowballDepth": 1,
+    "snowballSeeds": 5,
+    "snowballPerSeed": 10,
     "contactEmail": ""
   },
   "pipeline": {

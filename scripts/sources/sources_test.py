@@ -22,11 +22,13 @@ import kit  # noqa: E402
 import sources  # noqa: E402
 
 REQUESTS: list[str] = []
-ROUTES = [  # (URL prefix, fixture, content type); the first match wins
+ROUTES = [  # (part of the URL, fixture, content type); the first match wins
     ("https://api.openalex.org/works/W100", "openalex-work.json", "application/json"),
-    ("https://api.openalex.org/works?per-page=50&filter=openalex", "openalex-list.json", "application/json"),
-    ("https://api.openalex.org/works?per-page=50&filter=cites", "openalex-list.json", "application/json"),
+    ("https://api.openalex.org/works/doi:", "openalex-doi.json", "application/json"),
+    ("filter=openalex", "openalex-list.json", "application/json"),
+    ("filter=cites", "openalex-citers.json", "application/json"),
     ("https://api.openalex.org/works", "openalex-search.json", "application/json"),
+    ("https://api.crossref.org/works?filter=doi", "crossref-dois.json", "application/json"),
     ("https://api.crossref.org/works", "crossref.json", "application/json"),
     ("https://en.wikipedia.org/w/api.php", "wikipedia.json", "application/json"),
     ("https://openlibrary.org/search.json", "openlibrary.json", "application/json"),
@@ -45,8 +47,8 @@ def transport(url: str) -> tuple[bytes, str]:
     REQUESTS.append(url)
     if url in PAGES:
         return PAGES[url].encode(), "text/html"
-    for prefix, fixture, kind in ROUTES:
-        if url.startswith(prefix):
+    for part, fixture, kind in ROUTES:
+        if part in url:
             return (FIXTURES / fixture).read_bytes(), kind
     raise kit.AdapterError(f"no fixture for {url}")
 
@@ -92,8 +94,19 @@ def test_scholarly(log: Path) -> None:
     backward = sources.related(REPO, "openalex", first, "backward", 50, log)
     assert [item["title"] for item in backward] == ["A meta-analysis of compressed schedules"] and backward[0]["evidenceType"] == "review"
     assert last_query()["filter"] == "openalex:W200|W400"
-    sources.related(REPO, "openalex", first, "forward", 50, log)
+    forward = sources.related(REPO, "openalex", first, "forward", 50, log)
     assert last_query()["filter"] == "cites:W100" and last_query()["sort"] == "cited_by_count:desc"
+    assert [item["extra"]["openalexId"] for item in forward] == ["W500", "W600", "W400"]
+    resolved = sources.related(REPO, "openalex", {"key": "doi:10.5555/wt.2025.1", "title": "found by crossref", "doi": "10.5555/wt.2025.1",
+                                                  "extra": {}}, "forward", 50)
+    assert any("works/doi:10.5555/wt.2025.1" in url for url in REQUESTS[-2:]) and len(resolved) == 3, "a DOI-only record resolves first"
+    raises(kit.AdapterError, sources.related, REPO, "openalex", {"key": "url:x", "title": "no ids", "extra": {}}, "forward")
+
+    notices = sources.retractions(REPO, ["https://doi.org/10.5555/Retracted.Trial", "10.5555/new.trial", "not a doi"], log)
+    assert notices == {"10.5555/retracted.trial": [{"type": "retraction", "doi": "10.5555/retracted.trial.notice"}]}, \
+        "only retraction-type updates count; a correction does not"
+    assert last_query()["filter"] == "doi:10.5555/new.trial,doi:10.5555/retracted.trial"
+    assert sources.retractions(REPO, []) == {}
     raises(ValueError, sources.related, REPO, "crossref", first, "forward")
     raises(ValueError, sources.related, REPO, "openalex", first, "sideways")
 
@@ -107,6 +120,8 @@ def test_scholarly(log: Path) -> None:
 
     merged = sources.merge(found + crossref)
     assert len(merged) == 3 and merged[0]["foundBy"] == ["openalex", "crossref"], "the same DOI merges across adapters"
+    flagged = sources.merge([found[0], {**crossref[0], "extra": {**crossref[0]["extra"], "retracted": True}}])
+    assert flagged[0]["extra"]["retracted"] and not found[0]["extra"]["retracted"], "a retraction flag survives the merge, inputs untouched"
 
 
 def test_reference_books_news(log: Path) -> None:
@@ -173,6 +188,7 @@ def test_contract(log: Path) -> None:
         module = sources.module(spec)
         assert callable(module.search), identifier
         assert hasattr(module, "related") == bool(spec["related"]), f"{identifier}: related flag and module disagree"
+        assert hasattr(module, "retracted") == bool(spec.get("retractions")), f"{identifier}: retractions flag and module disagree"
 
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)

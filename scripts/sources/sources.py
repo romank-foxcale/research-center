@@ -120,13 +120,37 @@ def related(root: Path, identifier: str, item: dict[str, Any], direction: str, l
     return found
 
 
+def retractions(root: Path, dois: list[str], log: Path | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Which of dois are retracted, withdrawn or removed, asked of every adapter whose descriptor says it knows
+    ("retractions": true). An adapter failure is logged and raised: the caller decides how to report it."""
+    found: dict[str, list[dict[str, Any]]] = {}
+    if not dois:
+        return found
+    for identifier, spec in descriptors(root).items():
+        if not spec.get("retractions"):
+            continue
+        entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
+                 "retractionCheck": len(dois)}
+        try:
+            result = module(spec).retracted(dois, options(root, spec))
+        except kit.AdapterError as error:
+            log_search(log, {**entry, "status": "error", "count": 0, "error": str(error)[:300]})
+            raise
+        log_search(log, {**entry, "status": "ok", "count": len(result)})
+        found.update(result)
+    return found
+
+
 def merge(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One record per key, the first seen kept; every adapter that found it is listed in foundBy."""
+    """One record per key, the first seen kept; every adapter that found it is listed in foundBy, and a
+    retraction flag from any of them survives the merge."""
     merged: dict[str, dict[str, Any]] = {}
     for item in records:
-        kept = merged.setdefault(item["key"], {**item, "foundBy": []})
+        kept = merged.setdefault(item["key"], {**item, "extra": dict(item["extra"]), "foundBy": []})
         if item["adapter"] not in kept["foundBy"]:
             kept["foundBy"].append(item["adapter"])
+        if item["extra"].get("retracted"):
+            kept["extra"]["retracted"] = True
     return list(merged.values())
 
 

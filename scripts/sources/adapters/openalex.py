@@ -71,8 +71,12 @@ def search(query: str, filters: dict[str, str], since: str | None, limit: int, o
 def related(item: dict[str, Any], direction: str, limit: int, options: dict[str, Any]) -> list[dict[str, Any]]:
     """backward: the works it cites; forward: the works citing it, most cited first."""
     work_id = item.get("extra", {}).get("openalexId")
+    if not work_id and item.get("doi"):
+        # A record another adapter found: resolve its DOI to the OpenAlex work first.
+        work_id = kit.fetch_json(f"{API}/doi:{item['doi']}", {"select": "id", "mailto": options.get("contactEmail")},
+                                 options["interval"])["id"].rsplit("/", 1)[-1]
     if not work_id:
-        raise kit.AdapterError(f"{NAME}: record {item.get('title', '')[:60]!r} has no openalexId")
+        raise kit.AdapterError(f"{NAME}: record {item.get('title', '')[:60]!r} has neither an openalexId nor a DOI")
     if direction == "forward":
         data = kit.fetch_json(API, params(options, limit, filter=f"cites:{work_id}", sort="cited_by_count:desc"), options["interval"])
         return kit.each(data.get("results", []), to_record)

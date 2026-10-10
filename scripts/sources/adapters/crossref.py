@@ -44,6 +44,23 @@ def to_record(item: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def retracted(dois: list[str], options: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """The DOIs among dois that a retraction, removal or withdrawal notice updates, with those notices.
+    Asked 50 at a time; Crossref carries the Retraction Watch data in each work's updated-by."""
+    found: dict[str, list[dict[str, Any]]] = {}
+    unique = sorted({doi for doi in (kit.bare_doi(value) for value in dois) if doi})
+    for start in range(0, len(unique), 50):
+        chunk = unique[start:start + 50]
+        data = kit.fetch_json(API, {"filter": ",".join(f"doi:{doi}" for doi in chunk), "rows": len(chunk),
+                                    "mailto": options.get("contactEmail")}, options["interval"])
+        for item in (data.get("message") or {}).get("items", []):
+            notices = [{"type": update.get("type"), "doi": update.get("DOI")} for update in item.get("updated-by") or []
+                       if update.get("type") in WITHDRAWN]
+            if notices and kit.bare_doi(item.get("DOI")):
+                found[kit.bare_doi(item["DOI"])] = notices
+    return found
+
+
 def search(query: str, filters: dict[str, str], since: str | None, limit: int, options: dict[str, Any]) -> list[dict[str, Any]]:
     clauses = []
     if since:

@@ -12,7 +12,7 @@ ingest (optional) → grill → plan → search → screen → collect → analy
 | grill | An agent turns your topic into numbered questions, scope, needs and success criteria, asking only what your profile cannot answer | `research/<topic>/brief.md` |
 | plan | Hypotheses, a disconfirming search for each, adapter queries per question, exclusion criteria | `source-plan.md` |
 | search | The runner queries the adapters (scholarly works, books, news, feeds, watched pages); every query logged | `searches.json` |
-| screen | Each result included or excluded against the criteria, with a reason; retractions dropped | `screening.md` |
+| screen | Each result included or excluded against the criteria, with a reason; references and citations of the key works followed and screened too; retractions dropped | `screening.md` |
 | collect | Claude and GPT read the included records and search the web in parallel; every cited page is stored and every quote checked against it | `claims.md`, `sources/web-<topic>/` |
 | analyze | Each question answered from the claims ledger, ideas compared | `analysis.md` |
 | critique | Claude, GPT and Grok try to disprove every claim the analysis uses | `critique/` |

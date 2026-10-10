@@ -231,11 +231,27 @@ def main() -> int:
         # Screen: retracted records are excluded by the runner, the rest by the screener with a criterion; counts add up.
         screening = json.loads((topic / "screening.json").read_text())
         flow = screening["flow"]
-        assert flow == {"identified": 6, "duplicates": 1, "screened": 5, "excluded": 3, "excludedBy": {"X1": 1, "retracted": 2},
-                        "included": 2}, flow
-        assert flow["screened"] == flow["excluded"] + flow["included"] and flow["identified"] == flow["screened"] + flow["duplicates"]
+        assert flow == {"identified": 6, "duplicates": 1, "citationIdentified": 4, "citationDuplicates": 1, "screened": 8,
+                        "excluded": 4, "excludedBy": {"X1": 1, "retracted": 3}, "included": 4}, flow
+        assert flow["screened"] == flow["excluded"] + flow["included"]
+        assert flow["identified"] + flow["citationIdentified"] == flow["screened"] + flow["duplicates"] + flow["citationDuplicates"]
         assert all(row["criterion"] in ("X1", "retracted") for row in screening["records"] if row["decision"] == "exclude")
-        assert CALLS.count("screener") == 1 and "R2" not in SEEN_PROMPTS["screener"].split("# Candidates")[1], "retracted records skip the screener"
+        assert CALLS.count("screener") == 2, f"one screening per hop: {CALLS}"
+        shown = SEEN_PROMPTS["screener"].split("# Candidates, one JSON object per line")[1]
+        assert '"id": "R6"' in shown and '"id": "R7"' not in shown, "the retracted citer (R7) skips the screener"
+
+        # Snowball: from the included key work (W100) one reference (W400) and its citers were followed, screened and stored;
+        # a citer Crossref lists as retracted was excluded before screening, though OpenAlex did not flag it.
+        rows = {row["key"]: row for row in screening["records"]}
+        reference, citer, retracted = rows["doi:10.5555/meta.1999"], rows["doi:10.5555/new.trial"], rows["doi:10.5555/retracted.trial"]
+        assert reference["hop"] == 1 and reference["via"] == ["R1 backward", "R1 forward"] and reference["decision"] == "include"
+        assert citer["via"] == ["R1 forward"] and citer["decision"] == "include" and (root / citer["stored"]).is_file()
+        assert "Hours fell and output held steady." in (root / citer["stored"]).read_text()
+        assert retracted["decision"] == "exclude" and retracted["criterion"] == "retracted"
+        assert screening["retractionCheck"] == ["no DOIs to check", "3 DOIs checked, 1 retracted"], screening["retractionCheck"]
+        citations = json.loads((topic / "citations.json").read_text())
+        assert [entry.get("direction") or "retractions" for entry in citations] == ["backward", "forward", "retractions"], citations
+        assert "hop 1: R1 forward" in (topic / "screening.md").read_text()
         included = [row for row in screening["records"] if row["decision"] == "include"]
         record_text = (root / included[0]["stored"]).read_text()
         assert included[0]["stored"].startswith("sources/search-retrieval/") and "Output per hour rose by 7 percent." in record_text

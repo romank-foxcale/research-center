@@ -1,0 +1,68 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W500",
+   "doi": "https://doi.org/10.5555/retracted.trial",
+   "display_name": "A field trial later retracted",
+   "publication_date": "2026-02-01",
+   "type": "article",
+   "primary_location": {
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Working Time"
+    }
+   },
+   "authorships": [],
+   "cited_by_count": 3
+  },
+  {
+   "id": "https://openalex.org/W600",
+   "doi": "https://doi.org/10.5555/new.trial",
+   "display_name": "A newer field trial citing the productivity study",
+   "publication_date": "2026-05-01",
+   "type": "article",
+   "primary_location": {
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Working Time"
+    }
+   },
+   "authorships": [],
+   "cited_by_count": 1,
+   "abstract_inverted_index": {
+    "Hours": [
+     0
+    ],
+    "fell": [
+     1
+    ],
+    "and": [
+     2
+    ],
+    "output": [
+     3
+    ],
+    "held": [
+     4
+    ],
+    "steady.": [
+     5
+    ]
+   }
+  },
+  {
+   "id": "https://openalex.org/W400",
+   "doi": "https://doi.org/10.5555/meta.1999",
+   "display_name": "A meta-analysis of compressed schedules",
+   "publication_date": "1999-08-01",
+   "type": "review",
+   "primary_location": {
+    "source": {
+     "type": "journal",
+     "display_name": "Journal of Working Time"
+    }
+   },
+   "authorships": []
+  }
+ ]
+}

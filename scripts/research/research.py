@@ -52,7 +52,7 @@ STAGES = ("plan", "search", "screen", "collect", "analyze", "critique", "judge",
 OUTPUTS = {
     "plan": ["source-plan.json", "source-plan.md"],
     "search": ["searches.json", "candidates.json"],
-    "screen": ["screening.json", "screening.md"],
+    "screen": ["screening.json", "screening.md", "citations.json"],
     "collect": ["claims.json", "claims.md"],
     "analyze": ["analysis.md", "ideas.json"],
     "critique": ["critique"],
@@ -333,6 +333,7 @@ def candidate_line(item: dict[str, Any]) -> str:
     venue = item["extra"].get("venue") or item["extra"].get("domain") or ""
     return json.dumps({"id": item["id"], "title": item["title"], "type": item["evidenceType"], "date": item["date"] or "undated",
                        "by": ", ".join(item["authors"][:3]), "venue": venue, "url": item["url"], "questions": item["questions"],
+                       "found": item.get("via") or item["foundBy"],
                        "abstract": item["abstract"][:700]}, ensure_ascii=False)
 
 
@@ -403,14 +404,29 @@ def screen_check(batch: list[dict[str, Any]], criteria: dict[str, Any], known: s
     return check
 
 
-def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
-    """The screener includes or excludes every candidate against the plan's exclusion criteria, with a reason;
-    retracted records are excluded by the runner. Included records are stored for the researchers."""
+def mark_retractions(session: rc.Session, root: Path, records: list[dict[str, Any]], log: Path) -> str:
+    """Flag the records whose DOI a retraction-aware adapter (Crossref) lists as retracted, withdrawn or removed.
+    Records that adapter found itself already carry the flag. Returns how the check went, for the screening log."""
+    aware = {identifier for identifier, spec in registry.descriptors(root).items() if spec.get("retractions")}
+    dois = [item["doi"] for item in records if item.get("doi") and not item["extra"].get("retracted") and not set(item["foundBy"]) & aware]
+    if not dois:
+        return "no DOIs to check"
+    try:
+        found = registry.retractions(root, dois, log)
+    except kit.AdapterError as error:
+        session.say(f"retraction check failed ({error}); these records were screened without it", "warn")
+        return f"failed for {len(dois)} DOIs: {error}"
+    for item in records:
+        if item.get("doi") in found:
+            item["extra"]["retracted"] = True
+            item["extra"]["retractionNotices"] = found[item["doi"]]
+    return f"{len(dois)} DOIs checked, {sum(item.get('doi') in found for item in records)} retracted"
+
+
+def screen_hop(session: rc.Session, root: Path, topic: str, records: list[dict[str, Any]], hop: int,
+               plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Decisions for one set of records: retracted ones excluded by the runner, the rest by the screener in batches."""
     config = rc.settings(root)
-    directory = topic_dir(root, topic)
-    plan = rc.load_json(directory / "source-plan.json")
-    candidates = rc.load_json(directory / "candidates.json")
-    records = candidates["records"]
     criteria = {item["id"]: item for item in plan["exclusions"]}
     known = set(questions(root, topic))
     decisions: dict[str, dict[str, Any]] = {}
@@ -423,11 +439,11 @@ def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
     batches = [pending[index:index + size] for index in range(0, len(pending), size)]
     criteria_text = "\n".join(f"- {item['id']}: {item['text']} (from the brief's {item['from']})" for item in plan["exclusions"])
     replies = session.parallel([
-        (f"screen-{number}", lambda number=number, batch=batch: session.call_checked(
+        (f"screen-{hop}-{number}", lambda number=number, batch=batch: session.call_checked(
             config["pipeline"]["screener"],
             f"# Task\n\nScreen these {len(batch)} candidate records for research/{topic}.\n\n{context(root, topic)}\n\n"
             f"# Exclusion criteria\n\n{criteria_text}\n\n# Candidates, one JSON object per line\n\n" + "\n".join(map(candidate_line, batch)),
-            f"screen-{number}", json_reply(screen_check(batch, criteria, known))))
+            f"screen-{hop}-{number}", json_reply(screen_check(batch, criteria, known))))
         for number, batch in enumerate(batches, 1)
     ])
     for seen in replies.values():
@@ -435,41 +451,109 @@ def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
             decisions[identifier] = {"decision": entry["decision"], "criterion": entry.get("criterion") if entry["decision"] == "exclude" else None,
                                      "questions": entry.get("questions", []) if entry["decision"] == "include" else [],
                                      "reason": " ".join(str(entry["reason"]).split())}
+    return decisions
+
+
+def snowball(session: rc.Session, root: Path, frontier: list[dict[str, Any]], seen: set[str], next_number: int, hop: int,
+             log: Path) -> tuple[list[dict[str, Any]], int]:
+    """Follow the references (backward) and the citing works (forward) of the most cited included records.
+    Returns the records not seen before, numbered on from next_number, and how many results the lookups gave."""
+    config = rc.settings(root)["research"]
+    followers = [identifier for identifier, spec in registry.descriptors(root).items() if spec.get("related")]
+    if not followers:
+        return [], 0
+    seeds = sorted((item for item in frontier if item.get("doi") or item["extra"].get("openalexId")),
+                   key=lambda item: -int(item["extra"].get("citedByCount") or 0))[: config.get("snowballSeeds", 5)]
+    found: list[dict[str, Any]] = []
+    for seed in seeds:
+        for direction in kit.DIRECTIONS:
+            try:
+                results = registry.related(root, followers[0], seed, direction, config.get("snowballPerSeed", 10), log)
+            except kit.AdapterError as error:
+                session.say(f"snowball {seed['id']} {direction}: failed, {error}", "warn")
+                continue
+            found += [{**item, "via": f"{seed['id']} {direction}", "questions": seed["questions"]} for item in results]
+    fresh = [item for item in registry.merge(found) if item["key"] not in seen]
+    for offset, item in enumerate(fresh):
+        item["id"] = f"R{next_number + offset}"
+        item["hop"] = hop
+        item["via"] = sorted({other["via"] for other in found if other["key"] == item["key"]})
+        item["questions"] = sorted({question for other in found if other["key"] == item["key"] for question in other["questions"]})
+    session.say(f"snowball hop {hop}: {len(found)} references and citations from {len(seeds)} key works, {len(fresh)} new")
+    return fresh, len(found)
+
+
+def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
+    """Screen the search candidates, then snowball: follow the references and citations of the key included works
+    for research.snowballDepth hops, screening each hop the same way. Retractions are checked before every
+    screening. Included records are stored for the researchers."""
+    config = rc.settings(root)
+    directory = topic_dir(root, topic)
+    plan = rc.load_json(directory / "source-plan.json")
+    candidates = rc.load_json(directory / "candidates.json")
+    log = directory / "citations.json"
+    log.unlink(missing_ok=True)
+    records = [{**item, "hop": 0, "via": []} for item in candidates["records"]]
+    checks = [mark_retractions(session, root, records, log)]
+    decisions = screen_hop(session, root, topic, records, 0, plan)
+    frontier = [item for item in records if decisions[item["id"]]["decision"] == "include"]
+    citation_identified = 0
+    for hop in range(1, config["research"].get("snowballDepth", 1) + 1):
+        fresh, identified = snowball(session, root, frontier, {item["key"] for item in records}, len(records) + 1, hop, log)
+        citation_identified += identified
+        if not fresh:
+            break
+        checks.append(mark_retractions(session, root, fresh, log))
+        decisions.update(screen_hop(session, root, topic, fresh, hop, plan))
+        records += fresh
+        frontier = [item for item in fresh if decisions[item["id"]]["decision"] == "include"]
+    if not log.is_file():
+        rc.write_json(log, [])
     included = [item for item in records if decisions[item["id"]]["decision"] == "include"]
     store_included(root, topic, included)
     stored = {item["id"]: item["stored"] for item in included}
     rows = [{"id": item["id"], "key": item["key"], "title": item["title"], "url": item["url"], "doi": item["doi"],
-             "foundBy": item["foundBy"], "evidenceType": item["evidenceType"], **decisions[item["id"]],
-             "stored": stored.get(item["id"])} for item in records]
+             "foundBy": item["foundBy"], "hop": item["hop"], "via": item["via"], "evidenceType": item["evidenceType"],
+             **decisions[item["id"]], "stored": stored.get(item["id"])} for item in records]
     excluded_by: dict[str, int] = {}
     for row in rows:
         if row["decision"] == "exclude":
             excluded_by[row["criterion"]] = excluded_by.get(row["criterion"], 0) + 1
-    flow = {"identified": candidates["identified"], "duplicates": candidates["identified"] - len(records), "screened": len(records),
-            "excluded": sum(excluded_by.values()), "excludedBy": dict(sorted(excluded_by.items())), "included": len(included)}
-    rc.write_json(directory / "screening.json", {"flow": flow, "criteria": plan["exclusions"], "records": rows})
-    rc.write_text(directory / "screening.md", render_screening(topic, flow, plan["exclusions"], rows))
+    searched = len(candidates["records"])
+    flow = {"identified": candidates["identified"], "duplicates": candidates["identified"] - searched,
+            "citationIdentified": citation_identified, "citationDuplicates": citation_identified - (len(records) - searched),
+            "screened": len(records), "excluded": sum(excluded_by.values()), "excludedBy": dict(sorted(excluded_by.items())),
+            "included": len(included)}
+    rc.write_json(directory / "screening.json", {"flow": flow, "criteria": plan["exclusions"], "retractionCheck": checks, "records": rows})
+    rc.write_text(directory / "screening.md", render_screening(topic, flow, plan["exclusions"], rows, checks))
     session.say(f"screen: {flow['included']} included, {flow['excluded']} excluded of {flow['screened']} candidates")
 
 
 def flow_text(flow: dict[str, Any], criteria: list[dict[str, Any]]) -> str:
-    """The PRISMA-style flow: identified, duplicates, screened, excluded by criterion, included."""
+    """The PRISMA-style flow: identified by searching and by citation, duplicates, screened, excluded by criterion, included."""
     names = {item["id"]: item["text"] for item in criteria} | {RETRACTED: "retracted"}
-    lines = [f"- Identified by adapter searches: {flow['identified']}", f"- Duplicates removed: {flow['duplicates']}",
-             f"- Screened: {flow['screened']}", f"- Excluded: {flow['excluded']}"]
+    lines = [f"- Identified by adapter searches: {flow['identified']}", f"- Duplicates removed: {flow['duplicates']}"]
+    if flow.get("citationIdentified"):
+        lines += [f"- Identified by following references and citations: {flow['citationIdentified']}",
+                  f"- Of those, duplicates or already found: {flow['citationDuplicates']}"]
+    lines += [f"- Screened: {flow['screened']}", f"- Excluded: {flow['excluded']}"]
     lines += [f"  - {criterion} ({names.get(criterion, criterion)}): {count}" for criterion, count in flow["excludedBy"].items()]
     lines.append(f"- Included: {flow['included']}")
     return "\n".join(lines)
 
 
-def render_screening(topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]]) -> str:
-    lines = [f"# Screening: {topic}\n", flow_text(flow, criteria), "", "## Included\n",
+def render_screening(topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]],
+                     checks: list[str]) -> str:
+    def found(row: dict[str, Any]) -> str:
+        return f"hop {row['hop']}: {', '.join(row['via'])}" if row["hop"] else f"search: {', '.join(row['foundBy'])}"
+
+    lines = [f"# Screening: {topic}\n", flow_text(flow, criteria), "", f"Retraction check: {'; '.join(checks)}.", "", "## Included\n",
              "Read these first: each record's text is stored at the path given.\n",
-             "| Record | Title | Type | Questions | Stored | Reason |", "| --- | --- | --- | --- | --- | --- |"]
-    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['evidenceType']} | {', '.join(row['questions'])} | "
+             "| Record | Title | Type | Found | Questions | Stored | Reason |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['evidenceType']} | {cell(found(row))} | {', '.join(row['questions'])} | "
               f"{row['stored']} | {cell(row['reason'])} |" for row in rows if row["decision"] == "include"]
-    lines += ["", "## Excluded\n", "| Record | Title | Criterion | Reason |", "| --- | --- | --- | --- |"]
-    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['criterion']} | {cell(row['reason'])} |"
+    lines += ["", "## Excluded\n", "| Record | Title | Found | Criterion | Reason |", "| --- | --- | --- | --- | --- |"]
+    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {cell(found(row))} | {row['criterion']} | {cell(row['reason'])} |"
               for row in rows if row["decision"] == "exclude"]
     return "\n".join(lines)
 

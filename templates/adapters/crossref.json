@@ -22,5 +22,6 @@
   "watchable": true,
   "related": false,
   "needsKeyEnv": null,
-  "rateLimit": 0.5
+  "rateLimit": 0.5,
+  "retractions": true
 }

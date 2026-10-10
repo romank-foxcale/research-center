@@ -50,6 +50,7 @@ NUMBERS = {
     "ingest": ("maxFileBytes", "maxSourceBytes", "chunkBytes"),
     "research": ("maxSourcesPerResearcher", "resultsPerQuery", "screenBatch"),
 }
+COUNTS = ("snowballDepth", "snowballSeeds", "snowballPerSeed")  # optional; 0 is allowed
 DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
@@ -115,6 +116,10 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
             errors.append(f"{label}: pipeline.{slot} names role {identifier!r}, which is not in {roles_dir.relative_to(root)}")
         elif roles[identifier].get("access") != access:
             errors.append(f"{label}: pipeline.{slot} needs {access} access; role {identifier} has {roles[identifier].get('access')}")
+    for key in COUNTS:
+        value = settings.get("research", {}).get(key, 0)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            errors.append(f"{label}: research.{key} must be a whole number, 0 or more (0 turns snowballing off)")
     email = settings.get("research", {}).get("contactEmail", "")
     if not isinstance(email, str) or (email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)):
         errors.append(f"{label}: research.contactEmail must be empty or an email address the user chose to share")
@@ -142,6 +147,8 @@ def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
         module = str(spec.get("module", ""))
         if not re.fullmatch(r"[a-z0-9_]+", module) or not (HERE / "sources" / "adapters" / f"{module}.py").is_file():
             errors.append(f"{name}: module {module!r} is not in scripts/sources/adapters/")
+        if not isinstance(spec.get("retractions", False), bool):
+            errors.append(f"{name}: retractions must be true or false")
         if spec.get("needsKeyEnv") is not None and not re.fullmatch(r"[A-Z][A-Z0-9_]*", str(spec["needsKeyEnv"])):
             errors.append(f"{name}: needsKeyEnv must be null or an environment variable name; keys are never stored")
 

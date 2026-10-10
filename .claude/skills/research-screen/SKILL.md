@@ -11,6 +11,8 @@ The adapter searches returned candidate records: papers, books, news, feed items
 
 The brief (its questions, scope, out of scope and source preferences) and the exclusion criteria listed in the task. The criteria come from the brief. X0 always means the record bears on none of the brief's questions.
 
+Some batches hold records found by snowballing: the references or citing works of a record already included (`found` says which, e.g. `R1 forward`). Apply the same criteria; being cited by a good record does not make a record relevant.
+
 ## Decide, one record at a time
 
 - **Include** when the record could change the answer to at least one question: it reports evidence, data, a method, a ruling, an event or an informed argument about the subject, and no exclusion criterion applies. Name the questions it bears on.

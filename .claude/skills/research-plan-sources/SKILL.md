@@ -20,7 +20,8 @@ Read the brief: questions, scope, out of scope, source preferences. Read the pro
    - Write each query in the adapter's syntax, the way you would type it there, with filters where they narrow usefully.
    - `feed` and `page-watch` take a URL as the query: a journal's or regulator's RSS feed, a page whose changes matter.
 4. **Horizon.** `near` (0 to 3 years), `medium` (3 to 10) or `long` (10+): how far ahead the brief looks, or how far back the evidence may reach for a historical question. Set `since` on avenues to match the brief's recency window.
-5. **Exclusions.** Turn the brief's out of scope, recency window, distrusted sources and languages into numbered criteria X1, X2, ... the screener can apply to a title and abstract. Each names the brief section it comes from. X0 (bears on no question) is added by the runner.
+5. **Snowballing is automatic.** After screening, the runner follows the references and citing works of the most-cited included records. Plan searches that find the key works; you don't need avenues for their citations.
+6. **Exclusions.** Turn the brief's out of scope, recency window, distrusted sources and languages into numbered criteria X1, X2, ... the screener can apply to a title and abstract. Each names the brief section it comes from. X0 (bears on no question) is added by the runner.
 
 ## Output, exactly
 

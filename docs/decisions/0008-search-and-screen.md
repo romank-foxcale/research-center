@@ -2,7 +2,7 @@
 id: decision.0008-search-and-screen
 title: Research searches the planned adapters, screens every result with a logged reason, and tests its hypotheses
 status: accepted
-summary: The planner writes adapter queries, hypotheses with a disconfirming avenue each, a horizon and numbered exclusion criteria; the runner runs every query (search), a screener includes or excludes each result against those criteria with a reason (screen), included records are stored for the researchers, and the report shows the PRISMA-style flow.
+summary: The planner writes adapter queries, hypotheses with a disconfirming avenue each, a horizon and numbered exclusion criteria; the runner runs every query (search); a screener includes or excludes each result against those criteria with a reason, the runner snowballs from the key included works and drops retracted ones (screen); included records are stored for the researchers, and the report shows the PRISMA-style flow.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -36,6 +36,14 @@ With source adapters (ADR 0007) the RC can search far more than the web, but sea
   - The screener role (claude sonnet, read-only, batches of `research.screenBatch`) decides on every other record. An exclusion names one criterion, an inclusion the questions it bears on, and both give a reason.
   - Included records are stored under `sources/search-<topic>/`. Scholarly records and books are stored as metadata and abstract; other records as the fetched page, falling back to metadata.
   - The outputs are `screening.json` and `screening.md`, with the flow: identified, duplicates, screened, excluded by criterion, included.
+- **snowball** (inside screen, Wohlin's guidelines):
+  - From the `research.snowballSeeds` most-cited included records with a DOI or OpenAlex id, the runner follows up to `research.snowballPerSeed` references (backward) and citing works (forward) each, through the adapter whose descriptor says `related`.
+  - Records not seen before are screened again with the same criteria.
+  - This repeats for `research.snowballDepth` hops (default 1; 0 turns it off).
+  - Each record keeps its hop and the path it was found by, such as `R1 forward`.
+  - The lookups are logged in `citations.json`.
+  - The flow counts records identified by citation and their duplicates separately, as PRISMA's "other methods".
+- **retractions**: before every screening, the runner asks the adapters whose descriptor says `retractions` (Crossref) about every DOI that no such adapter found itself. Records with a retraction, withdrawal or removal notice are excluded as `retracted`; corrections are not. A failed check is reported in screening.md and the run goes on.
 - **collect**: the researchers read the included records first, then search the web along the `web` avenues. A cited URL that matches an included record (by DOI or canonical URL) reuses its stored text, so its quotes are checked against what was screened. Included records do not count against `maxSourcesPerResearcher`.
 - **report**: the runner appends "How the sources were found": the flow and the number of web pages the researchers added.
 

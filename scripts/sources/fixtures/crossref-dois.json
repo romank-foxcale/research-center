@@ -1,0 +1,37 @@
+{
+ "status": "ok",
+ "message": {
+  "items": [
+   {
+    "DOI": "10.5555/retracted.trial",
+    "type": "journal-article",
+    "title": [
+     "A field trial later retracted"
+    ],
+    "updated-by": [
+     {
+      "type": "retraction",
+      "DOI": "10.5555/retracted.trial.notice"
+     },
+     {
+      "type": "correction",
+      "DOI": "10.5555/c"
+     }
+    ]
+   },
+   {
+    "DOI": "10.5555/new.trial",
+    "type": "journal-article",
+    "title": [
+     "A newer field trial"
+    ],
+    "updated-by": [
+     {
+      "type": "correction",
+      "DOI": "10.5555/new.trial.erratum"
+     }
+    ]
+   }
+  ]
+ }
+}
