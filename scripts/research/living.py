@@ -17,6 +17,7 @@ See docs/decisions/0009-living-topics.md.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import shutil
 from pathlib import Path
 from typing import Any
@@ -162,6 +163,51 @@ def search_new(session: rc.Session, root: Path, topic: str, watch: dict[str, Any
     return fresh, len(found)
 
 
+def recheck(session: rc.Session, root: Path, topic: str) -> list[str]:
+    """Fetch again every stored page whose evidence type's half-life has passed since it was last checked. A claim
+    whose quote the page no longer holds, or whose page is gone, is marked drifted. Scholarly records (stored as
+    abstracts) are not re-fetched: retractions cover what changes there. Returns the drifted claim ids."""
+    directory = research.topic_dir(root, topic)
+    led = research.ledger(root, topic)
+    types = research.evidence_types(root)
+    families = {identifier: spec["family"] for identifier, spec in registry.descriptors(root).items()}
+    screened = {row["id"]: row for row in rc.load_json(directory / "screening.json")["records"]} if (directory / "screening.json").is_file() else {}
+    today = datetime.date.fromisoformat(rc.today())
+    drifted = []
+    for source in led["sources"]:
+        checked = source.get("checkedAt")
+        half_life = types.get(source.get("evidenceType", "unknown"), types["unknown"])["halfLifeDays"]
+        if not source.get("stored") or not checked or datetime.date.fromisoformat(checked) + datetime.timedelta(days=half_life) > today:
+            continue
+        row = screened.get(source.get("record"), {})
+        if any(families.get(adapter) in ("scholarly", "books") for adapter in row.get("foundBy", [])):
+            source["checkedAt"] = rc.today()
+            continue
+        try:
+            _, text, extractor, data = ingest.url_document(source["url"])
+        except Exception as error:  # noqa: BLE001 - any failure to fetch means the page is no longer what was checked
+            text, reason = None, f"the page could not be fetched again ({str(error)[:120]})"
+        for claim in led["claims"]:
+            if claim["source"] != source["id"] or not claim["quoteVerified"]:
+                continue
+            if text is None or not research.quote_found(claim["quote"], text):
+                claim.update({"quoteVerified": False, "drifted": {"at": rc.today(), "reason": reason if text is None else
+                              "the page no longer contains the quote"}})
+                drifted.append(claim["id"])
+        if text is not None:
+            # Keep the page as it reads now: that is what the claims were checked against today.
+            source_id, name = source["stored"].split("/")[1], source["stored"].split("/text/", 1)[1]
+            descriptor = rc.load_json(ingest.source_path(root, source_id))
+            entries = {name: {"origin": source["url"], "sha256": hashlib.sha256(data).hexdigest(), "extractor": extractor}}
+            research.store_appending(root, descriptor, entries, {name: text}, [], append=True)
+        source["checkedAt"] = rc.today()
+    if drifted:
+        session.say(f"refresh: {len(drifted)} claims drifted: {', '.join(drifted)}", "warn")
+    rc.write_json(directory / "claims.json", led)
+    rc.write_text(directory / "claims.md", research.render_ledger(led))
+    return drifted
+
+
 def screen_new(session: rc.Session, root: Path, topic: str, fresh: list[dict[str, Any]], stamp: str, log: Path) -> list[dict[str, Any]]:
     """Screen the new records like the first run did, store the included ones, and append them to screening.json."""
     directory = research.topic_dir(root, topic)
@@ -211,10 +257,12 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
         if not pending:
             rc.write_json(before_path, snapshot(directory))
             log.unlink(missing_ok=True)
+            drifted = recheck(session, root, topic)
             fresh, identified = search_new(session, root, topic, watch, log)
             session.say(f"refresh: {identified} results, {len(fresh)} not screened before")
             rows = screen_new(session, root, topic, fresh, stamp, log) if fresh else []
-            pending = {"stamp": stamp, "step": "screened", "identified": identified, "records": [row["id"] for row in rows], "added": []}
+            pending = {"stamp": stamp, "step": "screened", "identified": identified, "records": [row["id"] for row in rows], "added": [],
+                       "drifted": drifted}
             save_watch(directory, {**watch, "pending": pending})
         rows = [row for row in rc.load_json(directory / "screening.json")["records"] if row["id"] in pending["records"]]
         included = [row for row in rows if row["decision"] == "include"]
@@ -224,7 +272,9 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
             save_watch(directory, {**watch, "pending": pending})
         claims = {claim["id"]: claim for claim in research.ledger(root, topic)["claims"]}
         verified = [identifier for identifier in pending["added"] if claims[identifier]["quoteVerified"]]
-        material = bool(verified)
+        # Drifted evidence the conclusions rest on is as material as new evidence: both are re-critiqued.
+        relied_on = set(research.cited_claims(root, topic)) & set(pending.get("drifted", []))
+        material = bool(verified or relied_on)
         if material and pending["step"] == "collected":
             watch = {**watch, "version": watch["version"] + 1, "pending": {**pending, "step": "rederiving"}}
             # The new claims are what makes the next version; collect ran before it was known there would be one.
@@ -274,16 +324,20 @@ def build_delta(directory: Path, topic: str, stamp: str, watch: dict[str, Any], 
     moves = [{"idea": key, "from": before["rings"].get(key, "new"), "to": ring} for key, ring in after["rings"].items()
              if before["rings"].get(key) != ring]
     contested = [claim for claim in after["contested"] if claim not in before["contested"]]
-    review = bool(flips or idea_flips or moves or contested)
-    if not rows:
+    drifted = [claims[identifier] for identifier in pending.get("drifted", [])]
+    review = bool(flips or idea_flips or moves or contested or drifted)
+    if material:
+        summary = "material change: " + ("verdicts or rings moved, see Needs your review" if flips or idea_flips or moves or contested
+                                         else "new or drifted evidence, conclusions unchanged")
+    elif drifted:
+        summary = "no material change: some evidence drifted, none the conclusions rest on"
+    elif not rows:
         summary = "no material change: nothing new was found"
-    elif not material:
-        summary = "no material change: new records, but no new verified evidence"
     else:
-        summary = "material change: " + ("verdicts or rings moved, see Needs your review" if review else "new evidence, conclusions unchanged")
+        summary = "no material change: new records, but no new verified evidence"
     return {"topic": topic, "stamp": stamp, "version": watch["version"], "since": watch["lastChecked"], "material": material,
             "summary": summary, "identified": pending.get("identified", 0), "records": rows, "added": added, "flips": flips,
-            "ideaFlips": idea_flips, "moves": moves, "contested": contested, "names": after["names"] or before["names"]}
+            "ideaFlips": idea_flips, "moves": moves, "contested": contested, "drifted": drifted, "names": after["names"] or before["names"]}
 
 
 def write_delta(directory: Path, stamp: str, delta: dict[str, Any], watch: dict[str, Any]) -> None:
@@ -295,6 +349,7 @@ def write_delta(directory: Path, stamp: str, delta: dict[str, Any], watch: dict[
     review += [f"- Idea {item['idea']} ({names.get(item['idea'], '')}): {item['from']} → {item['to']}" for item in delta["ideaFlips"]]
     review += [f"- Idea {item['idea']} ({names.get(item['idea'], '')}) moved {item['from']} → {item['to']}" for item in delta["moves"]]
     review += [f"- {claim}: newly contested (a reviewer refuted it, the judge kept it)" for claim in delta["contested"]]
+    review += [f"- {claim['id']}: drifted, {claim['drifted']['reason']}" for claim in delta.get("drifted", [])]
     if review:
         lines += ["", "## Needs your review", "", "These changed since the previous version. Check them before relying on the report.", "", *review]
     if delta["records"]:

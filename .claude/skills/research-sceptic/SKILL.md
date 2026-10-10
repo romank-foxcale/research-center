@@ -18,6 +18,9 @@ A claim holds only when its stored source supports it, exactly as stated. For ea
    - Is it the vendor's own marketing presented as fact?
    - Is it out of date given the brief's window?
    - Does another claim or source in the ledger contradict it?
+   - Is the source graded more reliable than it deserves (the ledger shows its evidence type, grade and the researcher's reason)? Say so in the reason.
+   - Is it second-hand? A claim with `via ... (not traced)` repeats a source nobody stored: it is at best WEAK unless you find the original.
+   - Did it drift? A claim marked `drifted` is no longer on its page: UNSUPPORTED unless another stored source carries it.
 3. Then give a verdict:
    - HOLDS: the source supports it as stated.
    - WEAK: supported, but narrower, older, self-reported or from a weak source than the claim implies.

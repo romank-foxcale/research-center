@@ -59,10 +59,10 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 | Horizon scanning | Search deliberately for evidence of the opposite shift | The planner must add a disconfirming query for every hypothesis it expects; checked by the runner | WP2 |
 | Horizon scanning | Time horizons | The brief's scope states the horizon (near, medium, long); the planner's recency filters follow it | WP2 |
 | Horizon scanning | Signals weaken and are deprioritised | Staleness per evidence type (half-life); expired claims are re-checked on refresh | WP5 |
-| GRADE | Certainty per answer: high, moderate, low, very low | `certainty` per question answer in the analysis, checked by the runner | WP5 |
+| GRADE | Certainty per answer: high, moderate, low, very low | `certainty` per question answer, graded by the judge after the critique (on the final evidence), checked by the runner | WP5 |
 | GRADE | Downgrade for risk of bias, inconsistency, indirectness, imprecision, publication bias; upgrade for large effects | Generalized for any domain: low source reliability, conflicting claims, evidence about a context unlike "Our needs", vague or small-sample evidence, one-sided sources (for example vendor-only). Every downgrade names its reason and claims | WP5 |
-| Admiralty / NATO grading | Grade source reliability (A-F) separately from information credibility (1-6) | `reliability` on every source (researcher proposes with a reason, sceptics may challenge); `credibility` on every claim (judge) | WP5 |
-| Evidence hierarchies | What counts as strong evidence depends on the domain | `catalog/evidence-types.json`: domain-agnostic types with a reliability ceiling and a half-life each, replacing `SOURCE_KINDS` | WP5 |
+| Admiralty / NATO grading | Grade source reliability (A-F) separately from information credibility (1-6) | `reliability` on every source (researcher proposes with a reason, capped by type, sceptics challenge in their reasons); `credibility` on every claim (judge) | WP5 |
+| Evidence hierarchies | What counts as strong evidence depends on the domain | `catalog/evidence-types.json`: the adapters' domain-agnostic types with a reliability ceiling and a half-life each, replacing `SOURCE_KINDS` | WP5 |
 | SIFT lateral reading | Trace claims to the original; find better coverage | A claim from a secondary source carries `via`; for claims an answer relies on, collection must try to reach the primary source, and the sceptic flags untraced ones | WP5 |
 | SIFT / CRAAP | Investigate the source | Reliability grades come with a reason; retracted works are excluded through the Crossref retraction check | WP3, WP5 |
 | ACH (Heuer) | Enumerate competing hypotheses and score evidence against all of them | For questions with alternatives, the analysis outputs a hypothesis-by-claim matrix (consistent, inconsistent, neutral); the runner checks every hypothesis has disconfirming search coverage | WP6 |
@@ -92,7 +92,7 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 - **Budgets.** A new `budget.refreshCalls` (default 8). Screening is batched (up to 40 records per call). A refresh that would exceed the budget stops in a resumable state, as in `docs/decisions/0006-budgets-and-resume.md`.
 - **No silent widening.** An adapter that errors or hits its rate limit is reported in the run and in `searches.json` (status, count 0). Its earlier records are kept, never deleted.
 - **Tests never touch the network.** Each adapter ships recorded responses under `scripts/sources/fixtures/`, and its tests replay them. The Nix sandbox has no network anyway.
-- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, 0009 living topics, then evidence grading and certainty.
+- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, 0009 living topics, 0010 evidence grading.
 
 ## Open questions
 

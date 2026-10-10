@@ -58,7 +58,12 @@ PHASE = {"refresh": False}  # after the refresh finds NEW, the analysis cites C5
 def fake_page(url: str):
     if "dead" in url:
         raise extract.Skip("HTTP 404")
-    return f"{ingest.url_slug(url)}.md", f"Source: {url}\n\n# Paper\n\n{PAGE}\n", "pandoc", PAGE.encode()
+    page = PHASE.get("page") or PAGE
+    return f"{ingest.url_slug(url)}.md", f"Source: {url}\n\n# Paper\n\n{page}\n", "pandoc", page.encode()
+
+
+def graded(evidence: str, grade: str) -> dict[str, str]:
+    return {"evidenceType": evidence, "reliability": grade, "reliabilityReason": f"graded {grade} as {evidence}"}
 
 
 def block(data) -> str:
@@ -85,24 +90,25 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
         assert NEW in prompt and "Do not search the web" in prompt, "a refresh shows only the new records"
         quote = "Hybrid retrieval lost recall to dense retrieval in our new production trial" if role_id == "researcher-claude" \
             else "lost recall to dense retrieval in our new production trial"
-        return block({"sources": [{"ref": "N", "url": NEW, "title": "New trial", "kind": "paper"}],
+        return block({"sources": [{"ref": "N", "url": NEW, "title": "New trial", **graded("peer-reviewed", "B")}],
                       "claims": [{"text": f"In a new trial hybrid lost recall ({role_id}).", "source": "N", "questions": ["Q1"], "quote": quote}]})
     if role_id == "researcher-claude":
-        return block({"sources": [{"ref": "S1", "url": PAPER, "title": "Paper | Site", "published": "2026-01-01", "kind": "paper"}],
+        return block({"sources": [{"ref": "S1", "url": PAPER, "title": "Paper | Site", "published": "2026-01-01", **graded("peer-reviewed", "B")}],
                       "claims": [{"text": "Hybrid retrieval improves recall.", "source": "S1", "questions": ["Q1"], "type": "benchmark",
                                   "quote": "improves recall on every benchmark we tried in production"},
                                  {"text": "Hybrid retrieval is production ready.", "source": "S1", "questions": ["Q1"],
-                                  "quote": "a sentence that is nowhere on the page at all, really"}]})
+                                  "quote": "a sentence that is nowhere on the page at all, really",
+                                  "via": "the authors' own benchmark table, https://www.example.org/paper/"}]})
     if role_id == "researcher-gpt":
         # The first reply is malformed (a claim that is a bare string): a wrong shape is retried like a wrong answer.
         malformed = [] if retry else ["dense is better"]
         # Three web sources against a limit of 2 (EXTRA is dropped) plus an included record, which does not count.
-        return block({"sources": [{"ref": "A", "url": BLOG, "title": "Same paper", "kind": "blog"},
-                                  {"ref": "B", "url": DEAD, "title": "Dead post", "kind": "forum"},
-                                  {"ref": "C", "url": EXTRA, "title": "Over the limit", "kind": "blog"},
-                                  {"ref": "R", "url": RECORD, "title": "Productivity", "kind": "paper"}],
+        return block({"sources": [{"ref": "A", "url": BLOG, "title": "Same paper", **graded("commentary", "D")},
+                                  {"ref": "B", "url": DEAD, "title": "Dead post", **graded("forum", "A")},
+                                  {"ref": "C", "url": EXTRA, "title": "Over the limit", **graded("commentary", "D")},
+                                  {"ref": "R", "url": RECORD, "title": "Productivity", **graded("unknown", "C")}],
                       "claims": [{"text": "Dense retrieval alone is always better.", "source": "B", "questions": ["Q1"],
-                                  "quote": "dense always wins"},
+                                  "quote": "dense always wins", "via": "a vendor whitepaper"},
                                  {"text": "A claim on a source past the limit.", "source": "C", "questions": ["Q1"],
                                   "quote": "this source is dropped with its claim"},
                                  {"text": "Output per hour rose by 7 percent.", "source": "R", "questions": ["Q1"],
@@ -122,12 +128,15 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                  {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "page not stored"}, *update], "analysis": []})
     if role_id == "judge":
         refreshed = PHASE["refresh"]
-        update = [{"claim": "C5", "verdict": "HOLDS", "reason": "the new trial"}] if refreshed else []
-        return block({"claims": [{"claim": "C1", "verdict": "WEAK" if refreshed else "HOLDS", "reason": "a new trial disagrees" if refreshed else "all agree"},
-                                 {"claim": "C2", "verdict": "WEAK", "reason": "kept as weak"},
-                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "no page"}, *update],
+        update = [{"claim": "C5", "verdict": "HOLDS", "credibility": 2, "reason": "the new trial"}] if refreshed else []
+        return block({"claims": [{"claim": "C1", "verdict": "WEAK" if refreshed else "HOLDS", "credibility": 3 if refreshed else 2, "reason": "a new trial disagrees" if refreshed else "all agree"},
+                                 {"claim": "C2", "verdict": "WEAK", "credibility": 3, "reason": "kept as weak"},
+                                 {"claim": "C3", "verdict": "UNSUPPORTED", "credibility": 6, "reason": "no page"}, *update],
                       "ideas": [{"idea": "I1", "verdict": "SURVIVES", "reason": "C1 holds"},
-                                {"idea": "I2", "verdict": "FALLS", "reason": "C3 unsupported"}]})
+                                {"idea": "I2", "verdict": "FALLS", "reason": "C3 unsupported"}],
+                      "answers": [{"question": "Q1", "certainty": "low",
+                                   "downgrades": [{"domain": "imprecision", "levels": 1, "reason": "one benchmark", "claims": ["C1"]},
+                                                  {"domain": "one-sided", "levels": 1, "reason": "only the authors measured it"}]}]})
     if role_id == "applier":
         return block({"fits": [{"idea": "I1", "ring": "TRIAL", "sources": ["git-api"], "replaces": "keyword | search", "effort": "M",
                                 "risks": "embedding cost", "rationale": "Recall matters for us [C1].", "nextStep": "Shadow-run it."}]})
@@ -249,6 +258,22 @@ def test_living(root: Path, topic: Path) -> None:
     spec.loader.exec_module(module)
     assert module.validate(root) == [], module.validate(root)
 
+    # Drift: the paper's page changed after its half-life passed; the claim C1 rests on is marked drifted and re-critiqued.
+    PHASE["page"] = "Hybrid retrieval was evaluated; results are now in the appendix and vary by benchmark and by year."
+    led = json.loads((topic / "claims.json").read_text(encoding="utf-8"))
+    led["sources"][0]["checkedAt"] = "2020-01-01"
+    rc.write_json(topic / "claims.json", led)
+    CALLS.clear()
+    delta = quiet(living.refresh, root, "retrieval")
+    first_claim = next(claim for claim in json.loads((topic / "claims.json").read_text(encoding="utf-8"))["claims"] if claim["id"] == "C1")
+    assert first_claim["drifted"]["reason"] == "the page no longer contains the quote" and not first_claim["quoteVerified"]
+    assert delta["material"] and [claim["id"] for claim in delta["drifted"]] == ["C1"] and CALLS.count("judge") == 1, (delta["summary"], CALLS)
+    assert sum(call.startswith("sceptic-") for call in CALLS) == 3, "drifted evidence the report rests on is re-critiqued"
+    assert "- C1: drifted, the page no longer contains the quote" in (topic / "delta" / f"{rc.today()}-3.md").read_text(encoding="utf-8")
+    stored = root / json.loads((topic / "claims.json").read_text(encoding="utf-8"))["sources"][0]["stored"]
+    assert "results are now in the appendix" in stored.read_text(encoding="utf-8"), "the stored page is what was checked today"
+    PHASE["page"] = None
+
     # Cadence, pause and retire.
     assert living.due(root) == [], "just checked"
     watch["lastChecked"] = "2026-01-01"
@@ -301,6 +326,16 @@ def main() -> int:
     assert research.claim_refs("Yes [C3, C7] and [C1; C2] and [C9].") == ["C3", "C7", "C1", "C2", "C9"]
     assert rc.extract_json('Code:\n```python\nx = 1\n```\n\nData:\n```json\n{"a": 1}\n```') == {"a": 1}
     assert rc.extract_json('```\n{"b": 2}\n```\n\n```mermaid\ngraph TD\n```') == {"b": 2}
+    assert research.capped("A", "E") == "E" and research.capped("C", "B") == "C" and research.capped("F", "A") == "F"
+    answer = {"question": "Q1", "certainty": "moderate", "downgrades": [{"domain": "inconsistency", "levels": 1, "reason": "trials disagree"}]}
+    assert research.answer_problems([answer], ["Q1"], set()) == []
+    assert research.certainty_of({"downgrades": [{"levels": 2}, {"levels": 2}], "upgrades": []}) == "very low", "never below very low"
+    assert research.certainty_of({"downgrades": [{"levels": 1}], "upgrades": [{"levels": 2}]}) == "high", "never above high"
+    problems = " ".join(research.answer_problems([{**answer, "certainty": "high"},
+                                                  {"question": "Q2", "certainty": "low", "downgrades": [{"domain": "vibes", "reason": ""}]}],
+                                                 ["Q1", "Q2", "Q3"], set()))
+    for expected in ("no graded answer for Q3", "add up to 'moderate', not 'high'", "a domain in"):
+        assert expected in problems, (expected, problems)
     assert research.source_key(PAPER) == research.source_key(BLOG)
     assert research.source_key(RECORD) == "doi:10.5555/wt.2025.1"
     assert research.source_key("https://x.org/item?id=1") != research.source_key("https://x.org/item?id=2"), "queries stay apart"
@@ -369,6 +404,17 @@ def main() -> int:
         assert ledger["sources"][2]["record"] == included[0]["id"] and ledger["sources"][2]["stored"] == included[0]["stored"]
         assert [claim["quoteVerified"] for claim in ledger["claims"]] == [True, False, False, True], \
             "the record's claim is checked against its stored abstract, not a download"
+
+        # Grading: reliability is capped by the evidence type, a record keeps its adapter's type, via is traced or not.
+        paper, dead, record = ledger["sources"]
+        assert (paper["evidenceType"], paper["reliability"]) == ("peer-reviewed", "B") and paper["checkedAt"] == rc.today()
+        assert (dead["evidenceType"], dead["reliability"]) == ("forum", "E") and "said A; forum is at best E" in dead["reliabilityCapped"]
+        assert record["evidenceType"] == "peer-reviewed", "an included record keeps the evidence type its adapter gave it"
+        assert (ledger["claims"][1]["traced"], ledger["claims"][2]["traced"]) == (True, False), "via resolved against the ledger"
+        assert "| B | no | the authors' own benchmark table, https://www.example.org/paper/ (traced) |" in (topic / "claims.md").read_text()
+        judgement = json.loads((topic / "judgement.json").read_text())
+        assert [item["credibility"] for item in judgement["claims"]] == [2, 3, 6] and judgement["answers"][0]["certainty"] == "low"
+        assert "- Q1: **low**" in (topic / "judgement.md").read_text()
         stored = root / ledger["sources"][0]["stored"]
         assert stored.is_file() and PAGE in stored.read_text()
         assert json.loads((root / "catalog" / "sources" / "web-retrieval.json").read_text())["origin"] == "research:retrieval"
@@ -399,7 +445,8 @@ def main() -> int:
 
         report = (topic / "report.md").read_text()
         assert report.startswith("# Retrieval for our search") and "[C3]" not in report.split("## Evidence")[0]
-        assert "## Evidence" in report and "| C1 | HOLDS | yes | [Paper \\| Site](" in report and "## Contested" in report
+        assert "## Evidence" in report and "| C1 | HOLDS | 2 | B | yes | [Paper \\| Site](" in report and "## Contested" in report
+        assert "## Certainty of the answers" in report and "- Q1: **low** (imprecision -1: one benchmark; one-sided -1:" in report
         assert "C3 (UNSUPPORTED)" in report and "## Handoff" in report
         assert "## How the sources were found" in report and "- Duplicates removed: 1" in report and "X1 (Published before 2025): 1" in report
 
@@ -408,6 +455,14 @@ def main() -> int:
         module = validator.module_from_spec(spec)
         spec.loader.exec_module(module)
         assert module.validate(root) == [], module.validate(root)
+        original = (topic / "judgement.json").read_text()
+        tampered = json.loads(original)
+        tampered["answers"][0].pop("certainty")
+        tampered["answers"][0]["downgrades"][0]["reason"] = " "
+        (topic / "judgement.json").write_text(json.dumps(tampered))
+        errors = " ".join(module.validate(root))
+        assert "the answer to Q1 has no certainty" in errors and "imprecision grade of Q1 gives no reason" in errors, errors
+        (topic / "judgement.json").write_text(original)
 
         # Resume: a finished run costs nothing; --from judge redoes judge, apply and report only.
         CALLS.clear()

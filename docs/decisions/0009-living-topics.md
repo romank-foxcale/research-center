@@ -23,7 +23,7 @@ A one-shot report starts going stale on the day it is written. Living systematic
 ## Decision
 
 - **The brief decides.**
-  - `## Living` holds `Cadence:` (none, weekly, monthly, quarterly, or derived) and `Retire when:`. derived means 30 days for a near horizon and 91 for medium or long, clamped to weekly-quarterly; the grading work will refine it with evidence half-lives.
+  - `## Living` holds `Cadence:` (none, weekly, monthly, quarterly, or derived) and `Retire when:`. derived means 30 days for a near horizon and 91 for medium or long, clamped to weekly-quarterly. Evidence half-lives (ADR 0010) decide when stored evidence is re-checked, not how often new evidence is searched for.
   - `## Amendments` logs changes after acceptance.
   - Status runs draft → accepted → living ↔ paused, and retired is final.
 - **watch.json** is written after a complete run of a topic with a cadence. It holds the cadence, the brief hash, the version, the check dates, and the plan's adapter avenues whose adapter is watchable. Web avenues stay with the researchers and are not saved.

@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, handoff.
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -34,4 +34,8 @@ relations:
 - **Living topic**: a topic whose brief has a cadence; refreshed with ./rc research refresh, versioned, its searches saved in watch.json.
 - **Refresh**: re-running a living topic's saved searches since the last check, screening only new records, collecting claims from them with the next ids, and re-deriving the conclusions when new verified evidence arrived.
 - **Delta**: research/&lt;topic&gt;/delta/&lt;date&gt;.md, what one refresh changed; its Needs your review section lists flipped verdicts, moved rings and newly contested claims.
+- **Reliability**: how trustworthy a source is, A completely reliable to E unreliable, F cannot be judged; capped by its evidence type.
+- **Credibility**: how believable one claim is, 1 confirmed to 5 improbable, 6 cannot be judged; given by the judge.
+- **Certainty**: how sure an answer is, high, moderate, low or very low: high minus the named downgrades (reliability, inconsistency, indirectness, imprecision, one-sided), plus any upgrades.
+- **Drifted**: a claim whose page, re-fetched after its evidence type's half-life, no longer contains the quote or is gone.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

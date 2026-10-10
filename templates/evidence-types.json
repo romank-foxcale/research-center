@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "scale": {
+    "reliability": {
+      "A": "completely reliable",
+      "B": "usually reliable",
+      "C": "fairly reliable",
+      "D": "not usually reliable",
+      "E": "unreliable",
+      "F": "reliability cannot be judged"
+    },
+    "credibility": {
+      "1": "confirmed by other sources",
+      "2": "probably true",
+      "3": "possibly true",
+      "4": "doubtful",
+      "5": "improbable",
+      "6": "truth cannot be judged"
+    }
+  },
+  "types": [
+    {
+      "id": "dataset",
+      "description": "Primary data: a published dataset, measurements, survey microdata",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 730
+    },
+    {
+      "id": "review",
+      "description": "A systematic review or meta-analysis pooling many studies",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 1095
+    },
+    {
+      "id": "peer-reviewed",
+      "description": "A study or paper that passed peer review in a journal or conference",
+      "reliabilityCeiling": "B",
+      "halfLifeDays": 1095
+    },
+    {
+      "id": "preprint",
+      "description": "A study not yet peer reviewed (arXiv, SSRN, medRxiv, working papers)",
+      "reliabilityCeiling": "C",
+      "halfLifeDays": 365
+    },
+    {
+      "id": "thesis",
+      "description": "A doctoral or master's thesis",
+      "reliabilityCeiling": "C",
+      "halfLifeDays": 1095
+    },
+    {
+      "id": "report",
+      "description": "Grey literature: reports of agencies, think tanks, NGOs, consultancies",
+      "reliabilityCeiling": "C",
+      "halfLifeDays": 730
+    },
+    {
+      "id": "official-statistics",
+      "description": "Statistics published by a national or international statistics body",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 365
+    },
+    {
+      "id": "regulation",
+      "description": "The text of a law, regulation, directive or official guidance",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 365
+    },
+    {
+      "id": "court-ruling",
+      "description": "A court judgment or decision",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 1825
+    },
+    {
+      "id": "standard",
+      "description": "A standard or specification from a standards body",
+      "reliabilityCeiling": "A",
+      "halfLifeDays": 1095
+    },
+    {
+      "id": "company-filing",
+      "description": "A company's regulatory filing or audited report",
+      "reliabilityCeiling": "B",
+      "halfLifeDays": 365
+    },
+    {
+      "id": "documentation",
+      "description": "Official documentation of a product, project or service",
+      "reliabilityCeiling": "B",
+      "halfLifeDays": 180
+    },
+    {
+      "id": "book",
+      "description": "A book from a publisher",
+      "reliabilityCeiling": "B",
+      "halfLifeDays": 1825
+    },
+    {
+      "id": "journalism",
+      "description": "News reporting by a newsroom with editorial control",
+      "reliabilityCeiling": "C",
+      "halfLifeDays": 90
+    },
+    {
+      "id": "vendor",
+      "description": "Marketing or technical material by a party selling the thing",
+      "reliabilityCeiling": "D",
+      "halfLifeDays": 180
+    },
+    {
+      "id": "commentary",
+      "description": "Opinion, blogs, columns, talks, newsletters",
+      "reliabilityCeiling": "D",
+      "halfLifeDays": 180
+    },
+    {
+      "id": "forum",
+      "description": "Community discussion: forums, Q&A sites, social media, issue trackers",
+      "reliabilityCeiling": "E",
+      "halfLifeDays": 90
+    },
+    {
+      "id": "reference",
+      "description": "Encyclopedias and other tertiary reference works",
+      "reliabilityCeiling": "C",
+      "halfLifeDays": 365
+    },
+    {
+      "id": "unknown",
+      "description": "Anything that fits none of the above",
+      "reliabilityCeiling": "E",
+      "halfLifeDays": 180
+    }
+  ]
+}

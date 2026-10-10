@@ -83,6 +83,8 @@ def materialize(source: Path, target: Path) -> None:
     (target / "catalog" / "adapters").mkdir(parents=True, exist_ok=True)
     for path in sorted((source / "templates" / "adapters").glob("*.json")):
         shutil.copy2(path, target / "catalog" / "adapters" / path.name)
+    # How reliable each kind of evidence can be and how fast it goes stale; the instance tunes its own copy.
+    shutil.copy2(source / "templates" / "evidence-types.json", target / "catalog" / "evidence-types.json")
 
     for relative in (
         "catalog/sources",

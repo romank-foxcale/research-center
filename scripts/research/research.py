@@ -74,7 +74,14 @@ QUESTION = re.compile(r"^- (Q\d+):\s*(\S.*)$", re.MULTILINE)
 # One bracket may cite several claims: [C3], [C3, C7] and [C3; C7] all count.
 CLAIM_REF = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 IDEA_ID = re.compile(r"I\d+")
-SOURCE_KINDS = ("paper", "docs", "blog", "repo", "news", "forum", "talk", "other")
+# Admiralty grading (docs/decisions/0010-evidence-grading.md): how reliable a source is, A best, F cannot be judged,
+# graded separately from how credible a claim is, 1 confirmed .. 6 cannot be judged.
+GRADES = ("A", "B", "C", "D", "E", "F")
+CREDIBILITY = (1, 2, 3, 4, 5, 6)
+# GRADE-style certainty per answer: it starts high and every downgrade lowers it by its levels.
+CERTAINTIES = ("very low", "low", "moderate", "high")
+DOWNGRADES = ("reliability", "inconsistency", "indirectness", "imprecision", "one-sided")
+UPGRADES = ("large-effect", "convergence")
 WEB = "web"  # the avenue the researcher roles search themselves; every other avenue names an adapter
 STANCES = ("support", "disconfirm", "explore")
 HORIZONS = ("near", "medium", "long")
@@ -86,6 +93,47 @@ RETRACTED = "retracted"  # an exclusion the runner makes itself, from the adapte
 MIN_QUOTE_WORDS = 6
 # Words a quote must never lose or gain in a fuzzy match: they flip or change what it says.
 NEGATIONS = frozenset({"not", "no", "never", "none", "nor", "without", "cannot", "t"})
+
+
+def evidence_types(root: Path) -> dict[str, dict[str, Any]]:
+    """The instance's evidence types (catalog/evidence-types.json), or the template's defaults."""
+    path = root / "catalog" / "evidence-types.json"
+    if not path.is_file():
+        path = HERE.parent.parent / "templates" / "evidence-types.json"
+    return {item["id"]: item for item in rc.load_json(path)["types"]}
+
+
+def capped(grade: str, ceiling: str) -> str:
+    """A source is never graded more reliable than its evidence type allows: a forum post is at best E."""
+    return grade if grade == "F" else max(grade, ceiling, key=GRADES.index)
+
+
+def certainty_of(answer: dict[str, Any]) -> str:
+    """The certainty an answer's downgrades and upgrades add up to, starting from high."""
+    level = len(CERTAINTIES) - 1 - sum(int(item.get("levels", 1)) for item in answer.get("downgrades", []))
+    level += sum(int(item.get("levels", 1)) for item in answer.get("upgrades", []))
+    return CERTAINTIES[min(max(level, 0), len(CERTAINTIES) - 1)]
+
+
+def answer_problems(answers: Any, known: list[str], claim_ids: set[str]) -> list[str]:
+    """Why a set of graded answers does not hold: every question needs one, with a certainty its named, reasoned
+    downgrades and upgrades add up to."""
+    if not isinstance(answers, list):
+        return ['expected "answers": [{"question", "certainty", "downgrades": [...], "upgrades": [...]}]']
+    seen = {item.get("question"): item for item in answers if isinstance(item, dict)}
+    problems = [f"no graded answer for {question}" for question in known if question not in seen]
+    for question, item in seen.items():
+        if item.get("certainty") not in CERTAINTIES:
+            problems.append(f"{question}: certainty must be one of {CERTAINTIES}")
+            continue
+        for kind, allowed in (("downgrades", DOWNGRADES), ("upgrades", UPGRADES)):
+            for entry in item.get(kind, []):
+                if entry.get("domain") not in allowed or entry.get("levels", 1) not in (1, 2) or not str(entry.get("reason", "")).strip():
+                    problems.append(f"{question}: each of {kind} needs a domain in {allowed}, levels 1 or 2, and a reason")
+                problems += [f"{question}: {kind} cites unknown claim {claim}" for claim in set(entry.get("claims", [])) - claim_ids]
+        if certainty_of(item) != item["certainty"]:
+            problems.append(f"{question}: the downgrades and upgrades add up to {certainty_of(item)!r}, not {item['certainty']!r}")
+    return problems
 
 
 def claim_refs(text: str) -> list[str]:
@@ -666,6 +714,7 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
     known = set(questions(root, topic))
     limit = config["research"]["maxSourcesPerResearcher"]
     records = included_records(root, topic)
+    types = evidence_types(root)
 
     def check(data: Any) -> dict[str, Any]:
         if not isinstance(data, dict) or not isinstance(data.get("sources"), list) or not isinstance(data.get("claims"), list) \
@@ -688,11 +737,17 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         for source in data["sources"]:
             if not str(source.get("url", "")).startswith(("http://", "https://")):
                 raise ValueError(f"source {source.get('ref')} needs an http(s) url")
+            if source.get("evidenceType") not in types:
+                raise ValueError(f"source {source.get('ref')}: evidenceType must be one of {sorted(types)}")
+            if source.get("reliability") not in GRADES or not str(source.get("reliabilityReason", "")).strip():
+                raise ValueError(f"source {source.get('ref')}: reliability is one of {GRADES} with a reliabilityReason")
         for claim in data["claims"]:
             if not claim.get("text") or not claim.get("quote"):
                 raise ValueError(f"claim {claim.get('text', '')[:60]!r} needs text and a verbatim quote")
             if set(claim.get("questions", [])) - known:
                 raise ValueError(f"claim {claim.get('text', '')[:60]!r} refers to unknown questions")
+            if claim.get("via") is not None and not str(claim["via"]).strip():
+                raise ValueError(f"claim {claim.get('text', '')[:60]!r}: via names the original source, or is left out")
         return data
 
     if only is None:
@@ -728,19 +783,25 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         local = {}
         for source in reply["sources"]:
             key = source_key(source["url"])
+            evidence = records[key]["evidenceType"] if key in records else source["evidenceType"]
+            ceiling = types[evidence]["reliabilityCeiling"]
             entry = merged.setdefault(key, {
                 "id": f"S{len(merged) + 1}", "url": source["url"], "title": source.get("title", ""),
-                "published": source.get("published", "unknown"),
-                "kind": source.get("kind") if source.get("kind") in SOURCE_KINDS else "other", "foundBy": [], "addedIn": version,
+                "published": source.get("published", "unknown"), "evidenceType": evidence,
+                "reliability": capped(source["reliability"], ceiling), "reliabilityReason": " ".join(str(source["reliabilityReason"]).split()),
+                "foundBy": [], "addedIn": version, "checkedAt": rc.today(),
             })
+            if capped(source["reliability"], ceiling) != source["reliability"]:
+                entry["reliabilityCapped"] = f"{role_id} said {source['reliability']}; {evidence} is at best {ceiling}"
             if key in records:
-                entry.update({"record": records[key]["id"], "evidenceType": records[key]["evidenceType"]})
+                entry["record"] = records[key]["id"]
             entry["foundBy"] = sorted(set(entry["foundBy"]) | {role_id})
             local[source["ref"]] = entry["id"]
         for claim in reply["claims"]:
             claims.append({
                 "text": " ".join(claim["text"].split()), "source": local[claim["source"]], "quote": " ".join(claim["quote"].split()),
                 "questions": claim.get("questions", []), "type": claim.get("type", "fact"), "foundBy": role_id, "addedIn": version,
+                **({"via": " ".join(str(claim["via"]).split())} if claim.get("via") else {}),
             })
 
     source_id = f"web-{topic}"[:60].strip("-")
@@ -777,6 +838,9 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         claim["id"] = f"C{number}"
         stored = sources_by_id[claim["source"]].get("stored")
         claim["quoteVerified"] = bool(stored) and quote_found(claim["quote"], (root / stored).read_text(encoding="utf-8"))
+        if claim.get("via"):
+            # SIFT: a claim reported second-hand is traced when its original is itself in the ledger.
+            claim["traced"] = any(source_key(url.rstrip(".,;)")) in merged for url in re.findall(r"https?://\S+", claim["via"]))
     added = [{"id": claim.pop("id"), **claim} for claim in claims]
     led = {"topic": topic, "sources": list(merged.values()), "claims": [*existing["claims"], *added]}
     directory = topic_dir(root, topic)
@@ -806,13 +870,18 @@ def store_appending(root: Path, descriptor: dict[str, Any], entries: dict[str, A
 def render_ledger(ledger: dict[str, Any]) -> str:
     sources = {source["id"]: source for source in ledger["sources"]}
     lines = [f"# Claims ledger: {ledger['topic']}\n", "A claim whose quote is not verified, or whose page could not be stored, "
-             "rests on the researcher's word alone.\n", "| Claim | Text | Source | Quote verified | Questions |", "| --- | --- | --- | --- | --- |"]
+             "rests on the researcher's word alone. A drifted claim's page no longer says what was quoted.\n",
+             "| Claim | Text | Source | Reliability | Quote verified | Via | Questions |", "| --- | --- | --- | --- | --- | --- | --- |"]
     for claim in ledger["claims"]:
         source = sources[claim["source"]]
         where = source.get("stored") or f"{source['url']} (not stored)"
-        lines.append(f"| {claim['id']} | {cell(claim['text'])} | {source['id']}: {cell(where)} | {'yes' if claim['quoteVerified'] else 'no'} | {', '.join(claim['questions'])} |")
+        verified = "drifted" if claim.get("drifted") else "yes" if claim["quoteVerified"] else "no"
+        via = f"{cell(claim['via'])} ({'traced' if claim.get('traced') else 'not traced'})" if claim.get("via") else ""
+        lines.append(f"| {claim['id']} | {cell(claim['text'])} | {source['id']}: {cell(where)} | {source.get('reliability', '?')} | "
+                     f"{verified} | {via} | {', '.join(claim['questions'])} |")
     lines += ["", "## Sources", ""]
-    lines += [f"- {source['id']}: [{source.get('title') or source['url']}]({source['url']}) ({source['kind']}, published {source['published']}) "
+    lines += [f"- {source['id']}: [{source.get('title') or source['url']}]({source['url']}) ({source.get('evidenceType', source.get('kind', '?'))}, "
+              f"reliability {source.get('reliability', '?')}: {source.get('reliabilityReason', 'not graded')}; published {source['published']}) "
               f"stored: {source.get('stored') or source.get('fetch')}" for source in ledger["sources"]]
     return "\n".join(lines)
 
@@ -907,16 +976,20 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
     wanted = cited_claims(root, topic)
     ideas = [idea["id"] for idea in rc.load_json(directory / "ideas.json")["ideas"]]
     reviews = {path.stem.removeprefix("review-").upper(): rc.load_json(path) for path in sorted((directory / "critique").glob("review-*.json"))}
+    claim_ids = {claim["id"] for claim in ledger(root, topic)["claims"]}
 
     def check(data: Any) -> dict[str, Any]:
         if not isinstance(data, dict):
-            raise ValueError("expected {\"claims\": [...], \"ideas\": [...]}")
+            raise ValueError("expected {\"claims\": [...], \"ideas\": [...], \"answers\": [...]}")
         claim_seen = {item.get("claim"): item for item in data.get("claims", [])}
         idea_seen = {item.get("idea"): item for item in data.get("ideas", [])}
         problems = [f"no verdict for {claim}" for claim in wanted if claim not in claim_seen]
         problems += [f"no verdict for idea {idea}" for idea in ideas if idea not in idea_seen]
         problems += [f"{key}: verdict must be one of {CLAIM_VERDICTS}" for key, item in claim_seen.items() if item.get("verdict") not in CLAIM_VERDICTS]
         problems += [f"{key}: verdict must be one of {IDEA_VERDICTS}" for key, item in idea_seen.items() if item.get("verdict") not in IDEA_VERDICTS]
+        problems += [f"{key}: credibility must be one of {CREDIBILITY}" for key, item in claim_seen.items()
+                     if item.get("credibility") not in CREDIBILITY]
+        problems += answer_problems(data.get("answers"), questions(root, topic), claim_ids)
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return data
@@ -925,7 +998,8 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
                         for label, review in reviews.items())
     body = (
         f"# Task\n\nSettle every claim ({', '.join(wanted)}) and idea ({', '.join(ideas)}) of research/{topic}/analysis.md "
-        f"and ideas.json from these anonymous reviews, checking them against the stored sources.\n\n{context(root, topic)}\n\n{shown}"
+        f"and ideas.json from these anonymous reviews, checking them against the stored sources. Then grade the certainty of the "
+        f"answer to each question ({', '.join(questions(root, topic))}).\n\n{context(root, topic)}\n\n{shown}"
     )
     data = session.call_checked(config["pipeline"]["judge"], body, "judge", json_reply(check))
     # A claim one reviewer refuted but the judge kept is contested: the report says so; only the user can settle it.
@@ -940,14 +1014,25 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
     data["claims"] = with_history(data["claims"], previous.get("claims", []), "claim", "verdict", topic_version(directory))
     data["ideas"] = with_history(data["ideas"], previous.get("ideas", []), "idea", "verdict", topic_version(directory))
     rc.write_json(directory / "judgement.json", data)
-    lines = [f"# Judgement: {topic}\n", "| Claim | Verdict | Reason |", "| --- | --- | --- |"]
-    lines += [f"| {item['claim']} | {item['verdict']}{' (earlier version)' if item.get('carried') else ''} | {cell(item.get('reason', ''))} |"
-              for item in data["claims"]]
+    lines = [f"# Judgement: {topic}\n", "## Certainty of the answers\n", certainty_text(data["answers"]), "",
+             "| Claim | Verdict | Credibility | Reason |", "| --- | --- | --- | --- |"]
+    lines += [f"| {item['claim']} | {item['verdict']}{' (earlier version)' if item.get('carried') else ''} | {item.get('credibility', '?')} | "
+              f"{cell(item.get('reason', ''))} |" for item in data["claims"]]
     lines += ["", "| Idea | Verdict | Reason |", "| --- | --- | --- |"]
     lines += [f"| {item['idea']} | {item['verdict']} | {cell(item.get('reason', ''))} |" for item in data["ideas"]]
     if contested:
         lines += ["", "## Contested", ""] + [f"- {item['claim']}: refuted by {', '.join(item['refutedBy'])}, kept by the judge" for item in contested]
     rc.write_text(directory / "judgement.md", "\n".join(lines))
+
+
+def certainty_text(answers: list[dict[str, Any]]) -> str:
+    """One line per question: its certainty and why it is not higher."""
+    lines = []
+    for item in sorted(answers, key=lambda answer: int(answer["question"][1:])):
+        reasons = [f"{entry['domain']} -{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("downgrades", [])]
+        reasons += [f"{entry['domain']} +{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("upgrades", [])]
+        lines.append(f"- {item['question']}: **{item['certainty']}**" + (f" ({'; '.join(reasons)})" if reasons else ""))
+    return "\n".join(lines)
 
 
 def topic_version(directory: Path) -> int:
@@ -1093,11 +1178,19 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
     sources = {source["id"]: source for source in led["sources"]}
     claims = {claim["id"]: claim for claim in led["claims"]}
     used = sorted(set(claim_refs(markdown)), key=lambda value: int(value[1:]))
-    appendix = ["", "## Evidence", "", "| Claim | Verdict | Quote verified | Source |", "| --- | --- | --- | --- |"]
+    credibility = {item["claim"]: item.get("credibility", "?") for item in judgement["claims"]}
+    appendix = []
+    if judgement.get("answers"):
+        appendix += ["", "## Certainty of the answers", "", "How sure each answer is, starting from high and lowered for each "
+                     "named weakness of its evidence:", "", certainty_text(judgement["answers"])]
+    appendix += ["", "## Evidence", "", "Reliability of the source: A completely reliable to E unreliable, F cannot be judged. "
+                 "Credibility of the claim: 1 confirmed to 5 improbable, 6 cannot be judged.", "",
+                 "| Claim | Verdict | Credibility | Reliability | Quote verified | Source |", "| --- | --- | --- | --- | --- | --- |"]
     for claim_id in used:
         claim, source = claims[claim_id], sources[claims[claim_id]["source"]]
-        appendix.append(f"| {claim_id} | {verdicts.get(claim_id, 'not judged')} | {'yes' if claim['quoteVerified'] else 'no'} | "
-                        f"[{cell(source.get('title') or source['url'])}]({source['url']}){' — ' + source['stored'] if source.get('stored') else ''} |")
+        verified = "drifted" if claim.get("drifted") else "yes" if claim["quoteVerified"] else "no"
+        appendix.append(f"| {claim_id} | {verdicts.get(claim_id, 'not judged')} | {credibility.get(claim_id, '?')} | {source.get('reliability', '?')} | "
+                        f"{verified} | [{cell(source.get('title') or source['url'])}]({source['url']}){' — ' + source['stored'] if source.get('stored') else ''} |")
     if (directory / "screening.json").is_file():
         screening = rc.load_json(directory / "screening.json")
         web = [source for source in led["sources"] if not source.get("record")]

@@ -17,7 +17,7 @@ Markdown, in this order:
 
 1. `# <the brief's title>`
 2. `## TL;DR`: three to six bullets. The answer, the recommendation, the main caveat.
-3. One section per question, headed `## Q1: <question>`: the answer, then the evidence.
+3. One section per question, headed `## Q1: <question>`: the answer, how sure it is (the judgement's certainty for that question and its main reason, e.g. "Certainty: low, the trials are small and vendor-run"), then the evidence.
 4. `## Comparison`: the analysis's comparison, corrected by the judgement.
 5. `## What this means for us`: the fit. What to adopt, trial, assess or hold, where in the user's repos, and the next step for each.
 6. `## Caveats`: weak evidence, gaps, contested points.
@@ -28,5 +28,5 @@ Markdown, in this order:
 - Never cite a REFUTED or UNSUPPORTED claim as `[C#]`. If it matters that something widely believed is false, say so in words without the bracket citation. The runner appends a list of refuted claims anyway.
 - Mark claims judged WEAK in the prose ("one vendor benchmark suggests ...").
 - Answer every question of the brief, even when the answer is "the evidence does not settle this".
-- The runner appends the evidence table, the refuted and contested claims, and the handoff note. Don't write them yourself.
+- The runner appends the certainty of each answer, the evidence table with reliability and credibility grades, the refuted and contested claims, and the handoff note. Don't write them yourself.
 - No new facts. Everything comes from the ledger, the profile or the user's files.

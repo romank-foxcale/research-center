@@ -25,6 +25,7 @@ relations:
 | --- | --- | --- |
 | research-center.json | budgets, ingest limits, which role fills which pipeline slot | the user (bootstrap) |
 | catalog/agents/ | one JSON per role: provider, model, access, skills | the user (`./rc roles set`) |
+| catalog/evidence-types.json | the evidence types with their reliability ceiling and half-life | the template (seeded), the user |
 | catalog/adapters/ | one JSON per source adapter: family, what it covers, filters, rate limit | the template (seeded), the user |
 | catalog/sources/ | one JSON per source: kind, locators, include/exclude, note | `./rc ingest add`, research collect |
 | sources/&lt;id&gt;/ | extracted text, manifest (origin, sha256, extractor), redactions | ingest runner |

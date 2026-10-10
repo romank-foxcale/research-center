@@ -51,6 +51,8 @@ NUMBERS = {
     "research": ("maxSourcesPerResearcher", "resultsPerQuery", "screenBatch"),
 }
 COUNTS = ("snowballDepth", "snowballSeeds", "snowballPerSeed")  # optional; 0 is allowed
+GRADES = ("A", "B", "C", "D", "E", "F")
+CERTAINTIES = ("very low", "low", "moderate", "high")
 DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
@@ -126,6 +128,23 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
     email = settings.get("research", {}).get("contactEmail", "")
     if not isinstance(email, str) or (email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)):
         errors.append(f"{label}: research.contactEmail must be empty or an email address the user chose to share")
+
+
+def check_evidence_types(root: Path, path: Path, errors: list[str]) -> None:
+    """The evidence types cover exactly the adapters' vocabulary, each with a reliability ceiling and a half-life."""
+    name = path.relative_to(root).as_posix()
+    data = load(path, errors, root) if path.is_file() else None
+    if not isinstance(data, dict) or not isinstance(data.get("types"), list):
+        errors.append(f"{name}: missing, or without a types list")
+        return
+    ids = [item.get("id") for item in data["types"]]
+    if sorted(ids) != sorted(kit.EVIDENCE_TYPES):
+        errors.append(f"{name}: types must be exactly {kit.EVIDENCE_TYPES}; tune their ceilings and half-lives, not the ids")
+    for item in data["types"]:
+        if item.get("reliabilityCeiling") not in GRADES[:5]:
+            errors.append(f"{name}: {item.get('id')}: reliabilityCeiling must be one of {GRADES[:5]}")
+        if not isinstance(item.get("halfLifeDays"), int) or isinstance(item.get("halfLifeDays"), bool) or item["halfLifeDays"] <= 0:
+            errors.append(f"{name}: {item.get('id')}: halfLifeDays must be a positive whole number")
 
 
 def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
@@ -208,6 +227,12 @@ def check_reports(root: Path, errors: list[str]) -> None:
         known = {claim["id"] for claim in claims.get("claims", [])}
         verdicts = {item["claim"]: item["verdict"] for item in judgement.get("claims", [])}
         body = report.read_text(encoding="utf-8").split("\n## Evidence\n", 1)[0]
+        for answer in judgement.get("answers", []):
+            if answer.get("certainty") not in CERTAINTIES:
+                errors.append(f"{name}/judgement.json: the answer to {answer.get('question')} has no certainty")
+            for entry in [*answer.get("downgrades", []), *answer.get("upgrades", [])]:
+                if not str(entry.get("reason", "")).strip():
+                    errors.append(f"{name}/judgement.json: a {entry.get('domain')} grade of {answer.get('question')} gives no reason")
         cited = {claim for group in CLAIM.findall(body) for claim in re.split(r"\s*[,;]\s*", group)}
         for claim in sorted(cited):
             if claim not in known:
@@ -224,6 +249,8 @@ def validate(root: Path) -> list[str]:
         if isinstance(settings, dict):
             check_settings(root, settings, root / "catalog" / "agents", errors, "research-center.json")
         check_adapters(root, root / "catalog" / "adapters", errors)
+        if (root / "catalog" / "evidence-types.json").is_file():
+            check_evidence_types(root, root / "catalog" / "evidence-types.json", errors)
         check_sources(root, errors)
         check_notes(root, errors)
         check_reports(root, errors)
@@ -233,6 +260,7 @@ def validate(root: Path) -> list[str]:
         if isinstance(template, dict):
             check_settings(root, template, root / "templates" / "agents", errors, "templates/research-center.json")
         check_adapters(root, root / "templates" / "adapters", errors)
+        check_evidence_types(root, root / "templates" / "evidence-types.json", errors)
         if not any((root / "templates" / "adapters").glob("*.json")):
             errors.append("templates/adapters/: the template must ship the default source adapters")
         for folder in DATA_DIRS:

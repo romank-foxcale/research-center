@@ -35,16 +35,24 @@ End with one fenced JSON block:
 ```json
 {
   "sources": [
-    {"ref": "S1", "url": "https://arxiv.org/abs/2601.01234", "title": "Title of the page", "published": "2026-01-15", "kind": "paper"}
+    {"ref": "S1", "url": "https://arxiv.org/abs/2601.01234", "title": "Title of the page", "published": "2026-01-15",
+     "evidenceType": "preprint", "reliability": "C", "reliabilityReason": "Not yet peer reviewed; authors from a known lab, code released."},
+    {"ref": "S2", "url": "https://news.example.org/four-day-trial", "title": "Trial ends", "published": "2026-03-02",
+     "evidenceType": "journalism", "reliability": "C", "reliabilityReason": "Established newsroom; reports the trial's own summary."}
   ],
   "claims": [
     {"text": "The method improves exact-match by 7 points on HotpotQA over the BM25 baseline.", "source": "S1",
-     "quote": "verbatim words copied from the page", "questions": ["Q1"], "type": "benchmark"}
+     "quote": "verbatim words copied from the page", "questions": ["Q1"], "type": "benchmark"},
+    {"text": "The trial cut hours by 20 percent with no loss of output.", "source": "S2",
+     "quote": "verbatim words from the news article", "questions": ["Q2"], "type": "fact",
+     "via": "the trial's final report, https://example.org/trial-report.pdf"}
   ]
 }
 ```
 
-- `kind` is one of paper, docs, blog, repo, news, forum, talk, other.
+- `evidenceType` is one of dataset, review, peer-reviewed, preprint, thesis, report, official-statistics, regulation, court-ruling, standard, company-filing, documentation, book, journalism, vendor, commentary, forum, reference, unknown. For an included record, use the type the screening lists.
+- `reliability` grades the source, not the claim (Admiralty scale): A completely reliable, B usually reliable, C fairly reliable, D not usually reliable, E unreliable, F cannot be judged. Give the reason in `reliabilityReason`: track record, independence, method shown, conflicts of interest. The runner caps the grade at what the evidence type allows (a forum post is at best E).
+- `via`: when the page only reports what another source says, name that original, with its URL when you have it, and try to cite the original itself as a source too. A claim whose original is also in your sources is traced; one whose original is not counts for less.
 - `type` is one of fact, benchmark, announcement, opinion.
 - `source` refers to a `ref` in your own `sources` list. Use only http(s) URLs.
 - Stay within the source limit the task gives. 3 to 8 claims per source is typical.
