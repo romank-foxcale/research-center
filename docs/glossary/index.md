@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, handoff.
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, competing hypotheses matrix, diagnostic claim, key assumption, assessment, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -38,4 +38,8 @@ relations:
 - **Credibility**: how believable one claim is, 1 confirmed to 5 improbable, 6 cannot be judged; given by the judge.
 - **Certainty**: how sure an answer is, high, moderate, low or very low: high minus the named downgrades (reliability, inconsistency, indirectness, imprecision, one-sided), plus any upgrades.
 - **Drifted**: a claim whose page, re-fetched after its evidence type's half-life, no longer contains the quote or is gone.
+- **Competing hypotheses matrix**: per question with two or more plan hypotheses, every relied-on claim rated consistent (C), inconsistent (I) or neutral (N) with each; hypotheses rank by surviving inconsistent evidence.
+- **Diagnostic claim**: a claim rated differently across the hypotheses, so it tells them apart.
+- **Key assumption**: something an answer rests on that the evidence does not show (A1..); sceptics and the judge rule on it.
+- **Assessment**: a report paragraph that is the writer's judgement beyond the cited evidence, marked as such.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.

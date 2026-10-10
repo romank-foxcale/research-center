@@ -35,7 +35,8 @@ EXTRA = "https://extra.example.org/post"  # past the source limit of 2
 RECORD = "https://doi.org/10.5555/WT.2025.1"  # an included OpenAlex record; it never counts against the limit
 PLAN = {
     "horizon": "near",
-    "hypotheses": [{"id": "H1", "statement": "Hybrid retrieval gives the best recall", "questions": ["Q1"]}],
+    "hypotheses": [{"id": "H1", "statement": "Hybrid retrieval gives the best recall", "questions": ["Q1"]},
+                   {"id": "H2", "statement": "Dense retrieval alone gives the best recall", "questions": ["Q1"]}],
     "exclusions": [{"id": "X1", "text": "Published before 2025", "from": "Scope"}],
     "avenues": [
         {"adapter": "openalex", "query": "hybrid retrieval recall", "filters": {"type": "article"}, "since": "2024-01-01",
@@ -46,6 +47,8 @@ PLAN = {
          "stance": "explore", "questions": ["Q1"], "why": "official numbers"},
         {"adapter": "gdelt", "query": "short", "stance": "explore", "questions": ["Q1"], "why": "news"},
         {"adapter": "web", "query": "hybrid retrieval production", "stance": "explore", "questions": ["Q1"], "why": "engineering blogs"},
+        {"adapter": "web", "query": "dense retrieval worse than BM25", "stance": "disconfirm", "hypothesis": "H2", "questions": ["Q1"],
+         "why": "find where dense alone loses"},
     ],
 }
 PAGE = "Hybrid retrieval combines lexical and dense signals and improves recall on every benchmark we tried in production."
@@ -119,13 +122,22 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
         update = " A new trial disagrees [C5]." if PHASE["refresh"] else ""
         return f"## Summary\n\nHybrid wins.\n\n{python}## Q1: Which retrieval?\n\nHybrid [{cite}]. Not dense [C1; C3].{update}\n\n" + block(
             {"ideas": [{"id": "I1", "name": "Hybrid retrieval", "summary": "BM25 plus dense.", "claims": ["C1"]},
-                       {"id": "I2", "name": "Dense only", "summary": "Embeddings only.", "claims": ["C3"]}]})
+                       {"id": "I2", "name": "Dense only", "summary": "Embeddings only.", "claims": ["C3"]}],
+             "questions": [{"question": "Q1",
+                            "assumptions": [{"id": "A1", "text": "Recall on public benchmarks predicts recall on our catalogue", "claims": ["C1"]}],
+                            "ach": {"hypotheses": ["H1", "H2"],
+                                    "matrix": [{"claim": "C1", "ratings": {"H1": "C", "H2": "I"}},
+                                               {"claim": "C3", "ratings": {"H1": "I", "H2": "C"}},
+                                               {"claim": "C2", "ratings": {"H1": "C", "H2": "N"}}],
+                                    "untested": ["Learned sparse retrieval alone"]}}]})
     if role_id.startswith("sceptic-"):
         refute = role_id == "sceptic-grok"
         update = [{"claim": "C5", "verdict": "HOLDS", "reason": "in the new trial's abstract"}] if PHASE["refresh"] else []
         return block({"claims": [{"claim": "C1", "verdict": "HOLDS", "reason": "on the page"},
                                  {"claim": "C2", "verdict": "REFUTED" if refute else "WEAK", "reason": "not on the page"},
-                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "page not stored"}, *update], "analysis": []})
+                                 {"claim": "C3", "verdict": "UNSUPPORTED", "reason": "page not stored"}, *update],
+                      "assumptions": [{"assumption": "A1", "verdict": "WEAK", "reason": "our catalogue is not a public benchmark"}],
+                      "analysis": []})
     if role_id == "judge":
         refreshed = PHASE["refresh"]
         update = [{"claim": "C5", "verdict": "HOLDS", "credibility": 2, "reason": "the new trial"}] if refreshed else []
@@ -134,6 +146,7 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                  {"claim": "C3", "verdict": "UNSUPPORTED", "credibility": 6, "reason": "no page"}, *update],
                       "ideas": [{"idea": "I1", "verdict": "SURVIVES", "reason": "C1 holds"},
                                 {"idea": "I2", "verdict": "FALLS", "reason": "C3 unsupported"}],
+                      "assumptions": [{"assumption": "A1", "verdict": "WEAK", "reason": "untested on our catalogue"}],
                       "answers": [{"question": "Q1", "certainty": "low",
                                    "downgrades": [{"domain": "imprecision", "levels": 1, "reason": "one benchmark", "claims": ["C1"]},
                                                   {"domain": "one-sided", "levels": 1, "reason": "only the authors measured it"}]}]})
@@ -142,7 +155,9 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                 "risks": "embedding cost", "rationale": "Recall matters for us [C1].", "nextStep": "Shadow-run it."}]})
     if role_id == "reporter":
         cite = "[C1, C3]" if not retry else "the dense-only claim"
-        return f"# Retrieval\n\n## TL;DR\n\n- Hybrid [C1].\n\n## Q1: Which retrieval?\n\nHybrid [C1], weakly [C2]; not {cite}.\n"
+        hedge = "Hybrid is probably better." if not retry else "Assessment: hybrid is likely the better default for us."
+        return (f"# Retrieval\n\n## TL;DR\n\n- Hybrid [C1].\n\n## Q1: Which retrieval?\n\nCertainty: low, one benchmark.\n\n"
+                f"Hybrid [C1], weakly [C2]; not {cite}.\n\n{hedge}\n")
     raise AssertionError(f"unexpected role {role_id}")
 
 
@@ -336,6 +351,30 @@ def main() -> int:
                                                  ["Q1", "Q2", "Q3"], set()))
     for expected in ("no graded answer for Q3", "add up to 'moderate', not 'high'", "a domain in"):
         assert expected in problems, (expected, problems)
+    claims = {"C1", "C2", "C3"}
+    good = {"questions": [{"question": "Q1", "assumptions": [{"id": "A1", "text": "x"}],
+                           "ach": {"hypotheses": ["H1", "H2"], "matrix": [{"claim": "C1", "ratings": {"H1": "C", "H2": "I"}}]}}]}
+    assert research.analysis_problems(good, ["Q1"], claims, PLAN) == []
+    unsearched = {**PLAN, "avenues": [avenue for avenue in PLAN["avenues"] if avenue.get("hypothesis") != "H2"]}
+    assert "H2 has no disconfirming search" in " ".join(research.analysis_problems(good, ["Q1"], claims, unsearched))
+    bad = {"questions": [{"question": "Q1", "assumptions": [],
+                          "ach": {"hypotheses": ["H1", "H3"], "matrix": [{"claim": "C9", "ratings": {"H1": "X"}}]}}]}
+    problems = " ".join(research.analysis_problems(bad, ["Q1", "Q2"], claims, PLAN))
+    for expected in ("no entry for Q2", "name the assumptions", "leaves out hypothesis H2", "H3 is not a hypothesis of the plan",
+                     "C9 is not a ledger claim", "rates every hypothesis"):
+        assert expected in problems, (expected, problems)
+    without = {"questions": [{"question": "Q1", "assumptions": [{"id": "A1", "text": "x"}]}]}
+    assert "give an ach matrix" in " ".join(research.analysis_problems(without, ["Q1"], claims, PLAN))
+    ranking, diagnostic = research.ach_ranking({"hypotheses": ["H1", "H2"], "matrix": [
+        {"claim": "C1", "ratings": {"H1": "I", "H2": "C"}}, {"claim": "C2", "ratings": {"H1": "I", "H2": "I"}},
+        {"claim": "C3", "ratings": {"H1": "C", "H2": "I"}}]}, {"C3": "REFUTED"})
+    assert ranking == [("H2", 1), ("H1", 2)] and diagnostic == ["C1"], (ranking, diagnostic)
+    report = ("## TL;DR\n\n- It is almost certainly hybrid [C1].\n- Assessment: worth a trial.\n\n## Q1: Which?\n\n"
+              "Certainty: low.\n\nHybrid is very likely better [C1].\n\nPerhaps dense is fine.\n\n## Caveats\n\nPossibly wrong.")
+    problems = " ".join(research.language_problems(report, {"Q1": "low"}))
+    assert "'Q1: Which?' says 'perhaps'" in problems and "'very likely', which needs moderate certainty" in problems, problems
+    assert "\"Perhaps dense is fine.\" neither cites" in problems and "Caveats" not in problems and "says 'certainly'" not in problems, problems
+    assert research.language_problems("## Q1: x\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == []
     assert research.source_key(PAPER) == research.source_key(BLOG)
     assert research.source_key(RECORD) == "doi:10.5555/wt.2025.1"
     assert research.source_key("https://x.org/item?id=1") != research.source_key("https://x.org/item?id=2"), "queries stay apart"
@@ -448,6 +487,12 @@ def main() -> int:
         assert "## Evidence" in report and "| C1 | HOLDS | 2 | B | yes | [Paper \\| Site](" in report and "## Contested" in report
         assert "## Certainty of the answers" in report and "- Q1: **low** (imprecision -1: one benchmark; one-sided -1:" in report
         assert "C3 (UNSUPPORTED)" in report and "## Handoff" in report
+        assert "says 'probably'" in SEEN_PROMPTS["reporter"], "a vague hedge in an answer is rejected"
+        assert "## Competing hypotheses for Q1" in report and "1. H1: Hybrid retrieval gives the best recall (0 inconsistent)" in report
+        assert "2. H2: Dense retrieval alone gives the best recall (1 inconsistent)" in report, "C3 is unsupported, so only C1 counts against H2"
+        assert "Diagnostic claims, the ones that tell the hypotheses apart: C1, C2." in report and "Learned sparse retrieval alone" in report
+        assert "| A1: Recall on public benchmarks predicts recall on our catalogue | Q1 | WEAK |" in report
+        assert "| C1 | C | I |" in (topic / "analysis.md").read_text() and "A1" in SEEN_PROMPTS["sceptic-claude"].split("# Task")[1]
         assert "## How the sources were found" in report and "- Duplicates removed: 1" in report and "X1 (Published before 2025): 1" in report
 
         validator = __import__("importlib.util").util

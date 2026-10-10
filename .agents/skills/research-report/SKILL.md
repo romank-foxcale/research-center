@@ -27,6 +27,8 @@ Markdown, in this order:
 - Cite claims inline as `[C12]`. Every claim you cite must be in the ledger, and its verdict must be HOLDS or WEAK.
 - Never cite a REFUTED or UNSUPPORTED claim as `[C#]`. If it matters that something widely believed is false, say so in words without the bracket citation. The runner appends a list of refuted claims anyway.
 - Mark claims judged WEAK in the prose ("one vendor benchmark suggests ...").
+- **Evidence or assessment.** In the TL;DR and the answers, every paragraph and bullet either cites claims `[C#]` or starts with `Assessment:`, your judgement beyond the evidence. A line starting `Certainty:` states the grade.
+- **Say likelihood only with the scale** (ICD 203): almost no chance, very unlikely, unlikely, roughly even chance, likely, very likely, almost certain(ly). Never probably, possibly, perhaps, presumably, conceivably, definitely, certainly, undoubtedly, probable, improbable, doubtful. The question's certainty limits the words: likely, unlikely and roughly even chance need at least low certainty; very likely and very unlikely need moderate; almost certain and almost no chance need high. With very low certainty, say what the evidence shows and that it does not settle the question.
 - Answer every question of the brief, even when the answer is "the evidence does not settle this".
-- The runner appends the certainty of each answer, the evidence table with reliability and credibility grades, the refuted and contested claims, and the handoff note. Don't write them yourself.
+- The runner appends the certainty of each answer, the ranking of competing hypotheses with their diagnostic claims, the key assumptions with their verdicts, the evidence table with reliability and credibility grades, the refuted and contested claims, and the handoff note. Don't write them yourself.
 - No new facts. Everything comes from the ledger, the profile or the user's files.

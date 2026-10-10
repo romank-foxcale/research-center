@@ -96,6 +96,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 - Agents only read: every file is written by the runner, and access is enforced by CLI flags. Claude runs in `dontAsk` with an allow-list, Codex in its read-only sandbox, Cursor in a throwaway snapshot with a deny config.
 - Every profile fact cites a stored source file, and every report claim cites a stored page whose quote was checked.
 - Sceptics review independently. The judge sees them only as Review A, B, C. A claim one sceptic refuted and the judge kept is shown to you as contested.
+- Questions with competing answers are weighed in a hypothesis matrix, every answer names its key assumptions, and the report says likelihood only on a fixed scale, marking what is evidence and what is assessment.
 - Every source carries a reliability grade capped by its evidence type, every claim a credibility grade, and every answer a certainty (high to very low) with the named weaknesses that lowered it.
 - `./rc check` validates every manifest, citation and report, and fails on any unredacted secret.
 

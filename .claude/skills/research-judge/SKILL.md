@@ -43,6 +43,7 @@ End with one fenced JSON block:
 {
   "claims": [{"claim": "C3", "verdict": "WEAK", "credibility": 3, "reason": "Reviews A and C: one dataset only; confirmed on the stored page."}],
   "ideas": [{"idea": "I1", "verdict": "SURVIVES", "reason": "C3 and C7 hold."}],
+  "assumptions": [{"assumption": "A1", "verdict": "WEAK", "reason": "Plausible, not shown for this catalogue."}],
   "answers": [{"question": "Q1", "certainty": "low",
                "downgrades": [{"domain": "imprecision", "levels": 1, "reason": "Two small trials.", "claims": ["C3", "C7"]},
                               {"domain": "one-sided", "levels": 1, "reason": "Both run by the vendor.", "claims": ["C7"]}],
@@ -51,4 +52,4 @@ End with one fenced JSON block:
 }
 ```
 
-Give a verdict and a credibility for every claim, a verdict for every idea, and a graded answer for every question the task lists.
+Give a verdict and a credibility for every claim, a verdict for every idea and every assumption, and a graded answer for every question the task lists. An answer resting on an assumption you judge WEAK, REFUTED or UNSUPPORTED is downgraded for `indirectness` or `reliability`, naming the assumption in the reason.

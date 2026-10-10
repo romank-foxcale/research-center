@@ -38,6 +38,9 @@ End with one fenced JSON block:
   "claims": [
     {"claim": "C3", "verdict": "WEAK", "reason": "The page reports the gain on one dataset only.", "evidence": "sources/web-x/text/page.md"}
   ],
+  "assumptions": [
+    {"assumption": "A1", "verdict": "WEAK", "reason": "The benchmark data is public web text; the user's catalogue is product listings."}
+  ],
   "analysis": [
     {"where": "Q2", "issue": "States the method is 'production ready'; no claim says so."}
   ]
@@ -45,5 +48,7 @@ End with one fenced JSON block:
 ```
 
 - Give a verdict for every claim the task lists, each with a reason.
+- Test every assumption the task lists the same way: HOLDS when the ledger or the profile shows it, WEAK when it is plausible but unshown, REFUTED when evidence contradicts it, UNSUPPORTED when nothing bears on it.
+- Check the analysis's matrices (appended to analysis.md): a claim rated consistent with a hypothesis it actually contradicts is an overreach for `analysis`.
 - `analysis` lists statements in the analysis that overreach their claims. It may be empty.
 - Judge the evidence, not the writing. Don't propose new research.

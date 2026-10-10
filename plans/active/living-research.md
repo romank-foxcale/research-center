@@ -66,10 +66,10 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 | SIFT lateral reading | Trace claims to the original; find better coverage | A claim from a secondary source carries `via`; for claims an answer relies on, collection must try to reach the primary source, and the sceptic flags untraced ones | WP5 |
 | SIFT / CRAAP | Investigate the source | Reliability grades come with a reason; retracted works are excluded through the Crossref retraction check | WP3, WP5 |
 | ACH (Heuer) | Enumerate competing hypotheses and score evidence against all of them | For questions with alternatives, the analysis outputs a hypothesis-by-claim matrix (consistent, inconsistent, neutral); the runner checks every hypothesis has disconfirming search coverage | WP6 |
-| ACH (Heuer) | Weight diagnostic evidence; prefer the hypothesis with least inconsistent evidence | The judge reports diagnostic claims per question; the analysis ranks hypotheses by inconsistency, not by support | WP6 |
+| ACH (Heuer) | Weight diagnostic evidence; prefer the hypothesis with least inconsistent evidence | The runner computes the diagnostic claims and ranks hypotheses by surviving inconsistent evidence, not by support | WP6 |
 | Key assumptions check | List and test the assumptions an answer rests on | `assumptions` per answer; sceptics test them like claims | WP6 |
-| ICD 203 | Calibrated estimative language and separate confidence | The report uses a fixed word scale (almost certain ... remote) mapped to certainty; the runner rejects unmapped words in answer headlines | WP6 |
-| ICD 203 | Distinguish evidence from judgement | The report marks each sentence's basis: claim citation or "assessment" | WP6 |
+| ICD 203 | Calibrated estimative language and separate confidence | The report uses the fixed word scale (almost no chance ... almost certain), each word allowed only from a minimum certainty; the runner rejects hedges outside the scale in the TL;DR and answers | WP6 |
+| ICD 203 | Distinguish evidence from judgement | Every paragraph and bullet of the TL;DR and answers cites a claim or starts with "Assessment:" | WP6 |
 | Technology Radar | Rings, plus "new" and "moved" markers over time | Fit rings keep a history; the delta and report show new and moved ideas | WP4 |
 | Living evidence repository (ISPOR 2026) | Change flags for human validation | Flipped verdicts and moved rings are listed in the delta as "needs your review", like contested claims | WP4 |
 
@@ -92,7 +92,7 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 - **Budgets.** A new `budget.refreshCalls` (default 8). Screening is batched (up to 40 records per call). A refresh that would exceed the budget stops in a resumable state, as in `docs/decisions/0006-budgets-and-resume.md`.
 - **No silent widening.** An adapter that errors or hits its rate limit is reported in the run and in `searches.json` (status, count 0). Its earlier records are kept, never deleted.
 - **Tests never touch the network.** Each adapter ships recorded responses under `scripts/sources/fixtures/`, and its tests replay them. The Nix sandbox has no network anyway.
-- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, 0009 living topics, 0010 evidence grading.
+- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, 0009 living topics, 0010 evidence grading, 0011 structured analysis.
 
 ## Open questions
 

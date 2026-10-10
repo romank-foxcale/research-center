@@ -82,6 +82,18 @@ CREDIBILITY = (1, 2, 3, 4, 5, 6)
 CERTAINTIES = ("very low", "low", "moderate", "high")
 DOWNGRADES = ("reliability", "inconsistency", "indirectness", "imprecision", "one-sided")
 UPGRADES = ("large-effect", "convergence")
+# Analysis of Competing Hypotheses: each relied-on claim is consistent (C), inconsistent (I) or neutral (N) with each.
+RATINGS = ("C", "I", "N")
+ASSUMPTION_ID = re.compile(r"A\d+")
+# ICD 203 likelihood words and the least certainty each may be said with; longest phrases are matched first.
+LIKELIHOOD = {
+    "almost no chance": "high", "almost certainly": "high", "almost certain": "high", "very unlikely": "moderate",
+    "very likely": "moderate", "roughly even chance": "low", "unlikely": "low", "likely": "low",
+}
+SCALE = re.compile(r"\b(" + "|".join(sorted(map(re.escape, LIKELIHOOD), key=len, reverse=True)) + r")\b")
+# Hedges that read as likelihood but map to no number; the scale says it instead.
+VAGUE = re.compile(r"\b(probably|possibly|perhaps|presumably|conceivably|undoubtedly|definitely|certainly|"
+                   r"probable|improbable|doubtful|in all likelihood)\b")
 WEB = "web"  # the avenue the researcher roles search themselves; every other avenue names an adapter
 STANCES = ("support", "disconfirm", "explore")
 HORIZONS = ("near", "medium", "long")
@@ -133,6 +145,101 @@ def answer_problems(answers: Any, known: list[str], claim_ids: set[str]) -> list
                 problems += [f"{question}: {kind} cites unknown claim {claim}" for claim in set(entry.get("claims", [])) - claim_ids]
         if certainty_of(item) != item["certainty"]:
             problems.append(f"{question}: the downgrades and upgrades add up to {certainty_of(item)!r}, not {item['certainty']!r}")
+    return problems
+
+
+def plan_hypotheses(plan: dict[str, Any], question: str) -> list[str]:
+    """The plan's hypotheses about one question; two or more make it a question of competing hypotheses."""
+    return [item["id"] for item in plan.get("hypotheses", []) if question in item.get("questions", [])]
+
+
+def analysis_problems(data: dict[str, Any], known: list[str], claim_ids: set[str], plan: dict[str, Any]) -> list[str]:
+    """The structured part of an analysis (ACH, Heuer; key assumptions check): every question lists the assumptions
+    its answer rests on; a question the plan gave two or more hypotheses gets a matrix rating every relied-on claim
+    as consistent (C), inconsistent (I) or neutral (N) with each of them, and only hypotheses that were searched
+    against may be weighed."""
+    entries = data.get("questions")
+    if not isinstance(entries, list):
+        return ['expected "questions": [{"question", "assumptions": [...], "ach": {...}}] next to "ideas"']
+    seen = {entry.get("question"): entry for entry in entries if isinstance(entry, dict)}
+    problems = [f"no entry for {question} in questions" for question in known if question not in seen]
+    disconfirmed = {avenue.get("hypothesis") for avenue in plan.get("avenues", []) if avenue.get("stance") == "disconfirm"}
+    assumption_ids: list[str] = []
+    for question, entry in seen.items():
+        assumptions = entry.get("assumptions")
+        if not isinstance(assumptions, list) or not assumptions:
+            problems.append(f"{question}: name the assumptions its answer rests on (at least one)")
+            assumptions = []
+        for item in assumptions:
+            if not ASSUMPTION_ID.fullmatch(str(item.get("id", ""))) or not str(item.get("text", "")).strip():
+                problems.append(f"{question}: assumption {item} needs an id like A1 and a text")
+            assumption_ids.append(item.get("id"))
+            problems += [f"{question}: assumption {item.get('id')} cites unknown claim {claim}" for claim in set(item.get("claims", [])) - claim_ids]
+        expected = plan_hypotheses(plan, question)
+        ach = entry.get("ach")
+        if len(expected) < 2 and not ach:
+            continue
+        if not isinstance(ach, dict):
+            problems.append(f"{question}: the plan weighs {', '.join(expected)} against each other; give an ach matrix")
+            continue
+        hypotheses = ach.get("hypotheses") or []
+        problems += [f"{question}: the matrix leaves out hypothesis {hypothesis}" for hypothesis in expected if hypothesis not in hypotheses]
+        for hypothesis in hypotheses:
+            if hypothesis not in {item["id"] for item in plan.get("hypotheses", [])}:
+                problems.append(f"{question}: {hypothesis} is not a hypothesis of the plan; list an alternative nobody searched for under untested")
+            elif hypothesis not in disconfirmed:
+                problems.append(f"{question}: {hypothesis} has no disconfirming search in the plan, so it cannot be weighed")
+        if len(hypotheses) < 2:
+            problems.append(f"{question}: a matrix weighs at least two hypotheses")
+        rows = ach.get("matrix")
+        if not isinstance(rows, list) or not rows:
+            problems.append(f"{question}: the matrix needs a row per claim the answer relies on")
+            rows = []
+        for row in rows:
+            if row.get("claim") not in claim_ids:
+                problems.append(f"{question}: matrix row {row.get('claim')} is not a ledger claim")
+            ratings = row.get("ratings") or {}
+            if any(ratings.get(hypothesis) not in RATINGS for hypothesis in hypotheses):
+                problems.append(f"{question}: row {row.get('claim')} rates every hypothesis as one of {RATINGS}")
+    duplicates = sorted({identifier for identifier in assumption_ids if assumption_ids.count(identifier) > 1})
+    problems += [f"assumption id {identifier} is used twice" for identifier in duplicates if identifier]
+    return problems
+
+
+def ach_ranking(ach: dict[str, Any], verdicts: dict[str, str]) -> tuple[list[tuple[str, int]], list[str]]:
+    """Heuer's reading of a matrix: hypotheses ranked by how much surviving evidence is inconsistent with them
+    (fewest first), and the diagnostic claims, those rated differently across the hypotheses. Claims judged
+    REFUTED or UNSUPPORTED do not count."""
+    rows = [row for row in ach["matrix"] if verdicts.get(row["claim"]) not in ("REFUTED", "UNSUPPORTED")]
+    score = {hypothesis: sum(row["ratings"][hypothesis] == "I" for row in rows) for hypothesis in ach["hypotheses"]}
+    diagnostic = [row["claim"] for row in rows if len({row["ratings"][hypothesis] for hypothesis in ach["hypotheses"]}) > 1]
+    return sorted(score.items(), key=lambda item: (item[1], int(item[0][1:]))), diagnostic
+
+
+def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
+    """ICD 203 for the report: likelihood is said only with the fixed scale, never stronger than the question's
+    certainty allows, and every paragraph of the TL;DR and the answers cites evidence [C#] or says it is an
+    Assessment."""
+    problems = []
+    parts = re.split(r"^## (.+)$", markdown, flags=re.MULTILINE)
+    for heading, body in zip(parts[1::2], parts[2::2]):
+        question = re.match(r"(Q\d+)\b", heading.strip())
+        if heading.strip() != "TL;DR" and not question:
+            continue
+        lowered = body.lower()
+        # "almost certainly" is on the scale; its "certainly" is not a hedge of its own.
+        for word in sorted({match.group(0) for match in VAGUE.finditer(SCALE.sub(" ", lowered))}):
+            problems.append(f"'{heading.strip()}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact")
+        if question and question.group(1) in certainty:
+            have = CERTAINTIES.index(certainty[question.group(1)])
+            for word in sorted({match.group(0) for match in SCALE.finditer(lowered)}):
+                if CERTAINTIES.index(LIKELIHOOD[word]) > have:
+                    problems.append(f"'{heading.strip()}' says '{word}', which needs {LIKELIHOOD[word]} certainty; "
+                                    f"the judgement gives {certainty[question.group(1)]}")
+        for unit in re.split(r"\n\s*\n|\n(?=\s*[-*] )", body.strip()):
+            text = unit.strip()
+            if text and not claim_refs(text) and not re.match(r"^(?:[-*]\s*)?(?:\*\*)?(Assessment|Certainty)\b", text):
+                problems.append(f"'{heading.strip()}': \"{text[:70]}\" neither cites a claim [C#] nor starts with 'Assessment:'")
     return problems
 
 
@@ -894,6 +1001,7 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
     config = rc.settings(root)
     claim_ids = {claim["id"] for claim in ledger(root, topic)["claims"]}
     known = set(questions(root, topic))
+    plan = rc.load_json(topic_dir(root, topic) / "source-plan.json")
 
     def check(reply: str) -> tuple[str, dict[str, Any]]:
         ideas = rc.extract_json(reply)
@@ -907,9 +1015,12 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
             unknown |= set(idea.get("claims", [])) - claim_ids
         if unknown:
             raise ValueError(f"cites claims that are not in the ledger: {sorted(unknown)}")
-        missing = [question for question in sorted(known) if question not in markdown]
+        missing = [question for question in sorted(known) if not re.search(rf"\b{question}\b", markdown)]
         if missing:
             raise ValueError(f"does not answer {missing}: give each question its own section")
+        problems = analysis_problems(ideas, sorted(known, key=lambda value: int(value[1:])), claim_ids, plan)
+        if problems:
+            raise ValueError("; ".join(problems[:20]))
         return markdown, ideas
 
     body = f"# Task\n\nAnswer the brief's questions from research/{topic}/claims.md.\n\n{context(root, topic)}"
@@ -919,38 +1030,76 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
         body += ("\n\n# Previous version\n\nThe ledger has new claims since the last analysis. Its ideas were:\n"
                  + "\n".join(f"- {idea['id']}: {idea['name']}" for idea in previous)
                  + "\nKeep an idea's id when it is still the same idea, even if the evidence now weakens it; give new ideas new ids.")
+    competing = {question: plan_hypotheses(plan, question) for question in sorted(known) if len(plan_hypotheses(plan, question)) > 1}
+    if competing:
+        body += ("\n\n# Competing hypotheses\n\nThe plan weighs these against each other; give each such question an ach matrix:\n"
+                 + "\n".join(f"- {question}: {', '.join(hypotheses)}" for question, hypotheses in competing.items()))
     markdown, ideas = session.call_checked(config["pipeline"]["analyst"], body, "analyze", check)
     directory = topic_dir(root, topic)
-    rc.write_text(directory / "analysis.md", markdown)
+    rc.write_text(directory / "analysis.md", markdown + "\n\n" + render_structure(ideas, plan))
     rc.write_json(directory / "ideas.json", ideas)
+
+
+def render_structure(ideas: dict[str, Any], plan: dict[str, Any]) -> str:
+    """The analysis's assumptions and matrices as tables, appended by the runner so sceptics review them too.
+    Claim ids are written bare: these tables are not citations."""
+    statements = {item["id"]: item["statement"] for item in plan.get("hypotheses", [])}
+    lines = ["## Assumptions and competing hypotheses (from the analysis's data)", ""]
+    for entry in ideas.get("questions", []):
+        lines += [f"### {entry['question']}", ""]
+        lines += [f"- {item['id']}: {item['text']}" + (f" (rests on {', '.join(item['claims'])})" if item.get("claims") else "")
+                  for item in entry.get("assumptions", [])]
+        ach = entry.get("ach")
+        if ach:
+            lines += ["", "| Claim | " + " | ".join(ach["hypotheses"]) + " |", "| --- |" + " --- |" * len(ach["hypotheses"])]
+            lines += [f"| {row['claim']} | " + " | ".join(row["ratings"][hypothesis] for hypothesis in ach["hypotheses"]) + " |" for row in ach["matrix"]]
+            lines += [""] + [f"- {hypothesis}: {statements.get(hypothesis, '')}" for hypothesis in ach["hypotheses"]]
+            lines += [f"- Untested alternative: {item}" for item in ach.get("untested", [])]
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def cited_claims(root: Path, topic: str) -> list[str]:
     directory = topic_dir(root, topic)
     cited = set(claim_refs((directory / "analysis.md").read_text(encoding="utf-8")))
-    for idea in rc.load_json(directory / "ideas.json")["ideas"]:
+    data = rc.load_json(directory / "ideas.json")
+    for idea in data["ideas"]:
         cited |= set(idea.get("claims", []))
+    # Claims weighed in a matrix or holding up an assumption are relied on too, so they are critiqued.
+    for entry in data.get("questions", []):
+        cited |= {claim for item in entry.get("assumptions", []) for claim in item.get("claims", [])}
+        cited |= {row["claim"] for row in (entry.get("ach") or {}).get("matrix", [])}
     return sorted(cited, key=lambda value: int(value[1:]))
+
+
+def assumptions_of(root: Path, topic: str) -> list[dict[str, Any]]:
+    data = rc.load_json(topic_dir(root, topic) / "ideas.json")
+    return [{**item, "question": entry["question"]} for entry in data.get("questions", []) for item in entry.get("assumptions", [])]
 
 
 def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
     config = rc.settings(root)
     wanted = cited_claims(root, topic)
+    assumptions = [item["id"] for item in assumptions_of(root, topic)]
 
     def check(data: Any) -> dict[str, Any]:
         verdicts = data.get("claims") if isinstance(data, dict) else None
         if not isinstance(verdicts, list):
-            raise ValueError("expected {\"claims\": [{\"claim\", \"verdict\", \"reason\", \"evidence\"}], \"analysis\": [...]}")
+            raise ValueError("expected {\"claims\": [{\"claim\", \"verdict\", \"reason\", \"evidence\"}], \"assumptions\": [...], \"analysis\": [...]}")
         seen = {item.get("claim") for item in verdicts}
         missing = sorted(set(wanted) - seen, key=lambda value: int(value[1:]))
         bad = [item for item in verdicts if item.get("verdict") not in CLAIM_VERDICTS or not item.get("reason")]
+        tested = {item.get("assumption"): item for item in data.get("assumptions", []) if isinstance(item, dict)}
+        missing += [f"assumption {identifier}" for identifier in assumptions if identifier not in tested]
+        bad += [item for item in tested.values() if item.get("verdict") not in CLAIM_VERDICTS or not item.get("reason")]
         if missing or bad:
             raise ValueError(f"missing verdicts for {missing}; invalid entries {bad[:3]} (verdict one of {CLAIM_VERDICTS} with a reason)")
         return data
 
     body = (
-        f"# Task\n\nTry to disprove the claims that research/{topic}/analysis.md and ideas.json rely on: {', '.join(wanted)}. "
-        f"The ledger is research/{topic}/claims.md; stored pages are under sources/.\n\n{context(root, topic)}"
+        f"# Task\n\nTry to disprove the claims that research/{topic}/analysis.md and ideas.json rely on: {', '.join(wanted)}"
+        + (f"; and test the assumptions the answers rest on: {', '.join(assumptions)}" if assumptions else "")
+        + f". The ledger is research/{topic}/claims.md; stored pages are under sources/.\n\n{context(root, topic)}"
     )
     sceptics = config["pipeline"]["sceptics"]
     reviews = session.parallel([
@@ -977,10 +1126,11 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
     ideas = [idea["id"] for idea in rc.load_json(directory / "ideas.json")["ideas"]]
     reviews = {path.stem.removeprefix("review-").upper(): rc.load_json(path) for path in sorted((directory / "critique").glob("review-*.json"))}
     claim_ids = {claim["id"] for claim in ledger(root, topic)["claims"]}
+    assumptions = [item["id"] for item in assumptions_of(root, topic)]
 
     def check(data: Any) -> dict[str, Any]:
         if not isinstance(data, dict):
-            raise ValueError("expected {\"claims\": [...], \"ideas\": [...], \"answers\": [...]}")
+            raise ValueError("expected {\"claims\": [...], \"ideas\": [...], \"assumptions\": [...], \"answers\": [...]}")
         claim_seen = {item.get("claim"): item for item in data.get("claims", [])}
         idea_seen = {item.get("idea"): item for item in data.get("ideas", [])}
         problems = [f"no verdict for {claim}" for claim in wanted if claim not in claim_seen]
@@ -990,6 +1140,10 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
         problems += [f"{key}: credibility must be one of {CREDIBILITY}" for key, item in claim_seen.items()
                      if item.get("credibility") not in CREDIBILITY]
         problems += answer_problems(data.get("answers"), questions(root, topic), claim_ids)
+        settled = {item.get("assumption"): item for item in data.get("assumptions", []) if isinstance(item, dict)}
+        problems += [f"no verdict for assumption {identifier}" for identifier in assumptions if identifier not in settled]
+        problems += [f"assumption {key}: verdict must be one of {CLAIM_VERDICTS}" for key, item in settled.items()
+                     if item.get("verdict") not in CLAIM_VERDICTS]
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return data
@@ -998,8 +1152,9 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
                         for label, review in reviews.items())
     body = (
         f"# Task\n\nSettle every claim ({', '.join(wanted)}) and idea ({', '.join(ideas)}) of research/{topic}/analysis.md "
-        f"and ideas.json from these anonymous reviews, checking them against the stored sources. Then grade the certainty of the "
-        f"answer to each question ({', '.join(questions(root, topic))}).\n\n{context(root, topic)}\n\n{shown}"
+        f"and ideas.json from these anonymous reviews, checking them against the stored sources"
+        + (f"; settle the assumptions ({', '.join(assumptions)})" if assumptions else "")
+        + f". Then grade the certainty of the answer to each question ({', '.join(questions(root, topic))}).\n\n{context(root, topic)}\n\n{shown}"
     )
     data = session.call_checked(config["pipeline"]["judge"], body, "judge", json_reply(check))
     # A claim one reviewer refuted but the judge kept is contested: the report says so; only the user can settle it.
@@ -1163,9 +1318,10 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
         problems = [f"cites {claim}, which is not in the ledger" for claim in sorted(cited) if claim not in {c["id"] for c in led["claims"]}]
         problems += [f"relies on {claim}, judged {verdicts[claim]}: drop it or name it as refuted outside a [C#] citation"
                      for claim in sorted(cited) if verdicts.get(claim) in ("REFUTED", "UNSUPPORTED")]
-        problems += [f"does not answer {question}" for question in known if question not in markdown]
+        problems += [f"does not answer {question}" for question in known if not re.search(rf"^## {question}\b", markdown, flags=re.MULTILINE)]
         if not cited:
             problems.append("cites no claim: every finding needs a [C#] citation")
+        problems += language_problems(markdown, {item["question"]: item["certainty"] for item in judgement.get("answers", [])})
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return markdown
@@ -1183,6 +1339,23 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
     if judgement.get("answers"):
         appendix += ["", "## Certainty of the answers", "", "How sure each answer is, starting from high and lowered for each "
                      "named weakness of its evidence:", "", certainty_text(judgement["answers"])]
+    structure = rc.load_json(directory / "ideas.json").get("questions", [])
+    statements = {item["id"]: item["statement"] for item in rc.load_json(directory / "source-plan.json").get("hypotheses", [])}
+    for entry in structure:
+        if not entry.get("ach"):
+            continue
+        ranking, diagnostic = ach_ranking(entry["ach"], verdicts)
+        appendix += ["", f"## Competing hypotheses for {entry['question']}", "",
+                     "Ranked by how much surviving evidence is inconsistent with each, fewest first (Analysis of Competing Hypotheses):", ""]
+        appendix += [f"{rank}. {hypothesis}: {statements.get(hypothesis, '')} ({count} inconsistent)" for rank, (hypothesis, count) in enumerate(ranking, 1)]
+        appendix += ["", f"Diagnostic claims, the ones that tell the hypotheses apart: {', '.join(diagnostic) or 'none'}."]
+        appendix += [f"Untested alternative (no search looked for evidence against it): {item}" for item in entry["ach"].get("untested", [])]
+    settled = {item["assumption"]: item for item in judgement.get("assumptions", [])}
+    assumed = [item for entry in structure for item in entry.get("assumptions", [])]
+    if assumed:
+        appendix += ["", "## Key assumptions", "", "| Assumption | Question | Verdict | Reason |", "| --- | --- | --- | --- |"]
+        appendix += [f"| {item['id']}: {cell(item['text'])} | {entry['question']} | {settled.get(item['id'], {}).get('verdict', 'not judged')} | "
+                     f"{cell(settled.get(item['id'], {}).get('reason', ''))} |" for entry in structure for item in entry.get("assumptions", [])]
     appendix += ["", "## Evidence", "", "Reliability of the source: A completely reliable to E unreliable, F cannot be judged. "
                  "Credibility of the claim: 1 confirmed to 5 improbable, 6 cannot be judged.", "",
                  "| Claim | Verdict | Credibility | Reliability | Quote verified | Source |", "| --- | --- | --- | --- | --- | --- |"]

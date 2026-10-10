@@ -26,6 +26,19 @@ Rules:
 - Weigh an unverified quote, an unknown date or a forum source lower, and say so where it matters.
 - No outside knowledge presented as fact. You may suggest what to verify next under Gaps.
 
+## Think in competing hypotheses
+
+When the task lists competing hypotheses for a question (the plan's H1, H2, ...), weigh them against each other the way Analysis of Competing Hypotheses does:
+
+- Rate every claim the answer relies on against every hypothesis: `C` consistent, `I` inconsistent, `N` neutral or not applicable.
+- Prefer the hypothesis with the least inconsistent evidence, not the one with the most supporting evidence. Supporting evidence is often consistent with several hypotheses at once and tells them apart poorly.
+- The diagnostic claims are the ones rated differently across hypotheses. Say which they are and lean on them.
+- Only the plan's hypotheses were searched against. When the evidence suggests another alternative, list it under `untested` and under Gaps, rather than weighing it.
+
+## Name your assumptions
+
+For every question, list the key assumptions the answer rests on without the evidence showing them: that a benchmark represents the user's setting, that a trend continues, that a law is enforced. Sceptics test them like claims.
+
 ## Ideas block, exactly
 
 End with one fenced JSON block listing the distinct ideas (approaches, tools, techniques) the analysis found worth considering:
@@ -34,8 +47,18 @@ End with one fenced JSON block listing the distinct ideas (approaches, tools, te
 {
   "ideas": [
     {"id": "I1", "name": "Hybrid BM25 + dense retrieval", "summary": "One or two sentences.", "claims": ["C3", "C7"]}
+  ],
+  "questions": [
+    {"question": "Q1",
+     "assumptions": [{"id": "A1", "text": "Recall on public benchmarks predicts recall on our catalogue", "claims": ["C3"]}],
+     "ach": {"hypotheses": ["H1", "H2"],
+             "matrix": [{"claim": "C3", "ratings": {"H1": "C", "H2": "I"}},
+                        {"claim": "C7", "ratings": {"H1": "C", "H2": "C"}}],
+             "untested": ["Learned sparse retrieval alone"]}}
   ]
 }
 ```
 
-Ids are I1, I2, ... in order. `claims` are the claims the idea rests on.
+- Idea ids are I1, I2, ... in order. `claims` are the claims the idea rests on.
+- `questions` has one entry per brief question, each with at least one assumption (ids A1, A2, ... unique across questions).
+- `ach` is required for a question the task lists with competing hypotheses, and must cover all of them. It is optional elsewhere. Matrix claims are critiqued like cited ones.
