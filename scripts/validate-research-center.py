@@ -38,6 +38,7 @@ SINGLE_ROLES = {
     "digester": "read-only",
     "profiler": "read-only",
     "sourcePlanner": "read-only",
+    "screener": "read-only",
     "analyst": "read-only",
     "judge": "read-only",
     "applier": "read-only",
@@ -47,7 +48,7 @@ LIST_ROLES = {"researchers": "web-read", "sceptics": "read-only"}
 NUMBERS = {
     "budget": ("ingestCalls", "researchCalls"),
     "ingest": ("maxFileBytes", "maxSourceBytes", "chunkBytes"),
-    "research": ("maxSourcesPerResearcher",),
+    "research": ("maxSourcesPerResearcher", "resultsPerQuery", "screenBatch"),
 }
 DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources")
 KINDS = ("folder", "git", "url", "notion", "gdrive")

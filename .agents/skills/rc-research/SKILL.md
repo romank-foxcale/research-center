@@ -1,6 +1,6 @@
 ---
 name: rc-research
-description: Run, resume, follow and present a Research Center research run with ./rc research - plan sources, collect from the web, analyze, critique by anonymous sceptics, judge, apply to the user's repos and report - then walk the user through the report, its caveats and the Control Center handoff. Use when the user wants to run or resume research on an accepted brief, asks how a research run is going, or wants the report explained, questioned or compared.
+description: Run, resume, follow and present a Research Center research run with ./rc research - plan sources, search the adapters, screen the results, collect from them and the web, analyze, critique by anonymous sceptics, judge, apply to the user's repos and report - then walk the user through the report, its caveats and the Control Center handoff. Use when the user wants to run or resume research on an accepted brief, asks how a research run is going, or wants the report explained, questioned or compared.
 ---
 
 # Run and present research
@@ -19,6 +19,7 @@ description: Run, resume, follow and present a Research Center research run with
 Read research/<topic>/report.md, judgement.md and fit.md, then give the user:
 
 - the TL;DR and the answer to each question, citing claim ids;
+- how the sources were found: the screening flow at the end of the report (identified, duplicates, excluded by criterion, included). Point at research/<topic>/screening.md when the user doubts an exclusion, and at searches.json for the exact queries;
 - what the sceptics and the judge struck down (the report's "Refuted or unsupported" section), and any **contested** claims, which only the user can settle;
 - the fit: ADOPT, TRIAL, ASSESS or HOLD per idea, and where it lands in their repos;
 - the handoff: if research/<topic>/handoff.md exists, it is a Control Center task plan. The user copies it into the CC's `plans/active/` and refines it there with grill-task-planning. The RC never writes into a CC or into product code.

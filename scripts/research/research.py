@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 """./rc research: a topic's brief, then a fixed, resumable pipeline that ends in a cited report.
 
-plan     source-planner reads the brief and profile          -> source-plan.json
-collect  researchers search the web in parallel; the runner  -> claims.json (+ sources/web-<topic>/)
-         stores every cited page and checks every quote
-analyze  analyst answers the questions from the ledger       -> analysis.md, ideas.json
-critique sceptics try to disprove each claim, in parallel    -> critique/review-<x>.json
-judge    the judge reads the reviews as anonymous labels     -> judgement.json
-apply    applier fits surviving ideas to the user's repos    -> fit.json, fit.md, handoff.md
-report   reporter writes the answer; the runner checks it    -> report.md
+plan     source-planner turns the brief into adapter queries,   -> source-plan.json
+         hypotheses with disconfirming searches, a horizon
+         and numbered exclusion criteria
+search   the runner runs every adapter query (no agent)         -> searches.json, candidates.json
+screen   the screener includes or excludes each candidate     -> screening.json (+ sources/search-<topic>/)
+         against the criteria, with a reason; the runner
+         stores the included records' text
+collect  researchers read the included records, search the    -> claims.json (+ sources/web-<topic>/)
+         web in parallel; the runner stores every cited
+         page and checks every quote
+analyze  analyst answers the questions from the ledger        -> analysis.md, ideas.json
+critique sceptics try to disprove each claim, in parallel     -> critique/review-<x>.json
+judge    the judge reads the reviews as anonymous labels      -> judgement.json
+apply    applier fits surviving ideas to the user's repos     -> fit.json, fit.md, handoff.md
+report   reporter writes the answer; the runner checks it     -> report.md (with the screening flow)
 
 Each stage's output is committed under research/<topic>/; a run resumes at the first missing output.
-See docs/decisions/0004-research-pipeline.md.
+See docs/decisions/0004-research-pipeline.md and 0008-search-and-screen.md.
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import http.client
 import json
@@ -33,13 +41,18 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "runner"))
 sys.path.insert(0, str(HERE.parent / "ingest"))
+sys.path.insert(0, str(HERE.parent / "sources"))
 import extract  # noqa: E402
 import ingest  # noqa: E402
+import kit  # noqa: E402
 import rc  # noqa: E402
+import sources as registry  # noqa: E402
 
-STAGES = ("plan", "collect", "analyze", "critique", "judge", "apply", "report")
+STAGES = ("plan", "search", "screen", "collect", "analyze", "critique", "judge", "apply", "report")
 OUTPUTS = {
     "plan": ["source-plan.json", "source-plan.md"],
+    "search": ["searches.json", "candidates.json"],
+    "screen": ["screening.json", "screening.md"],
     "collect": ["claims.json", "claims.md"],
     "analyze": ["analysis.md", "ideas.json"],
     "critique": ["critique"],
@@ -57,6 +70,14 @@ QUESTION = re.compile(r"^- (Q\d+):\s*(\S.*)$", re.MULTILINE)
 CLAIM_REF = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 IDEA_ID = re.compile(r"I\d+")
 SOURCE_KINDS = ("paper", "docs", "blog", "repo", "news", "forum", "talk", "other")
+WEB = "web"  # the avenue the researcher roles search themselves; every other avenue names an adapter
+STANCES = ("support", "disconfirm", "explore")
+HORIZONS = ("near", "medium", "long")
+HYPOTHESIS_ID = re.compile(r"H\d+")
+CRITERION_ID = re.compile(r"X\d+")
+# Every screening may exclude for this; the planner adds X1.. from the brief.
+OFF_TOPIC = {"id": "X0", "text": "Bears on none of the brief's questions", "from": "Questions"}
+RETRACTED = "retracted"  # an exclusion the runner makes itself, from the adapters' retraction flags
 MIN_QUOTE_WORDS = 6
 # Words a quote must never lose or gain in a fuzzy match: they flip or change what it says.
 NEGATIONS = frozenset({"not", "no", "never", "none", "nor", "without", "cannot", "t"})
@@ -176,32 +197,281 @@ def json_reply(check):
 # Stages ---------------------------------------------------------------------------------------------------
 
 
+def adapter_menu(root: Path) -> str:
+    """What the planner may choose from: every adapter's coverage, query syntax and filters, plus the web."""
+    lines = [f"- `{WEB}`: the researcher roles search the open web themselves (Claude and GPT). Use it for what no adapter covers."]
+    for identifier, spec in registry.descriptors(root).items():
+        filters = "; ".join(f"{name}: {text}" for name, text in spec.get("filters", {}).items()) or "none"
+        lines.append(f"- `{identifier}` ({spec['family']}): {spec['covers']} Query: {spec['queryHelp']} Filters: {filters}.")
+    return "\n".join(lines)
+
+
+def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]]) -> list[str]:
+    """Why a source plan cannot be searched as it stands; empty when it can."""
+    if not isinstance(data, dict) or not isinstance(data.get("avenues"), list) or not data["avenues"]:
+        return ['expected {"avenues": [...], "hypotheses": [...], "horizon": "...", "exclusions": [...]}']
+    problems = []
+    if data.get("horizon") not in HORIZONS:
+        problems.append(f"horizon must be one of {HORIZONS}")
+    hypotheses = data.get("hypotheses")
+    if not isinstance(hypotheses, list) or not hypotheses:
+        problems.append("name at least one hypothesis (H1, H2, ...): the answers you expect, so they can be searched against")
+        hypotheses = []
+    hypothesis_ids = set()
+    for hypothesis in hypotheses:
+        if not HYPOTHESIS_ID.fullmatch(str(hypothesis.get("id", ""))) or not hypothesis.get("statement"):
+            problems.append(f"hypothesis {hypothesis} needs an id like H1 and a statement")
+        hypothesis_ids.add(hypothesis.get("id"))
+    exclusions = data.get("exclusions") if isinstance(data.get("exclusions"), list) else []
+    for criterion in exclusions:
+        if not CRITERION_ID.fullmatch(str(criterion.get("id", ""))) or criterion.get("id") == OFF_TOPIC["id"] or not criterion.get("text"):
+            problems.append(f"exclusion {criterion} needs an id X1, X2, ... (X0 is reserved) and a text")
+        if criterion.get("from") not in SECTIONS:
+            problems.append(f"exclusion {criterion.get('id')} must name the brief section it comes from, one of {SECTIONS}")
+    covered, disconfirmed, families = set(), set(), set()
+    for number, avenue in enumerate(data["avenues"], 1):
+        label = f"avenue {number} ({avenue.get('adapter')})"
+        adapter = avenue.get("adapter")
+        if adapter != WEB and adapter not in adapters:
+            problems.append(f"{label}: adapter must be {WEB} or one of {sorted(adapters)}")
+            continue
+        if not str(avenue.get("query", "")).strip() or not avenue.get("why"):
+            problems.append(f"{label}: needs a query and a why")
+        if avenue.get("stance") not in STANCES:
+            problems.append(f"{label}: stance must be one of {STANCES}")
+        unknown = set(avenue.get("questions") or []) - known
+        if unknown or not avenue.get("questions"):
+            problems.append(f"{label}: questions must name brief questions, not {sorted(unknown) or 'none'}")
+        covered |= set(avenue.get("questions") or [])
+        if avenue.get("stance") == "disconfirm":
+            if avenue.get("hypothesis") not in hypothesis_ids:
+                problems.append(f"{label}: a disconfirming avenue names the hypothesis it tests")
+            disconfirmed.add(avenue.get("hypothesis"))
+        if adapter == WEB:
+            continue
+        families.add(adapters[adapter]["family"])
+        bad = set(avenue.get("filters") or {}) - set(adapters[adapter].get("filters", {}))
+        if bad:
+            problems.append(f"{label}: {adapter} has no filter {sorted(bad)}")
+        if avenue.get("since"):
+            try:
+                datetime.date.fromisoformat(avenue["since"])
+            except (TypeError, ValueError):
+                problems.append(f"{label}: since must be YYYY-MM-DD")
+    problems += [f"no avenue serves {question}" for question in sorted(known - covered)]
+    problems += [f"{hypothesis} has no disconfirming avenue: search for evidence that it is wrong"
+                 for hypothesis in sorted(hypothesis_ids - disconfirmed) if hypothesis]
+    available = {spec["family"] for spec in adapters.values()}
+    if len(families) < min(2, len(available)):
+        problems.append(f"use adapters from at least two families besides the web; available: {sorted(available)}")
+    return problems
+
+
 def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
     config = rc.settings(root)
+    known, adapters = set(questions(root, topic)), registry.descriptors(root)
 
     def check(data: Any) -> dict[str, Any]:
-        avenues = data.get("avenues") if isinstance(data, dict) else None
-        if not avenues:
-            raise ValueError("expected {\"avenues\": [{\"where\", \"queries\", \"why\", \"questions\"}]}")
-        known = set(questions(root, topic))
-        for avenue in avenues:
-            if not avenue.get("where") or not avenue.get("why") or not avenue.get("queries"):
-                raise ValueError(f"avenue {avenue} needs where, why and queries")
-            unknown = set(avenue.get("questions", [])) - known
-            if unknown:
-                raise ValueError(f"avenue {avenue.get('where')} refers to unknown questions {sorted(unknown)}")
+        problems = plan_problems(data, known, adapters)
+        if problems:
+            raise ValueError("; ".join(problems[:20]))
         return data
 
-    body = f"# Task\n\nPlan where to search.\n\n{context(root, topic)}"
+    body = f"# Task\n\nPlan where to search.\n\n{context(root, topic)}\n\n# Avenues you can plan\n\n{adapter_menu(root)}"
     data = session.call_checked(config["pipeline"]["sourcePlanner"], body, "plan", json_reply(check))
+    data["exclusions"] = [OFF_TOPIC, *data.get("exclusions", [])]
     directory = topic_dir(root, topic)
     rc.write_json(directory / "source-plan.json", data)
-    lines = [f"# Source plan: {topic}\n"]
-    for avenue in data["avenues"]:
-        lines.append(f"## {avenue['where']}\n\nWhy: {avenue['why']}\n\nQuestions: {', '.join(avenue.get('questions', []))}\n")
-        lines += [f"- `{query}`" for query in avenue["queries"]]
-        lines.append("")
+    lines = [f"# Source plan: {topic}\n", f"Horizon: {data['horizon']}\n", "## Hypotheses\n"]
+    lines += [f"- {item['id']}: {item['statement']}" for item in data["hypotheses"]]
+    lines += ["", "## Exclusion criteria\n"] + [f"- {item['id']}: {item['text']} (from {item['from']})" for item in data["exclusions"]]
+    lines += ["", "## Avenues\n", "| # | Adapter | Query | Filters | Since | Stance | Questions | Why |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for number, avenue in enumerate(data["avenues"], 1):
+        stance = avenue["stance"] + (f" {avenue['hypothesis']}" if avenue.get("hypothesis") else "")
+        filters = ", ".join(f"{key}={value}" for key, value in (avenue.get("filters") or {}).items())
+        lines.append(f"| {number} | {avenue['adapter']} | {cell(avenue['query'])} | {cell(filters)} | {avenue.get('since') or ''} | "
+                     f"{stance} | {', '.join(avenue['questions'])} | {cell(avenue['why'])} |")
     rc.write_text(directory / "source-plan.md", "\n".join(lines))
+
+
+def stage_search(session: rc.Session, root: Path, topic: str) -> None:
+    """Run every adapter avenue of the plan. No agent is called; each query is logged in searches.json."""
+    config = rc.settings(root)
+    directory = topic_dir(root, topic)
+    plan = rc.load_json(directory / "source-plan.json")
+    log = directory / "searches.json"
+    log.unlink(missing_ok=True)
+    limit = config["research"].get("resultsPerQuery", 20)
+    found, failed, tried = [], 0, 0
+    for number, avenue in enumerate(plan["avenues"], 1):
+        if avenue["adapter"] == WEB:
+            continue
+        tried += 1
+        try:
+            records = registry.search(root, avenue["adapter"], avenue["query"], avenue.get("filters") or {}, avenue.get("since"), limit, log)
+        except kit.AdapterError as error:
+            failed += 1
+            session.say(f"search {number} ({avenue['adapter']}): failed, {error}", "warn")
+            continue
+        session.say(f"search {number} ({avenue['adapter']}): {len(records)} results for {avenue['query']!r}")
+        found += [{**item, "avenue": number, "questions": avenue["questions"]} for item in records]
+    if tried and failed == tried:
+        raise rc.RcError("every adapter search failed (see searches.json); the run stops rather than becoming web-only")
+    merged = registry.merge(found)
+    for number, item in enumerate(merged, 1):
+        same = [other for other in found if other["key"] == item["key"]]
+        item["id"] = f"R{number}"
+        item["avenues"] = sorted({other["avenue"] for other in same})
+        item["questions"] = sorted({question for other in same for question in other["questions"]})
+        item.pop("avenue", None)
+    rc.write_json(directory / "candidates.json", {"identified": len(found), "records": merged})
+    session.say(f"search: {len(found)} results, {len(found) - len(merged)} duplicates, {len(merged)} candidates to screen")
+
+
+def candidate_line(item: dict[str, Any]) -> str:
+    venue = item["extra"].get("venue") or item["extra"].get("domain") or ""
+    return json.dumps({"id": item["id"], "title": item["title"], "type": item["evidenceType"], "date": item["date"] or "undated",
+                       "by": ", ".join(item["authors"][:3]), "venue": venue, "url": item["url"], "questions": item["questions"],
+                       "abstract": item["abstract"][:700]}, ensure_ascii=False)
+
+
+def record_text(item: dict[str, Any]) -> str:
+    """What is stored for an included record whose page is not fetched: its metadata and abstract."""
+    lines = [f"Source: {item['url']}", "", f"# {item['title']}", ""]
+    for label, value in (("Authors", ", ".join(item["authors"])), ("Date", item["date"]), ("Type", item["evidenceType"]),
+                         ("Venue", item["extra"].get("venue")), ("DOI", item["doi"]), ("Found by", ", ".join(item["foundBy"]))):
+        if value:
+            lines.append(f"- {label}: {value}")
+    lines += ["", "## Abstract", "", item["abstract"] or "(no abstract available)"]
+    return "\n".join(lines)
+
+
+def store_included(root: Path, topic: str, included: list[dict[str, Any]]) -> None:
+    """Commit the text of every included record under sources/search-<topic>/: scholarly records and books as
+    metadata and abstract (abstracts in v1), everything else as the fetched page, falling back to the metadata."""
+    source_id = f"search-{topic}"[:60].strip("-")
+    families = {identifier: spec["family"] for identifier, spec in registry.descriptors(root).items()}
+    entries, texts = {}, {}
+    for item in included:
+        stored = f"{item['id'].lower()}-{ingest.url_slug(item['url'])}.md"
+        text, extractor, data = record_text(item), "metadata", b""
+        if families.get(item["adapter"]) not in ("scholarly", "books"):
+            try:
+                _, text, extractor, data = ingest.url_document(item["url"])
+            except (extract.Skip, urllib.error.URLError, http.client.HTTPException, subprocess.TimeoutExpired, OSError, ValueError):
+                text, extractor = record_text(item), "metadata"
+        texts[stored] = text
+        entries[stored] = {"origin": item["url"], "sha256": hashlib.sha256(data or text.encode()).hexdigest(), "extractor": extractor}
+        item["stored"] = f"sources/{source_id}/text/{stored}"
+    descriptor = {
+        "schemaVersion": 1, "id": source_id, "kind": "url", "locators": [item["url"] for item in included],
+        "include": [], "exclude": [], "depth": 0, "maxDocuments": len(included), "note": f"records included by research/{topic}",
+        "origin": f"research:{topic}", "addedAt": rc.today(),
+    }
+    rc.write_json(ingest.source_path(root, source_id), descriptor)
+    ingest.store(root, descriptor, entries, texts, [], {})
+
+
+def screen_check(batch: list[dict[str, Any]], criteria: dict[str, Any], known: set[str]):
+    """The contract of one screener reply: one decision per record of the batch; an exclusion names a criterion,
+    an inclusion the questions it bears on, and both give a reason."""
+    wanted = {item["id"] for item in batch}
+
+    def check(data: Any) -> dict[str, dict[str, Any]]:
+        entries = data.get("decisions") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            raise ValueError('expected {"decisions": [{"id", "decision", "criterion", "questions", "reason"}]}')
+        seen = {entry.get("id"): entry for entry in entries}
+        problems = [f"no decision for {identifier}" for identifier in sorted(wanted - set(seen))]
+        problems += [f"{identifier} is not in this batch" for identifier in sorted(set(seen) - wanted, key=str)]
+        for identifier in sorted(wanted & set(seen)):
+            entry = seen[identifier]
+            if not str(entry.get("reason", "")).strip():
+                problems.append(f"{identifier}: give a reason")
+            if entry.get("decision") == "exclude":
+                if entry.get("criterion") not in criteria:
+                    problems.append(f"{identifier}: an exclusion names one of {sorted(criteria)}")
+            elif entry.get("decision") == "include":
+                if not entry.get("questions") or set(entry["questions"]) - known:
+                    problems.append(f"{identifier}: an inclusion names the brief questions it bears on")
+            else:
+                problems.append(f"{identifier}: decision must be include or exclude")
+        if problems:
+            raise ValueError("; ".join(problems[:20]))
+        return seen
+    return check
+
+
+def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
+    """The screener includes or excludes every candidate against the plan's exclusion criteria, with a reason;
+    retracted records are excluded by the runner. Included records are stored for the researchers."""
+    config = rc.settings(root)
+    directory = topic_dir(root, topic)
+    plan = rc.load_json(directory / "source-plan.json")
+    candidates = rc.load_json(directory / "candidates.json")
+    records = candidates["records"]
+    criteria = {item["id"]: item for item in plan["exclusions"]}
+    known = set(questions(root, topic))
+    decisions: dict[str, dict[str, Any]] = {}
+    for item in records:
+        if item["extra"].get("retracted"):
+            decisions[item["id"]] = {"decision": "exclude", "criterion": RETRACTED, "questions": [],
+                                     "reason": "the publisher or the index flags it as retracted"}
+    pending = [item for item in records if item["id"] not in decisions]
+    size = config["research"].get("screenBatch", 40)
+    batches = [pending[index:index + size] for index in range(0, len(pending), size)]
+    criteria_text = "\n".join(f"- {item['id']}: {item['text']} (from the brief's {item['from']})" for item in plan["exclusions"])
+    replies = session.parallel([
+        (f"screen-{number}", lambda number=number, batch=batch: session.call_checked(
+            config["pipeline"]["screener"],
+            f"# Task\n\nScreen these {len(batch)} candidate records for research/{topic}.\n\n{context(root, topic)}\n\n"
+            f"# Exclusion criteria\n\n{criteria_text}\n\n# Candidates, one JSON object per line\n\n" + "\n".join(map(candidate_line, batch)),
+            f"screen-{number}", json_reply(screen_check(batch, criteria, known))))
+        for number, batch in enumerate(batches, 1)
+    ])
+    for seen in replies.values():
+        for identifier, entry in seen.items():
+            decisions[identifier] = {"decision": entry["decision"], "criterion": entry.get("criterion") if entry["decision"] == "exclude" else None,
+                                     "questions": entry.get("questions", []) if entry["decision"] == "include" else [],
+                                     "reason": " ".join(str(entry["reason"]).split())}
+    included = [item for item in records if decisions[item["id"]]["decision"] == "include"]
+    store_included(root, topic, included)
+    stored = {item["id"]: item["stored"] for item in included}
+    rows = [{"id": item["id"], "key": item["key"], "title": item["title"], "url": item["url"], "doi": item["doi"],
+             "foundBy": item["foundBy"], "evidenceType": item["evidenceType"], **decisions[item["id"]],
+             "stored": stored.get(item["id"])} for item in records]
+    excluded_by: dict[str, int] = {}
+    for row in rows:
+        if row["decision"] == "exclude":
+            excluded_by[row["criterion"]] = excluded_by.get(row["criterion"], 0) + 1
+    flow = {"identified": candidates["identified"], "duplicates": candidates["identified"] - len(records), "screened": len(records),
+            "excluded": sum(excluded_by.values()), "excludedBy": dict(sorted(excluded_by.items())), "included": len(included)}
+    rc.write_json(directory / "screening.json", {"flow": flow, "criteria": plan["exclusions"], "records": rows})
+    rc.write_text(directory / "screening.md", render_screening(topic, flow, plan["exclusions"], rows))
+    session.say(f"screen: {flow['included']} included, {flow['excluded']} excluded of {flow['screened']} candidates")
+
+
+def flow_text(flow: dict[str, Any], criteria: list[dict[str, Any]]) -> str:
+    """The PRISMA-style flow: identified, duplicates, screened, excluded by criterion, included."""
+    names = {item["id"]: item["text"] for item in criteria} | {RETRACTED: "retracted"}
+    lines = [f"- Identified by adapter searches: {flow['identified']}", f"- Duplicates removed: {flow['duplicates']}",
+             f"- Screened: {flow['screened']}", f"- Excluded: {flow['excluded']}"]
+    lines += [f"  - {criterion} ({names.get(criterion, criterion)}): {count}" for criterion, count in flow["excludedBy"].items()]
+    lines.append(f"- Included: {flow['included']}")
+    return "\n".join(lines)
+
+
+def render_screening(topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]]) -> str:
+    lines = [f"# Screening: {topic}\n", flow_text(flow, criteria), "", "## Included\n",
+             "Read these first: each record's text is stored at the path given.\n",
+             "| Record | Title | Type | Questions | Stored | Reason |", "| --- | --- | --- | --- | --- | --- |"]
+    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['evidenceType']} | {', '.join(row['questions'])} | "
+              f"{row['stored']} | {cell(row['reason'])} |" for row in rows if row["decision"] == "include"]
+    lines += ["", "## Excluded\n", "| Record | Title | Criterion | Reason |", "| --- | --- | --- | --- |"]
+    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['criterion']} | {cell(row['reason'])} |"
+              for row in rows if row["decision"] == "exclude"]
+    return "\n".join(lines)
 
 
 def cell(value: Any) -> str:
@@ -238,22 +508,35 @@ def quote_found(quote: str, text: str) -> bool:
     return all(critical) and sum(found) >= 0.8 * len(runs)
 
 
-def canonical_url(url: str) -> str:
-    return re.sub(r"[#?].*$", "", url.strip()).rstrip("/").lower().replace("http://", "https://").replace("://www.", "://")
+def source_key(url: str) -> str:
+    """The identity a cited page merges on: its DOI when the URL is one, else the canonical URL (which keeps the
+    query, so ?id=1 and ?id=2 stay different pages). The same keys as adapter records."""
+    return kit.record_key(kit.bare_doi(url), url)
+
+
+def included_records(root: Path, topic: str) -> dict[str, dict[str, Any]]:
+    """The screened-in records of a topic by key; empty for a topic screened before the screen stage existed."""
+    path = topic_dir(root, topic) / "screening.json"
+    if not path.is_file():
+        return {}
+    return {row["key"]: row for row in rc.load_json(path)["records"] if row["decision"] == "include" and row.get("stored")}
 
 
 def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
     config = rc.settings(root)
     known = set(questions(root, topic))
     limit = config["research"]["maxSourcesPerResearcher"]
+    records = included_records(root, topic)
 
     def check(data: Any) -> dict[str, Any]:
         if not isinstance(data, dict) or not isinstance(data.get("sources"), list) or not isinstance(data.get("claims"), list) \
                 or not data["sources"] or not data["claims"]:
             raise ValueError("expected {\"sources\": [...], \"claims\": [...]} with at least one of each")
-        # Sources past the limit are dropped with the claims citing them before anything else is checked, so
-        # the merge below never meets a claim whose source is gone.
-        kept = data["sources"][:limit]
+        # Web sources past the limit are dropped with the claims citing them before anything else is checked, so
+        # the merge below never meets a claim whose source is gone. Included records never count against it.
+        web = [source for source in data["sources"] if source_key(str(source.get("url", ""))) not in records]
+        dropped = {id(source) for source in web[limit:]}
+        kept = [source for source in data["sources"] if id(source) not in dropped]
         refs = {source.get("ref") for source in kept}
         everything = {source.get("ref") for source in data["sources"]}
         unknown = [claim for claim in data["claims"] if claim.get("source") not in everything]
@@ -274,7 +557,10 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
         return data
 
     body = (
-        f"# Task\n\nCollect evidence following research/{topic}/source-plan.md. At most {limit} sources.\n\n{context(root, topic)}"
+        f"# Task\n\nCollect evidence for research/{topic}. First read the included records listed in research/{topic}/screening.md "
+        f"(their text is stored at the paths given) and extract claims from them, citing each by its URL. Then search the web along "
+        f"the `web` avenues of research/{topic}/source-plan.md for what the records leave open. At most {limit} web sources; "
+        f"included records do not count.\n\n{context(root, topic)}"
     )
     researchers = config["pipeline"]["researchers"]
     replies = session.parallel([
@@ -291,12 +577,14 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
             session.say(f"collect-{role_id}: {reply['overLimit']} sources past the limit of {limit} dropped with their claims", "warn")
         local = {}
         for source in reply["sources"]:
-            key = canonical_url(source["url"])
+            key = source_key(source["url"])
             entry = merged.setdefault(key, {
                 "id": f"S{len(merged) + 1}", "url": source["url"], "title": source.get("title", ""),
                 "published": source.get("published", "unknown"),
                 "kind": source.get("kind") if source.get("kind") in SOURCE_KINDS else "other", "foundBy": [],
             })
+            if key in records:
+                entry.update({"record": records[key]["id"], "evidenceType": records[key]["evidenceType"]})
             entry["foundBy"] = sorted(set(entry["foundBy"]) | {role_id})
             local[source["ref"]] = entry["id"]
         for claim in reply["claims"]:
@@ -308,6 +596,10 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
     source_id = f"web-{topic}"[:60].strip("-")
     entries, texts, skipped = {}, {}, []
     for entry in merged.values():
+        if entry.get("record"):
+            # Already screened in and stored; the claim is checked against that text, not a second download.
+            entry["fetch"], entry["stored"] = "ok", records[source_key(entry["url"])]["stored"]
+            continue
         try:
             stored, text, extractor, data = ingest.url_document(entry["url"])
         # One unreadable page is recorded and skipped; it never fails a stage whose replies are already paid for.
@@ -321,7 +613,7 @@ def stage_collect(session: rc.Session, root: Path, topic: str) -> None:
         entry["fetch"] = "ok"
         entry["stored"] = f"sources/{source_id}/text/{stored}"
     descriptor = {
-        "schemaVersion": 1, "id": source_id, "kind": "url", "locators": [entry["url"] for entry in merged.values()],
+        "schemaVersion": 1, "id": source_id, "kind": "url", "locators": [entry["url"] for entry in merged.values() if not entry.get("record")],
         "include": [], "exclude": [], "depth": 0, "maxDocuments": len(merged), "note": f"pages cited by research/{topic}",
         "origin": f"research:{topic}", "addedAt": rc.today(),
     }
@@ -606,6 +898,13 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
         claim, source = claims[claim_id], sources[claims[claim_id]["source"]]
         appendix.append(f"| {claim_id} | {verdicts.get(claim_id, 'not judged')} | {'yes' if claim['quoteVerified'] else 'no'} | "
                         f"[{cell(source.get('title') or source['url'])}]({source['url']}){' — ' + source['stored'] if source.get('stored') else ''} |")
+    if (directory / "screening.json").is_file():
+        screening = rc.load_json(directory / "screening.json")
+        web = [source for source in led["sources"] if not source.get("record")]
+        appendix += ["", "## How the sources were found", "", flow_text(screening["flow"], screening["criteria"]),
+                     f"- Found by the researchers' web search: {len(web)} pages, {sum(source.get('stored') is not None for source in web)} stored",
+                     "", f"Every search with its exact query: research/{topic}/searches.json. Every screening decision with its reason: "
+                     f"research/{topic}/screening.md."]
     dropped = [item for item in judgement["claims"] if item["verdict"] in ("REFUTED", "UNSUPPORTED")]
     if dropped:
         appendix += ["", "## Refuted or unsupported", ""]
@@ -624,7 +923,7 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
 
 
 RUNNERS = {
-    "plan": stage_plan, "collect": stage_collect, "analyze": stage_analyze, "critique": stage_critique,
+    "plan": stage_plan, "search": stage_search, "screen": stage_screen, "collect": stage_collect, "analyze": stage_analyze, "critique": stage_critique,
     "judge": stage_judge, "apply": stage_apply, "report": stage_report,
 }
 

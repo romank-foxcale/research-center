@@ -3,7 +3,7 @@ id: index
 title: Research Center knowledge index
 status: active
 summary: Entry point to the RC's own architecture, decisions, rules, glossary and debt. Read only the notes a task needs.
-verified_at: 2026-10-10
+verified_at: 2026-10-11
 evidence:
   - AGENTS.md
   - rc
@@ -26,6 +26,7 @@ relations:
 - [0005 Rule hooks](decisions/0005-rule-hooks.md)
 - [0006 Call budgets and resumable runs](decisions/0006-budgets-and-resume.md)
 - [0007 Source adapters](decisions/0007-source-adapters.md)
+- [0008 Search, screen and disconfirming searches](decisions/0008-search-and-screen.md)
 
 ## Rules
 

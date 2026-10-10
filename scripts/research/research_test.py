@@ -18,17 +18,35 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-sys.path[:0] = [str(HERE), str(HERE.parent / "runner"), str(HERE.parent / "ingest")]
+sys.path[:0] = [str(HERE), str(HERE.parent / "runner"), str(HERE.parent / "ingest"), str(HERE.parent / "sources")]
 import extract  # noqa: E402
 import ingest  # noqa: E402
+import kit  # noqa: E402
 import providers  # noqa: E402
 import rc  # noqa: E402
 import research  # noqa: E402
+import sources_test  # noqa: E402  (its fixture transport answers the adapter searches)
 
 PAPER = "https://example.org/paper"
 BLOG = "https://www.example.org/paper/"  # the same page as PAPER once canonical
 DEAD = "https://dead.example.org/post"
 EXTRA = "https://extra.example.org/post"  # past the source limit of 2
+RECORD = "https://doi.org/10.5555/WT.2025.1"  # an included OpenAlex record; it never counts against the limit
+PLAN = {
+    "horizon": "near",
+    "hypotheses": [{"id": "H1", "statement": "Hybrid retrieval gives the best recall", "questions": ["Q1"]}],
+    "exclusions": [{"id": "X1", "text": "Published before 2025", "from": "Scope"}],
+    "avenues": [
+        {"adapter": "openalex", "query": "hybrid retrieval recall", "filters": {"type": "article"}, "since": "2024-01-01",
+         "stance": "support", "hypothesis": "H1", "questions": ["Q1"], "why": "measured results"},
+        {"adapter": "crossref", "query": "hybrid retrieval failure", "stance": "disconfirm", "hypothesis": "H1",
+         "questions": ["Q1"], "why": "find where hybrid loses"},
+        {"adapter": "feed", "query": "https://agency.example.org/feed", "filters": {"evidenceType": "official-statistics"},
+         "stance": "explore", "questions": ["Q1"], "why": "official numbers"},
+        {"adapter": "gdelt", "query": "short", "stance": "explore", "questions": ["Q1"], "why": "news"},
+        {"adapter": "web", "query": "hybrid retrieval production", "stance": "explore", "questions": ["Q1"], "why": "engineering blogs"},
+    ],
+}
 PAGE = "Hybrid retrieval combines lexical and dense signals and improves recall on every benchmark we tried in production."
 CALLS: list[str] = []
 SEEN_PROMPTS: dict[str, str] = {}
@@ -50,7 +68,16 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
     SEEN_PROMPTS[role_id] = prompt
     retry = "previous reply was rejected" in prompt
     if role_id == "source-planner":
-        return block({"avenues": [{"where": "papers", "why": "measured results", "queries": ["hybrid retrieval"], "questions": ["Q1"]}]})
+        if retry:
+            return block(PLAN)
+        # The first plan only looks for support: no disconfirming avenue, so it is rejected.
+        return block({**PLAN, "avenues": [avenue for avenue in PLAN["avenues"] if avenue["stance"] != "disconfirm"]})
+    if role_id == "screener":
+        candidates = [json.loads(line) for line in prompt.split("# Candidates, one JSON object per line\n\n", 1)[1].splitlines() if line.strip()]
+        return block({"decisions": [
+            {"id": item["id"], "decision": "exclude", "criterion": "X1", "reason": "an older release"} if "2024" in item["url"]
+            else {"id": item["id"], "decision": "include", "questions": ["Q1"], "reason": "bears on recall"}
+            for item in candidates]})
     if role_id == "researcher-claude":
         return block({"sources": [{"ref": "S1", "url": PAPER, "title": "Paper | Site", "published": "2026-01-01", "kind": "paper"}],
                       "claims": [{"text": "Hybrid retrieval improves recall.", "source": "S1", "questions": ["Q1"], "type": "benchmark",
@@ -60,13 +87,17 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
     if role_id == "researcher-gpt":
         # The first reply is malformed (a claim that is a bare string): a wrong shape is retried like a wrong answer.
         malformed = [] if retry else ["dense is better"]
+        # Three web sources against a limit of 2 (EXTRA is dropped) plus an included record, which does not count.
         return block({"sources": [{"ref": "A", "url": BLOG, "title": "Same paper", "kind": "blog"},
                                   {"ref": "B", "url": DEAD, "title": "Dead post", "kind": "forum"},
-                                  {"ref": "C", "url": EXTRA, "title": "Over the limit", "kind": "blog"}],
+                                  {"ref": "C", "url": EXTRA, "title": "Over the limit", "kind": "blog"},
+                                  {"ref": "R", "url": RECORD, "title": "Productivity", "kind": "paper"}],
                       "claims": [{"text": "Dense retrieval alone is always better.", "source": "B", "questions": ["Q1"],
                                   "quote": "dense always wins"},
                                  {"text": "A claim on a source past the limit.", "source": "C", "questions": ["Q1"],
-                                  "quote": "this source is dropped with its claim"}, *malformed]})
+                                  "quote": "this source is dropped with its claim"},
+                                 {"text": "Output per hour rose by 7 percent.", "source": "R", "questions": ["Q1"],
+                                  "quote": "Output per hour rose by 7 percent"}, *malformed]})
     if role_id == "analyst":
         cite = "C99" if not retry else "C2"
         python = "```python\nprint('a code sample before the JSON block')\n```\n\n"
@@ -97,6 +128,7 @@ def make_instance(base: Path) -> Path:
     root = base / "rc"
     (root / "catalog").mkdir(parents=True)
     shutil.copytree(REPO / "templates" / "agents", root / "catalog" / "agents")
+    shutil.copytree(REPO / "templates" / "adapters", root / "catalog" / "adapters", copy_function=shutil.copyfile)
     shutil.copytree(REPO / ".agents", root / ".agents")
     shutil.copytree(REPO / "templates", root / "templates")
     settings = json.loads((REPO / "templates" / "research-center.json").read_text())
@@ -149,6 +181,7 @@ def main() -> int:
     providers.run = fake_run
     ingest.url_document = fake_page
     ingest.guard = lambda root, lookup=None: None
+    kit.TRANSPORT = sources_test.transport
 
     assert research.quote_found("recall on every benchmark we tried in production", PAGE)
     assert not research.quote_found("never said anything like this at all", PAGE)
@@ -163,7 +196,19 @@ def main() -> int:
     assert research.claim_refs("Yes [C3, C7] and [C1; C2] and [C9].") == ["C3", "C7", "C1", "C2", "C9"]
     assert rc.extract_json('Code:\n```python\nx = 1\n```\n\nData:\n```json\n{"a": 1}\n```') == {"a": 1}
     assert rc.extract_json('```\n{"b": 2}\n```\n\n```mermaid\ngraph TD\n```') == {"b": 2}
-    assert research.canonical_url(PAPER) == research.canonical_url(BLOG)
+    assert research.source_key(PAPER) == research.source_key(BLOG)
+    assert research.source_key(RECORD) == "doi:10.5555/wt.2025.1"
+    assert research.source_key("https://x.org/item?id=1") != research.source_key("https://x.org/item?id=2"), "queries stay apart"
+    adapters = {path.stem: json.loads(path.read_text()) for path in (REPO / "templates" / "adapters").glob("*.json")}
+    assert research.plan_problems(PLAN, {"Q1"}, adapters) == []
+    problems = " ".join(research.plan_problems({**PLAN, "avenues": [{**avenue, "filters": {"bogus": "1"}} if avenue["adapter"] == "openalex"
+                                                                    else avenue for avenue in PLAN["avenues"] if avenue["adapter"] != "feed"]
+                                                } | {"horizon": "soon", "exclusions": [{"id": "X0", "text": "reserved", "from": "Nowhere"}]},
+                                                {"Q1", "Q2"}, adapters))
+    for expected in ("horizon", "X0 is reserved", "brief section", "no filter", "no avenue serves Q2"):
+        assert expected in problems, (expected, problems)
+    web_only = {**PLAN, "avenues": [avenue for avenue in PLAN["avenues"] if avenue["adapter"] in ("web", "openalex", "crossref")]}
+    assert "two families" in " ".join(research.plan_problems(web_only, {"Q1"}, adapters)), "scholarly alone is one family"
 
     with tempfile.TemporaryDirectory() as directory:
         root = make_instance(Path(directory))
@@ -171,11 +216,38 @@ def main() -> int:
         quiet(research.run_research, root, "retrieval", None, None)
         topic = root / "research" / "retrieval"
 
+        # Plan: the one-sided first plan is rejected; the stored plan carries the hypotheses and X0 + X1.
+        assert CALLS.count("source-planner") == 2 and "H1 has no disconfirming avenue" in SEEN_PROMPTS["source-planner"]
+        plan = json.loads((topic / "source-plan.json").read_text())
+        assert [item["id"] for item in plan["exclusions"]] == ["X0", "X1"] and "| disconfirm H1 |" in (topic / "source-plan.md").read_text()
+
+        # Search: every adapter avenue ran and was logged, the failing one included; the web avenue is not searched here.
+        searches = json.loads((topic / "searches.json").read_text())
+        assert [(entry["adapter"], entry["status"]) for entry in searches] == \
+            [("openalex", "ok"), ("crossref", "ok"), ("feed", "ok"), ("gdelt", "error")], searches
+        candidates = json.loads((topic / "candidates.json").read_text())
+        assert candidates["identified"] == 6 and len(candidates["records"]) == 5, "the DOI found by openalex and crossref merges"
+
+        # Screen: retracted records are excluded by the runner, the rest by the screener with a criterion; counts add up.
+        screening = json.loads((topic / "screening.json").read_text())
+        flow = screening["flow"]
+        assert flow == {"identified": 6, "duplicates": 1, "screened": 5, "excluded": 3, "excludedBy": {"X1": 1, "retracted": 2},
+                        "included": 2}, flow
+        assert flow["screened"] == flow["excluded"] + flow["included"] and flow["identified"] == flow["screened"] + flow["duplicates"]
+        assert all(row["criterion"] in ("X1", "retracted") for row in screening["records"] if row["decision"] == "exclude")
+        assert CALLS.count("screener") == 1 and "R2" not in SEEN_PROMPTS["screener"].split("# Candidates")[1], "retracted records skip the screener"
+        included = [row for row in screening["records"] if row["decision"] == "include"]
+        record_text = (root / included[0]["stored"]).read_text()
+        assert included[0]["stored"].startswith("sources/search-retrieval/") and "Output per hour rose by 7 percent." in record_text
+        assert "## Excluded" in (topic / "screening.md").read_text()
+
         ledger = json.loads((topic / "claims.json").read_text())
-        assert [source["url"] for source in ledger["sources"]] == [PAPER, DEAD], "PAPER and BLOG merge into one source"
+        assert [source["url"] for source in ledger["sources"]] == [PAPER, DEAD, RECORD], "PAPER and BLOG merge into one source"
         assert ledger["sources"][0]["foundBy"] == ["researcher-claude", "researcher-gpt"]
         assert ledger["sources"][1]["stored"] is None and ledger["sources"][1]["fetch"].startswith("failed")
-        assert [claim["quoteVerified"] for claim in ledger["claims"]] == [True, False, False], ledger["claims"]
+        assert ledger["sources"][2]["record"] == included[0]["id"] and ledger["sources"][2]["stored"] == included[0]["stored"]
+        assert [claim["quoteVerified"] for claim in ledger["claims"]] == [True, False, False, True], \
+            "the record's claim is checked against its stored abstract, not a download"
         stored = root / ledger["sources"][0]["stored"]
         assert stored.is_file() and PAGE in stored.read_text()
         assert json.loads((root / "catalog" / "sources" / "web-retrieval.json").read_text())["origin"] == "research:retrieval"
@@ -208,6 +280,7 @@ def main() -> int:
         assert report.startswith("# Retrieval for our search") and "[C3]" not in report.split("## Evidence")[0]
         assert "## Evidence" in report and "| C1 | HOLDS | yes | [Paper \\| Site](" in report and "## Contested" in report
         assert "C3 (UNSUPPORTED)" in report and "## Handoff" in report
+        assert "## How the sources were found" in report and "- Duplicates removed: 1" in report and "X1 (Published before 2025): 1" in report
 
         validator = __import__("importlib.util").util
         spec = validator.spec_from_file_location("validate_rc", REPO / "scripts" / "validate-research-center.py")

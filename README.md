@@ -3,15 +3,17 @@
 An AI research assistant you run with your own Claude, ChatGPT and Cursor subscriptions. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, critiqued by sceptics and fitted to your own projects.
 
 ```text
-ingest (optional) → grill → plan → collect → analyze → critique → judge → apply → report
+ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
 ```
 
 | Stage | What happens | Output |
 | --- | --- | --- |
 | ingest | Folders, repos, URLs, Notion and Drive become committed text (secrets redacted), one digest per source, and a cited profile of you or your company | `sources/`, `knowledge/` |
 | grill | An agent turns your topic into numbered questions, scope, needs and success criteria, asking only what your profile cannot answer | `research/<topic>/brief.md` |
-| plan | Where to search and why, per question | `source-plan.md` |
-| collect | Claude and GPT search the web in parallel; every cited page is stored and every quote checked against it | `claims.md`, `sources/web-<topic>/` |
+| plan | Hypotheses, a disconfirming search for each, adapter queries per question, exclusion criteria | `source-plan.md` |
+| search | The runner queries the adapters (scholarly works, books, news, feeds, watched pages); every query logged | `searches.json` |
+| screen | Each result included or excluded against the criteria, with a reason; retractions dropped | `screening.md` |
+| collect | Claude and GPT read the included records and search the web in parallel; every cited page is stored and every quote checked against it | `claims.md`, `sources/web-<topic>/` |
 | analyze | Each question answered from the claims ledger, ideas compared | `analysis.md` |
 | critique | Claude, GPT and Grok try to disprove every claim the analysis uses | `critique/` |
 | judge | Grok settles the anonymous reviews; contested claims are flagged for you | `judgement.md` |

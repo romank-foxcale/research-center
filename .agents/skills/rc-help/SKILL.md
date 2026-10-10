@@ -10,7 +10,7 @@ Explain the RC in this order, briefly, then offer a pick list of where to start.
 ## The pipeline
 
 ```
-ingest (optional, repeatable) → grill → plan → collect → analyze → critique → judge → apply → report
+ingest (optional, repeatable) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
 ```
 
 1. **Ingest** (rc-ingest, `./rc ingest`): point at folders, repos, URLs, Notion, Drive. Their text is committed, with secrets redacted, then digested and reduced into a cited profile.

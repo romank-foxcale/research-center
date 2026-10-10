@@ -12,6 +12,7 @@ evidence:
 relations:
   - docs/architecture/research-center.md
   - docs/decisions/0006-budgets-and-resume.md
+  - docs/decisions/0008-search-and-screen.md
 ---
 
 # Research is a fixed seven-stage pipeline with a claims ledger every later stage must cite
@@ -33,5 +34,5 @@ The user wants a system that decides where to look, how to store and analyze wha
 
 ## Consequences
 
-- A run of the default pipeline costs about 9 agent calls, plus retries.
+- A run of the default pipeline costs about 9 agent calls, plus retries. Search and screen (docs/decisions/0008-search-and-screen.md) add the screening batches.
 - Web pages can change or disappear. The stored copy is what the claims were checked against.

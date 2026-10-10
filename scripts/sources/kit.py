@@ -199,7 +199,9 @@ def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0)
         except urllib.error.HTTPError as error:
             if error.code in (429, 500, 502, 503, 504) and attempt < RETRIES:
                 delay = error.headers.get("Retry-After", "")
-                time.sleep(min(int(delay), 30) if delay.isdigit() else 2 ** (attempt + 1))
+                # Without Retry-After, back off exponentially but never less than the host's own interval
+                # (GDELT allows one request per 5 seconds; a 2-second retry only earns another 429).
+                time.sleep(min(int(delay), 30) if delay.isdigit() else max(interval * 2, 2 ** (attempt + 1)))
                 continue
             raise AdapterError(f"{host}: HTTP {error.code}") from error
         except (urllib.error.URLError, TimeoutError, OSError) as error:

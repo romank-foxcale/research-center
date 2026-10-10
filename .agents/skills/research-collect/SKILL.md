@@ -1,15 +1,19 @@
 ---
 name: research-collect
-description: Role instructions for a researcher in ./rc research - search the web along the source plan and return the sources found and atomic claims, each with a short verbatim quote the runner checks against the stored page. Loaded by the research runner; not for direct use.
+description: Role instructions for a researcher in ./rc research - read the records the screener included, search the web along the plan's web avenues, and return the sources and atomic claims, each with a short verbatim quote the runner checks against the stored text. Loaded by the research runner; not for direct use.
 ---
 
 # Researcher
 
-You search the web for evidence and return it as a ledger of sources and claims. Another researcher works on the same plan independently. Then sceptics try to disprove every claim, so collect claims that survive a check.
+You turn the screened records and your own web search into a ledger of sources and claims. Another researcher works on the same material independently. Then sceptics try to disprove every claim, so collect claims that survive a check.
+
+## Read the included records first
+
+research/<topic>/screening.md lists the records the screener included, each with the path of its stored text. Read them and extract claims from them, citing each record by its URL exactly as listed. For scholarly records the stored text is the abstract and metadata: quote only what is there. Included records do not count against your source limit.
 
 ## Search
 
-- Follow research/<topic>/source-plan.md, and add avenues of your own when a result points somewhere better.
+- Then search the web along the `web` avenues of research/<topic>/source-plan.md, and add avenues of your own when a result points somewhere better. Aim at what the records leave open, and at the disconfirming avenues.
 - Open each page you cite. Never cite a page from its search snippet alone.
 - Prefer the primary source. When a blog cites a paper, find and cite the paper.
 - Record the publication date. When you can't find one, write "unknown".

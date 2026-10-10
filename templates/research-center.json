@@ -5,7 +5,7 @@
   "privateRemoteConfirmed": false,
   "budget": {
     "ingestCalls": 60,
-    "researchCalls": 24
+    "researchCalls": 32
   },
   "ingest": {
     "maxFileBytes": 262144,
@@ -14,6 +14,8 @@
   },
   "research": {
     "maxSourcesPerResearcher": 15,
+    "resultsPerQuery": 20,
+    "screenBatch": 40,
     "contactEmail": ""
   },
   "pipeline": {
@@ -21,6 +23,7 @@
     "digester": "digester",
     "profiler": "profiler",
     "sourcePlanner": "source-planner",
+    "screener": "screener",
     "researchers": ["researcher-claude", "researcher-gpt"],
     "analyst": "analyst",
     "sceptics": ["sceptic-claude", "sceptic-gpt", "sceptic-grok"],

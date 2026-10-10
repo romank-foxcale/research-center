@@ -92,7 +92,7 @@ Each row is a point this plan adopts and the mechanism that enforces it.
 - **Budgets.** A new `budget.refreshCalls` (default 8). Screening is batched (up to 40 records per call). A refresh that would exceed the budget stops in a resumable state, as in `docs/decisions/0006-budgets-and-resume.md`.
 - **No silent widening.** An adapter that errors or hits its rate limit is reported in the run and in `searches.json` (status, count 0). Its earlier records are kept, never deleted.
 - **Tests never touch the network.** Each adapter ships recorded responses under `scripts/sources/fixtures/`, and its tests replay them. The Nix sandbox has no network anyway.
-- New ADRs record these decisions: 0007 source adapters, 0008 living topics and refresh, 0009 evidence grading and certainty.
+- New ADRs record these decisions: 0007 source adapters, 0008 search and screen, then living topics and refresh, and evidence grading and certainty.
 
 ## Open questions
 

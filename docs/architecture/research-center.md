@@ -2,8 +2,8 @@
 id: architecture.research-center
 title: Research Center architecture
 status: active
-summary: The RC is a runner that drives read-only agent roles through ingest (fetch, digest, profile) and research (plan, collect, analyze, critique, judge, apply, report); every file is written by the runner and every fact is traced to stored text.
-verified_at: 2026-10-10
+summary: The RC is a runner that drives read-only agent roles through ingest (fetch, digest, profile) and research (plan, search, screen, collect, analyze, critique, judge, apply, report); every file is written by the runner and every fact is traced to stored text.
+verified_at: 2026-10-11
 evidence:
   - scripts/runner/rc.py
   - scripts/ingest/ingest.py
@@ -36,7 +36,7 @@ relations:
 
 1. **Ingest** (`scripts/ingest/ingest.py`): each source is fetched by kind. Folders and repos are read by the runner, URLs are downloaded, and Notion and Drive are read by the connector role. Text is extracted (`extract.py`), redacted (`secrets_scan.py`) and stored with a manifest. A source whose manifest fingerprint changed is digested in chunks; then the profiler rebuilds the profile from all digests.
 2. **Grill**: an interactive session follows `grill-research-topic`, reads the profile, and writes and accepts the brief.
-3. **Research** (`scripts/research/research.py`): seven stages, each committing its output. The runner checks every reply against the stage's contract and gives the role one retry with the problems listed.
+3. **Research** (`scripts/research/research.py`): nine stages, each committing its output. Search runs the planned adapter queries without an agent; screen includes or excludes every result with a logged reason (docs/decisions/0008-search-and-screen.md). The runner checks every reply against the stage's contract and gives the role one retry with the problems listed.
 
 ## Runtime
 

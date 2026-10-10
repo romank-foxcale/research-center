@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "screener",
+  "purpose": "Includes or excludes each record the adapter searches found, against the plan's exclusion criteria, with a reason",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "read-only",
+  "skills": [
+    "research-screen"
+  ]
+}

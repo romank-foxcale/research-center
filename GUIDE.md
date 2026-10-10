@@ -131,7 +131,7 @@ or directly:
 The `grill-research-topic` skill writes the brief with you, then `rc-research` runs it:
 
 ```bash
-./rc research run support-memory    # plan → collect → analyze → critique → judge → apply → report
+./rc research run support-memory    # plan → search → screen → collect → analyze → critique → judge → apply → report
 ./rc watch                          # live: stages, what each agent says, stalls
 ```
 

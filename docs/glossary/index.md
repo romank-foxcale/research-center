@@ -2,8 +2,8 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, handoff.
-verified_at: 2026-10-10
+summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, record, evidence type, hypothesis, exclusion criterion, candidate, screening flow, handoff.
+verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
   - scripts/ingest/ingest.py
@@ -26,4 +26,8 @@ relations:
 - **Adapter**: a runner-side search over one kind of source (scholarly works, news, books, a feed, a watched page), described in catalog/adapters/&lt;id&gt;.json.
 - **Record**: one adapter result: title, authors, date, URL, DOI, evidence type, abstract; keyed by DOI, else canonical URL.
 - **Evidence type**: what kind of evidence a record is (peer-reviewed, preprint, journalism, regulation, book, ...), independent of the subject.
+- **Hypothesis**: an answer the planner expects (H1..). Each one gets at least one disconfirming search.
+- **Exclusion criterion**: a numbered reason (X1..) taken from the brief for which the screener drops a record; X0 is "bears on no question".
+- **Candidate**: a record the adapter searches found (R1..), before screening. **Included** candidates are stored and read by the researchers.
+- **Screening flow**: identified, duplicates, screened, excluded by criterion, included (PRISMA-style), shown in screening.md and the report.
 - **Handoff**: a Control Center task plan for ADOPT and TRIAL ideas.
