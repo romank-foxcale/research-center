@@ -8,7 +8,7 @@ evidence:
   - scripts/sources/adapters/page_watch.py
 relations:
   - docs/debt/index.md
-  - plans/active/living-research.md
+  - docs/decisions/0007-source-adapters.md
 ---
 
 # page-watch fingerprints the whole visible page

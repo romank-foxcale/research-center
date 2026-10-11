@@ -190,7 +190,7 @@ def analysis_problems(data: dict[str, Any], known: list[str], claim_ids: set[str
             elif hypothesis not in disconfirmed:
                 problems.append(f"{question}: {hypothesis} has no disconfirming search in the plan, so it cannot be weighed")
         if len(hypotheses) < 2:
-            problems.append(f"{question}: a matrix weighs at least two hypotheses")
+            problems.append(f"{question}: a matrix weighs at least two hypotheses; leave ach out for a question the plan gave fewer")
         rows = ach.get("matrix")
         if not isinstance(rows, list) or not rows:
             problems.append(f"{question}: the matrix needs a row per claim the answer relies on")
@@ -425,7 +425,18 @@ def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]
     for hypothesis in hypotheses:
         if not HYPOTHESIS_ID.fullmatch(str(hypothesis.get("id", ""))) or not hypothesis.get("statement"):
             problems.append(f"hypothesis {hypothesis} needs an id like H1 and a statement")
+        unknown = set(hypothesis.get("questions") or []) - known
+        if unknown or not hypothesis.get("questions"):
+            problems.append(f"hypothesis {hypothesis.get('id')}: questions must name the brief questions it answers")
         hypothesis_ids.add(hypothesis.get("id"))
+    # A question gets competing answers, so the analysis can weigh them (ACH), unless the planner says why it has none.
+    single = data.get("noAlternatives") if isinstance(data.get("noAlternatives"), list) else []
+    excused = {item.get("question") for item in single if isinstance(item, dict) and str(item.get("why", "")).strip()}
+    for question in sorted(known, key=lambda value: int(value[1:])):
+        answers = [item.get("id") for item in hypotheses if question in (item.get("questions") or [])]
+        if len(answers) < 2 and question not in excused:
+            problems.append(f"{question} has {len(answers)} hypothesis: give it at least two competing answers, or list it under "
+                            "noAlternatives with why it has none")
     exclusions = data.get("exclusions") if isinstance(data.get("exclusions"), list) else []
     for criterion in exclusions:
         if not CRITERION_ID.fullmatch(str(criterion.get("id", ""))) or criterion.get("id") == OFF_TOPIC["id"] or not criterion.get("text"):
@@ -490,6 +501,7 @@ def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
     rc.write_json(directory / "source-plan.json", data)
     lines = [f"# Source plan: {topic}\n", f"Horizon: {data['horizon']}\n", "## Hypotheses\n"]
     lines += [f"- {item['id']}: {item['statement']}" for item in data["hypotheses"]]
+    lines += [f"- {item['question']} has no competing answers: {item['why']}" for item in data.get("noAlternatives", [])]
     lines += ["", "## Exclusion criteria\n"] + [f"- {item['id']}: {item['text']} (from {item['from']})" for item in data["exclusions"]]
     lines += ["", "## Avenues\n", "| # | Adapter | Query | Filters | Since | Stance | Questions | Why |",
               "| --- | --- | --- | --- | --- | --- | --- | --- |"]

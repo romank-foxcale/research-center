@@ -29,6 +29,7 @@ Plan: plans/active/living-research.md, WP6.
 ## Decision
 
 - **Competing hypotheses.** The analysis's JSON gains `questions`: one entry per brief question.
+  - The plan gives every question at least two competing hypotheses, unless it lists the question under `noAlternatives` with a reason (ADR 0008), so most questions get a matrix.
   - For a question with two or more plan hypotheses, an `ach` matrix is required. It covers all of them and rates every claim the answer relies on as `C`, `I` or `N` against each.
   - Only hypotheses of the plan may be weighed, and each must have a disconfirming search in the plan. Otherwise the analysis is rejected. An alternative nobody searched against goes under `untested` and is reported as a gap.
   - Matrix claims count as relied on, so they are critiqued.

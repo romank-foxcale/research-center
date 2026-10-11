@@ -128,6 +128,9 @@ def validate(root: Path) -> list[str]:
                 target = local_target(root, note, value, from_root=True)
                 if target and not target.exists():
                     errors.append(f"{relative}: broken {field} path '{value}'")
+                # docs/ is copied into every instance, the template's own plans are not: such a link breaks there.
+                if value.startswith("plans/") and not (root / "research-center.json").is_file():
+                    errors.append(f"{relative}: {field} path '{value}' points at a template plan, which instances do not get")
 
         for raw_link in MARKDOWN_LINK.findall(text):
             target = local_target(root, note, raw_link, from_root=False)

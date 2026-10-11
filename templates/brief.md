@@ -13,7 +13,7 @@ Status: draft
 
 ## Scope
 
-<What is in: technologies, vendors, time window, depth.>
+<What is in: the subject's boundaries (populations, regions, products, methods, schools of thought), the time window, depth.>
 
 ## Out of scope
 

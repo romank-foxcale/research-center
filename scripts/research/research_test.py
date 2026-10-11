@@ -386,6 +386,14 @@ def main() -> int:
                                                 {"Q1", "Q2"}, adapters))
     for expected in ("horizon", "X0 is reserved", "brief section", "no filter", "no avenue serves Q2"):
         assert expected in problems, (expected, problems)
+    # Competing hypotheses: one hypothesis per question is what the first real run's planner wrote; it is rejected
+    # unless the question is listed under noAlternatives with a reason.
+    lone = {**PLAN, "hypotheses": PLAN["hypotheses"][:1], "avenues": [avenue for avenue in PLAN["avenues"] if avenue.get("hypothesis") != "H2"]}
+    assert "Q1 has 1 hypothesis: give it at least two competing answers" in " ".join(research.plan_problems(lone, {"Q1"}, adapters))
+    assert research.plan_problems({**lone, "noAlternatives": [{"question": "Q1", "why": "a list of measures"}]}, {"Q1"}, adapters) == []
+    assert research.plan_problems({**lone, "noAlternatives": [{"question": "Q1", "why": " "}]}, {"Q1"}, adapters) != [], "a reason is required"
+    untagged = {**PLAN, "hypotheses": [{**PLAN["hypotheses"][0], "questions": []}, PLAN["hypotheses"][1]]}
+    assert "H1: questions must name the brief questions" in " ".join(research.plan_problems(untagged, {"Q1"}, adapters))
     web_only = {**PLAN, "avenues": [avenue for avenue in PLAN["avenues"] if avenue["adapter"] in ("web", "openalex", "crossref")]}
     assert "two families" in " ".join(research.plan_problems(web_only, {"Q1"}, adapters)), "scholarly alone is one family"
 

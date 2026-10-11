@@ -13,7 +13,7 @@ Read the brief: questions, scope, out of scope, source preferences. Read the pro
 
 ## Plan
 
-1. **Hypotheses.** Write down the answers you expect (H1, H2, ...), including the popular answer if you doubt it. They are not conclusions: they say what to search against.
+1. **Competing hypotheses.** For every question, write down the answers it could have (H1, H2, ...), at least two that cannot all be true: "output stays stable" against "output falls", "staggered days fit best" against "a shared day off fits best". Include the popular answer if you doubt it, and the uncomfortable one. Tag each hypothesis with the questions it answers. The analyst weighs them against each other in a matrix, so a question with one hypothesis gets no weighing at all. A question that really has no competing answers (a list to compile, a measure to choose) goes under `noAlternatives` with the reason; the runner accepts nothing else.
 2. **Disconfirm.** For every hypothesis, plan at least one avenue whose purpose is to find evidence that it is wrong: failed replications, critics, negative results, counter-examples, the opposing side's best case. Mark it `"stance": "disconfirm"` with the hypothesis id. One-sided plans produce one-sided reports, and the runner rejects them.
 3. **Avenues.** One avenue is one query on one adapter, or `web` for what only open web search can find. Cover every question. Use adapters from at least two families besides the web, for example scholarly works plus news, or books plus a regulator's feed.
    - Primary sources first: studies and data over articles about them, the law over commentary on it, a company's filing over a journalist's summary.
@@ -31,7 +31,11 @@ End with one fenced JSON block:
 {
   "horizon": "near",
   "hypotheses": [
-    {"id": "H1", "statement": "A four-day week keeps output stable in knowledge work", "questions": ["Q1"]}
+    {"id": "H1", "statement": "A four-day week keeps output stable in knowledge work", "questions": ["Q1"]},
+    {"id": "H2", "statement": "Output falls once the novelty fades; early pilots overstate it", "questions": ["Q1"]}
+  ],
+  "noAlternatives": [
+    {"question": "Q2", "why": "Asks where trials were abandoned and why: a list of cases to compile, not competing answers"}
   ],
   "exclusions": [
     {"id": "X1", "text": "Published before 2019", "from": "Scope"},
@@ -42,6 +46,8 @@ End with one fenced JSON block:
      "stance": "support", "hypothesis": "H1", "questions": ["Q1"], "why": "Trials with measured output are the strongest evidence"},
     {"adapter": "openalex", "query": "four-day week productivity decline OR failed trial", "since": "2019-01-01",
      "stance": "disconfirm", "hypothesis": "H1", "questions": ["Q1"], "why": "Find trials where output fell"},
+    {"adapter": "openalex", "query": "four-day week productivity sustained long-term follow-up", "since": "2019-01-01",
+     "stance": "disconfirm", "hypothesis": "H2", "questions": ["Q1"], "why": "Follow-ups where output held after the first year contradict H2"},
     {"adapter": "gdelt", "query": "\"four-day week\" trial ended", "stance": "explore", "questions": ["Q2"],
      "why": "Firms that abandoned the scheme show up in news first"},
     {"adapter": "web", "query": "four-day week pilot results report site:gov.uk", "stance": "explore", "questions": ["Q2"],
@@ -53,4 +59,5 @@ End with one fenced JSON block:
 - `adapter` is `web` or an adapter id from the task. `filters` only uses that adapter's filters. `since` is YYYY-MM-DD or omitted.
 - `stance` is `support`, `disconfirm` or `explore`. A `disconfirm` avenue names its `hypothesis`.
 - `questions` only names question ids that exist in the brief.
+- Every question has at least two hypotheses tagged with it, or an entry in `noAlternatives` with a `why`.
 - Plan 6 to 14 avenues.

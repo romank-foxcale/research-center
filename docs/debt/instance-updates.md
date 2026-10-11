@@ -9,7 +9,7 @@ evidence:
   - install/rc-kit
 relations:
   - docs/debt/index.md
-  - plans/active/living-research.md
+  - docs/decisions/0001-template-and-instances.md
 ---
 
 # Instances do not receive template updates

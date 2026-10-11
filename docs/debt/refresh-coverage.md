@@ -9,7 +9,7 @@ evidence:
   - scripts/sources/adapters/openalex.py
 relations:
   - docs/debt/index.md
-  - plans/active/living-research.md
+  - docs/decisions/0009-living-topics.md
 ---
 
 # A refresh searches less than a full run

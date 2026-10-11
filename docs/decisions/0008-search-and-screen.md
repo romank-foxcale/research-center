@@ -23,7 +23,7 @@ With source adapters (ADR 0007) the RC can search far more than the web, but sea
 
 ## Decision
 
-- **plan** returns `horizon` (near, medium, long), `hypotheses` H1.., `exclusions` X1.. each naming the brief section it comes from, and `avenues`, each one query on one adapter or `web`, with filters, since, stance (support, disconfirm, explore) and the questions it serves. The runner rejects a plan that:
+- **plan** returns `horizon` (near, medium, long), `hypotheses` H1.. (at least two competing ones per question, or the question listed under `noAlternatives` with why; added after the first real run, whose planner wrote one hypothesis per question and so left nothing to weigh), `exclusions` X1.. each naming the brief section it comes from, and `avenues`, each one query on one adapter or `web`, with filters, since, stance (support, disconfirm, explore) and the questions it serves. The runner rejects a plan that:
   - lacks a disconfirming avenue for some hypothesis;
   - leaves a question without an avenue;
   - uses an unknown adapter or filter;

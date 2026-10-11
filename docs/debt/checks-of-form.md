@@ -10,7 +10,7 @@ evidence:
   - docs/decisions/0011-structured-analysis.md
 relations:
   - docs/debt/index.md
-  - plans/active/living-research.md
+  - docs/decisions/0011-structured-analysis.md
 ---
 
 # Grades and language are checked for form, not truth
