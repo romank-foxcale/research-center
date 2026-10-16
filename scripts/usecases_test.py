@@ -95,9 +95,10 @@ def instance(base: Path) -> Path:
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory() as directory:
+    with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as bare:
         root = instance(Path(directory))
-        assert "template" in raises(ValueError, usecases.command_new, REPO, "alpha", "Alpha"), "use cases live in instances"
+        # A folder with no research-center.json stands for the template, wherever this test runs.
+        assert "template" in raises(ValueError, usecases.command_new, Path(bare), "alpha", "Alpha"), "use cases live in instances"
         quiet(usecases.command_new, root, "alpha", "Alpha Corp technology scouting")
         quiet(usecases.command_new, root, "beta", "Personal learning")
         assert "already exists" in raises(ValueError, usecases.command_new, root, "alpha", "again")

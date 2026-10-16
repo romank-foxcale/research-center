@@ -1,6 +1,6 @@
 # use-case-scopes: An RC holds several use cases, each with its own scope, sources, profile and research
 
-Lifecycle: active
+Lifecycle: completed
 Planning status: accepted
 
 ## Outcome
@@ -83,4 +83,6 @@ Settings, roles, adapters, evidence types, skills and scripts stay shared by the
 
 ## Lifecycle closure
 
-Not closed.
+- state: completed
+- date: 2026-10-16
+- evidence: foxcale_RC instance created with rc-kit new; usecases/foxcale scope written from foxcale.com, di_CC and pv_CC, accepted and set as defaultUseCase; rc check 13 of 13 in the template and in the instance (2026-10-16)
