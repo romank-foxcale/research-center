@@ -1,6 +1,6 @@
 # windows-native: The RC runs natively on Windows with uv and Python, Claude-only by default
 
-Lifecycle: active
+Lifecycle: completed
 Planning status: accepted
 
 ## Outcome
@@ -48,7 +48,7 @@ The RC installs and runs on native Windows with no WSL and no Nix. The same code
 
 | Question | Impact | Owner/next evidence |
 | --- | --- | --- |
-| Does Claude Code on Windows run project hooks through Git Bash, so `scripts/hook` keeps working? | Rule hooks | Probe with a hook that writes a marker, during WP1 |
+| Does Claude Code on Windows run project hooks through Git Bash, so `scripts/hook` keeps working? | Rule hooks | Resolved 2026-10-16: in Claude Code on native Windows, the pre-bash hook denied a `git commit --dry-run` whose message credited an AI. |
 
 ## Work packages
 
@@ -76,4 +76,6 @@ The RC installs and runs on native Windows with no WSL and no Nix. The same code
 
 ## Lifecycle closure
 
-Not closed.
+- state: completed
+- date: 2026-10-16
+- evidence: rc check passes 12/12 natively on Windows; a fresh RC made with rc-kit new on Windows passes its own rc check and adapter fixtures; a copy of the four-day-week instance (bash rc, Nix, Cursor judge) upgraded with rc upgrade --reset-roles to Claude-only roles, no Nix files, research intact, and passes rc check; Claude Code read-only probe passed and the rule hooks fire on Windows
