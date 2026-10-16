@@ -22,6 +22,9 @@ import kit  # noqa: E402
 import sources  # noqa: E402
 
 REQUESTS: list[str] = []
+# Where adapter searches run: a template-like folder holding only the default adapters, set in main(), so the test
+# gives the same result in the template and inside any instance (whatever it enabled or configured).
+ROOT = REPO
 ROUTES = [  # (part of the URL, fixture, content type); the first match wins
     ("https://api.openalex.org/works/W100", "openalex-work.json", "application/json"),
     ("https://api.openalex.org/works/doi:", "openalex-doi.json", "application/json"),
@@ -81,7 +84,7 @@ def test_keys_and_dates() -> None:
 
 
 def test_scholarly(log: Path) -> None:
-    found = sources.search(REPO, "openalex", "four-day week", {"type": "article"}, "2024-01-01", 50, log)
+    found = sources.search(ROOT, "openalex", "four-day week", {"type": "article"}, "2024-01-01", 50, log)
     assert [item["title"] for item in found] == ["Productivity under a four-day week", "Working paper on compressed weeks"], "untitled skipped"
     first, second = found
     assert first["key"] == "doi:10.5555/wt.2025.1" and first["evidenceType"] == "peer-reviewed" and first["authors"] == ["Ada Example", "Ben Sample"]
@@ -91,26 +94,26 @@ def test_scholarly(log: Path) -> None:
     assert query["filter"] == "from_publication_date:2024-01-01,type:article" and query["search"] == "four-day week"
     assert "mailto" not in query, "no contact email is sent unless the user set one"
 
-    backward = sources.related(REPO, "openalex", first, "backward", 50, log)
+    backward = sources.related(ROOT, "openalex", first, "backward", 50, log)
     assert [item["title"] for item in backward] == ["A meta-analysis of compressed schedules"] and backward[0]["evidenceType"] == "review"
     assert last_query()["filter"] == "openalex:W200|W400"
-    forward = sources.related(REPO, "openalex", first, "forward", 50, log)
+    forward = sources.related(ROOT, "openalex", first, "forward", 50, log)
     assert last_query()["filter"] == "cites:W100" and last_query()["sort"] == "cited_by_count:desc"
     assert [item["extra"]["openalexId"] for item in forward] == ["W500", "W600", "W400"]
-    resolved = sources.related(REPO, "openalex", {"key": "doi:10.5555/wt.2025.1", "title": "found by crossref", "doi": "10.5555/wt.2025.1",
+    resolved = sources.related(ROOT, "openalex", {"key": "doi:10.5555/wt.2025.1", "title": "found by crossref", "doi": "10.5555/wt.2025.1",
                                                   "extra": {}}, "forward", 50)
     assert any("works/doi:10.5555/wt.2025.1" in url for url in REQUESTS[-2:]) and len(resolved) == 3, "a DOI-only record resolves first"
-    raises(kit.AdapterError, sources.related, REPO, "openalex", {"key": "url:x", "title": "no ids", "extra": {}}, "forward")
+    raises(kit.AdapterError, sources.related, ROOT, "openalex", {"key": "url:x", "title": "no ids", "extra": {}}, "forward")
 
-    notices = sources.retractions(REPO, ["https://doi.org/10.5555/Retracted.Trial", "10.5555/new.trial", "not a doi"], log)
+    notices = sources.retractions(ROOT, ["https://doi.org/10.5555/Retracted.Trial", "10.5555/new.trial", "not a doi"], log)
     assert notices == {"10.5555/retracted.trial": [{"type": "retraction", "doi": "10.5555/retracted.trial.notice"}]}, \
         "only retraction-type updates count; a correction does not"
     assert last_query()["filter"] == "doi:10.5555/new.trial,doi:10.5555/retracted.trial"
-    assert sources.retractions(REPO, []) == {}
-    raises(ValueError, sources.related, REPO, "crossref", first, "forward")
-    raises(ValueError, sources.related, REPO, "openalex", first, "sideways")
+    assert sources.retractions(ROOT, []) == {}
+    raises(ValueError, sources.related, ROOT, "crossref", first, "forward")
+    raises(ValueError, sources.related, ROOT, "openalex", first, "sideways")
 
-    crossref = sources.search(REPO, "crossref", "four-day week", {}, "2025-01-01", 50, log)
+    crossref = sources.search(ROOT, "crossref", "four-day week", {}, "2025-01-01", 50, log)
     assert len(crossref) == 2, "untitled skipped"
     article, comment = crossref
     assert article["abstract"] == "Output per hour rose ." and article["extra"]["venue"] == "Journal of Working Time"
@@ -125,55 +128,55 @@ def test_scholarly(log: Path) -> None:
 
 
 def test_reference_books_news(log: Path) -> None:
-    page = sources.search(REPO, "wikipedia", "four-day week", {}, None, 5, log)[0]
+    page = sources.search(ROOT, "wikipedia", "four-day week", {}, None, 5, log)[0]
     assert page["url"] == "https://en.wikipedia.org/wiki/Four-day_workweek" and page["abstract"] == "over four days & not five"
     assert page["evidenceType"] == "reference"
-    raises(kit.AdapterError, sources.search, REPO, "wikipedia", "x", {"lang": "en.evil.org/"}, None, 5)
+    raises(kit.AdapterError, sources.search, ROOT, "wikipedia", "x", {"lang": "en.evil.org/"}, None, 5)
 
-    books = sources.search(REPO, "openlibrary", "four-day week", {}, "2000-01-01", 5, log)
+    books = sources.search(ROOT, "openlibrary", "four-day week", {}, "2000-01-01", 5, log)
     assert [book["title"] for book in books] == ["Case for a four day week"], "since keeps 2020, drops 1972 and the keyless doc"
 
-    news = sources.search(REPO, "gdelt", '"four-day week"', {"language": "english"}, "2000-01-01", 5, log)
+    news = sources.search(ROOT, "gdelt", '"four-day week"', {"language": "english"}, "2000-01-01", 5, log)
     assert [item["date"] for item in news] == ["2026-10-02", "2026-10-01"] and news[0]["evidenceType"] == "journalism"
     assert news[0]["key"] == "url:https://news.example.org/a?id=1", "tracking parameters do not split a page"
     query = last_query()
     assert query["query"] == '"four-day week" sourcelang:english'
     assert query["startdatetime"] > "20000101000000", "since older than GDELT's window is clamped to it"
-    raises(kit.AdapterError, sources.search, REPO, "gdelt", "x", {"country": "fr; DROP"}, None, 5)
-    message = raises(kit.AdapterError, sources.search, REPO, "gdelt", "short", {}, None, 5, log)
+    raises(kit.AdapterError, sources.search, ROOT, "gdelt", "x", {"country": "fr; DROP"}, None, 5)
+    message = raises(kit.AdapterError, sources.search, ROOT, "gdelt", "short", {}, None, 5, log)
     assert "too short" in message, message
 
 
 def test_feeds_and_pages(log: Path) -> None:
-    rss = sources.search(REPO, "feed", "https://agency.example.org/feed", {"evidenceType": "official-statistics"}, None, 10, log)
+    rss = sources.search(ROOT, "feed", "https://agency.example.org/feed", {"evidenceType": "official-statistics"}, None, 10, log)
     assert [item["url"] for item in rss] == ["https://agency.example.org/stats/2026", "https://agency.example.org/stats/2024"]
     assert rss[0]["abstract"] == "Average hours fell ." and rss[0]["authors"] == ["Statistics Office"]
     assert rss[0]["evidenceType"] == "official-statistics" and rss[0]["date"] == "2026-10-02"
-    recent = sources.search(REPO, "feed", "https://agency.example.org/feed", {}, "2026-01-01", 10)
+    recent = sources.search(ROOT, "feed", "https://agency.example.org/feed", {}, "2026-01-01", 10)
     assert [item["date"] for item in recent] == ["2026-10-02"] and recent[0]["evidenceType"] == "unknown"
-    atom = sources.search(REPO, "feed", "https://lab.example.org/atom", {}, None, 10)
+    atom = sources.search(ROOT, "feed", "https://lab.example.org/atom", {}, None, 10)
     assert atom[0]["url"] == "https://lab.example.org/pilot" and atom[0]["authors"] == ["Dr. Lab"] and atom[0]["date"] == "2026-09-30"
-    rdf = sources.search(REPO, "feed", "https://journal.example.org/rdf", {}, None, 10)
+    rdf = sources.search(ROOT, "feed", "https://journal.example.org/rdf", {}, None, 10)
     assert rdf[0]["title"] == "Article one" and rdf[0]["date"] == "2026-09-15"
-    assert "entities" in raises(kit.AdapterError, sources.search, REPO, "feed", "https://bomb.example.org/feed", {}, None, 10)
-    raises(kit.AdapterError, sources.search, REPO, "feed", "file:///etc/passwd", {}, None, 10)
+    assert "entities" in raises(kit.AdapterError, sources.search, ROOT, "feed", "https://bomb.example.org/feed", {}, None, 10)
+    raises(kit.AdapterError, sources.search, ROOT, "feed", "file:///etc/passwd", {}, None, 10)
 
     url = "https://gov.example.org/hours"
-    watched = sources.search(REPO, "page-watch", url, {"evidenceType": "regulation"}, None, 1, log)[0]
+    watched = sources.search(ROOT, "page-watch", url, {"evidenceType": "regulation"}, None, 1, log)[0]
     assert watched["title"] == "Maximum weekly hours – Example Gov" and "tracking" not in watched["abstract"]
     assert "48 hours" in watched["abstract"] and watched["evidenceType"] == "regulation"
-    again = sources.search(REPO, "page-watch", url, {}, None, 1)[0]
+    again = sources.search(ROOT, "page-watch", url, {}, None, 1)[0]
     assert again["extra"]["sha256"] == watched["extra"]["sha256"], "the same page keeps its fingerprint"
     PAGES[url] = (FIXTURES / "page.html").read_text(encoding="utf-8").replace("48 hours", "40 hours")
-    changed = sources.search(REPO, "page-watch", url, {}, None, 1)[0]
+    changed = sources.search(ROOT, "page-watch", url, {}, None, 1)[0]
     assert changed["extra"]["sha256"] != watched["extra"]["sha256"], "a changed page gets a new fingerprint"
 
 
 def test_contract(log: Path) -> None:
-    raises(ValueError, sources.search, REPO, "openalex", "x", {"bogus": "1"})
-    raises(ValueError, sources.search, REPO, "nope", "x")
-    raises(ValueError, sources.search, REPO, "../runner/rc", "x")
-    raises(ValueError, sources.search, REPO, "openalex", "x", {}, "last week")
+    raises(ValueError, sources.search, ROOT, "openalex", "x", {"bogus": "1"})
+    raises(ValueError, sources.search, ROOT, "nope", "x")
+    raises(ValueError, sources.search, ROOT, "../runner/rc", "x")
+    raises(ValueError, sources.search, ROOT, "openalex", "x", {}, "last week")
 
     entries = json.loads(log.read_text(encoding="utf-8"))
     assert all(entry["status"] in ("ok", "error") and "at" in entry for entry in entries)
@@ -184,7 +187,7 @@ def test_contract(log: Path) -> None:
     assert errors and errors[-1]["adapter"] == "gdelt" and errors[-1]["count"] == 0 and "too short" in errors[-1]["error"]
     assert any(entry.get("direction") == "backward" for entry in entries), "related lookups are logged too"
 
-    for identifier, spec in sources.descriptors(REPO).items():
+    for identifier, spec in sources.descriptors(ROOT).items():
         module = sources.module(spec)
         assert callable(module.search), identifier
         assert hasattr(module, "related") == bool(spec["related"]), f"{identifier}: related flag and module disagree"
@@ -225,8 +228,7 @@ def test_contract(log: Path) -> None:
 def test_packs_and_own_adapters() -> None:
     """Packs are enabled per instance without touching code; an adapter made with `new` passes its own fixture test;
     every shipped fixture passes."""
-    assert sources.run_fixture(REPO, "pubmed") == [] and sources.run_fixture(REPO, "github") == []
-    assert "pubmed" not in sources.descriptors(REPO), "a pack is not active until an instance enables it"
+    assert sources.run_fixture(REPO, "pubmed") == [] and sources.run_fixture(REPO, "github") == [], "enabled or not"
     previous, kit.TRANSPORT = kit.TRANSPORT, None
     try:
         fixture = json.loads((FIXTURES / "pubmed.fixture.json").read_text(encoding="utf-8"))
@@ -251,7 +253,11 @@ def test_packs_and_own_adapters() -> None:
         sources.set_pack(root, "medicine", False)
         assert "pubmed" not in sources.descriptors(root)
         raises(ValueError, sources.set_pack, root, "astrology", True)
-        raises(ValueError, sources.set_pack, REPO, "medicine", True)
+        # A folder without research-center.json is the template: packs are enabled only in instances. (Not REPO
+        # itself: this test also runs inside instances, where enabling would change the instance.)
+        template_like = Path(directory) / "template"
+        template_like.mkdir()
+        raises(ValueError, sources.set_pack, template_like, "medicine", True)
 
         written = sources.scaffold(root, "city-council", "regulatory", "regulation")
         assert [path.name for path in written] == ["city-council.json", "city_council.py", "city-council.fixture.json"]
@@ -286,7 +292,13 @@ def test_rate_limit() -> None:
 
 
 def main() -> int:
+    global ROOT
     kit.TRANSPORT = transport
+    isolated = tempfile.TemporaryDirectory()
+    ROOT = Path(isolated.name)
+    (ROOT / "templates" / "adapters").mkdir(parents=True)
+    for path in (REPO / "templates" / "adapters").glob("*.json"):
+        shutil.copyfile(path, ROOT / "templates" / "adapters" / path.name)
     test_keys_and_dates()
     test_rate_limit()
     test_packs_and_own_adapters()

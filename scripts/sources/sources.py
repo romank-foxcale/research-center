@@ -136,11 +136,10 @@ def fixture_path(root: Path, identifier: str) -> Path:
 
 
 def testable(root: Path) -> dict[str, dict[str, Any]]:
-    """Every adapter there is here, with packs included in the template, keyed by id."""
-    found = dict(descriptors(root))
-    if not (root / "research-center.json").is_file():
-        for pack in packs().values():
-            found.update(pack["descriptors"])
+    """Every adapter there is here, keyed by id: the active ones and every pack's, enabled or not, so a pack's
+    fixture can be checked before it is turned on."""
+    found = {identifier: spec for pack in packs().values() for identifier, spec in pack["descriptors"].items()}
+    found.update(descriptors(root))
     return found
 
 
