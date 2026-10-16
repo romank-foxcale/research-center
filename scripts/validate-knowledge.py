@@ -11,7 +11,7 @@ from pathlib import Path
 from rule_hooks import extra_markdown_dirs, markdown_allowed
 
 
-REQUIRED_FILES = ("README.md", "AGENTS.md", "flake.nix", "docs/index.md")
+REQUIRED_FILES = ("README.md", "AGENTS.md", "rc.py", "pyproject.toml", "docs/index.md")
 REQUIRED_FIELDS = ("id", "title", "status", "summary", "verified_at")
 ALLOWED_STATUSES = {"active", "accepted", "draft", "superseded", "archived"}
 MARKDOWN_LINK = re.compile(r"\[[^]]+\]\(([^)]+)\)")
@@ -60,7 +60,7 @@ def repository_files(root: Path) -> list[str]:
     if (root / ".git").exists():
         listed = subprocess.run(
             ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         if listed.returncode == 0:
             return listed.stdout.splitlines()

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "sceptic-sonnet",
+  "purpose": "A second, independent sceptic on another model: tries to disprove each claim the analysis relies on",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "read-only",
+  "skills": [
+    "research-sceptic"
+  ]
+}

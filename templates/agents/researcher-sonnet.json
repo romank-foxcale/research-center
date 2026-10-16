@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "researcher-sonnet",
+  "purpose": "A second, independent researcher on another model: reads the records and searches the web along the plan",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "web-read",
+  "skills": [
+    "research-collect"
+  ]
+}

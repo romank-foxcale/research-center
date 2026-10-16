@@ -50,7 +50,7 @@ def command_show(root: Path) -> None:
     print(f"Remote    privateRemoteConfirmed {str(config.get('privateRemoteConfirmed', False)).lower()}")
     print("\nAgents")
     command_list(root)
-    print("\nChange a role: ./rc roles set <role> --provider <claude|codex|cursor> --model <model>; "
+    print("\nChange a role: ./rc roles set <role> --provider <claude|codex> --model <model>; "
           f"other settings: edit {path.name}")
 
 

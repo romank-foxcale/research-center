@@ -115,7 +115,7 @@ def github_slug(remote: str) -> str | None:
 def visibility(slug: str) -> str | None:
     try:
         result = subprocess.run(["gh", "repo", "view", slug, "--json", "visibility", "--jq", ".visibility"],
-                                capture_output=True, text=True, timeout=60)
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return result.stdout.strip().upper() if result.returncode == 0 else None
@@ -124,7 +124,7 @@ def visibility(slug: str) -> str | None:
 def guard(root: Path, lookup=visibility) -> None:
     """Refuse to commit sources into the template or into a repo that is, or may be, public."""
     config = rc.settings(root)
-    result = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"], capture_output=True, text=True)
+    result = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     remote = result.stdout.strip() if result.returncode == 0 else ""
     if not remote:
         return  # nothing is published from a repo without a remote
@@ -166,7 +166,7 @@ def folder_files(folder: Path) -> list[str]:
 
 def git_remote(checkout: Path, locator: str) -> str:
     """The repo's portable name for handoffs: its origin URL, else the locator when that is a URL."""
-    result = subprocess.run(["git", "-C", str(checkout), "remote", "get-url", "origin"], capture_output=True, text=True)
+    result = subprocess.run(["git", "-C", str(checkout), "remote", "get-url", "origin"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode == 0 and result.stdout.strip():
         return result.stdout.strip()
     return locator if "://" in locator or locator.startswith("git@") else ""
@@ -186,12 +186,12 @@ def git_checkout(root: Path, descriptor: dict[str, Any]) -> tuple[Path, str]:
         else:
             checkout.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "clone", "--depth", "1", "--", locator, str(checkout)], check=True, capture_output=True)
-    revision = subprocess.run(["git", "-C", str(checkout), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    revision = subprocess.run(["git", "-C", str(checkout), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout.strip()
     return checkout, revision
 
 
 def git_files(checkout: Path) -> list[str]:
-    listed = subprocess.run(["git", "-C", str(checkout), "ls-files", "-z"], capture_output=True, text=True, check=True)
+    listed = subprocess.run(["git", "-C", str(checkout), "ls-files", "-z"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
     return sorted(name for name in listed.stdout.split("\0") if name)
 
 
@@ -216,7 +216,7 @@ def url_document(url: str) -> tuple[str, str, str, bytes]:
     if kind == "application/pdf" or url.lower().endswith(".pdf"):
         text, _, extractor = extract.extract("page.pdf", data)
     elif kind in ("text/html", "application/xhtml+xml"):
-        text, extractor = extract.html_to_markdown(data), "pandoc"
+        text, extractor = extract.html_to_markdown(data), "markdownify"
     elif kind.startswith("text/") or kind in ("application/json", "application/xml"):
         text, extractor = extract.decode(data), "text"
     else:

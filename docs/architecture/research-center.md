@@ -47,4 +47,5 @@ relations:
 - `scripts/runner/providers.py`: one headless CLI call per role, with access enforced by flags.
 - `scripts/sources/`: source adapters the runner searches besides the web (`./rc sources`), one record shape keyed by DOI or canonical URL, every search logged; domain packs in `templates/packs/`, the scaffold for an instance's own adapters in `templates/adapter-template/` (docs/decisions/0007-source-adapters.md).
 - `scripts/research/research.py`: the pipeline and its contracts: plan, screening, grading (0010), competing hypotheses and calibrated language (0011). `living.py`: watch, refresh, drift and deltas (0009).
-- `nix/tools.nix`: pandoc, pdftotext, python-pptx and openpyxl for ingest and collect. It is built from that file alone, so a large instance is not copied into the store on every command.
+- `rc.py` with the `rc.cmd`, `rc.ps1` and `./rc` launchers: the command line, run by uv in the environment of `pyproject.toml` and `uv.lock`. Document conversion is pure Python (pypdfium2, mammoth, markdownify, striprtf, python-pptx, openpyxl), so nothing else is installed (docs/decisions/0012-windows-native-uv.md).
+- `scripts/upgrade-instance.py` (`rc upgrade`, `rc-kit upgrade`): brings an existing instance's template-owned files up to the template.

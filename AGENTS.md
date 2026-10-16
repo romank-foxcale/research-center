@@ -20,7 +20,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 
 - What the user knows: `sources/` (committed text), `knowledge/digests/` and `knowledge/profile/`, every fact cited.
 - What a research run found: `research/<topic>/`, every claim in `claims.json` traced to a stored page.
-- How the RC works: the scripts, the Nix checks and the atomic notes in `docs/`.
+- How the RC works: the scripts, `rc check` and the atomic notes in `docs/`.
 - Secrets: never in this repository. The runner redacts them, and `./rc check` fails on any left.
 
 ## Hard rules
@@ -45,4 +45,4 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 
 ## Verification
 
-A change to the RC is finished with `./rc check`. If Nix is unavailable, run `./rc validate` and the Python tests named in `flake.nix`, and say explicitly that the Nix part was not verified.
+A change to the RC is finished with `./rc check` (`rc check` in cmd or PowerShell): every validator and test suite, run with the locked environment of `pyproject.toml` and `uv.lock`. It needs only uv. Say explicitly if it could not be run.

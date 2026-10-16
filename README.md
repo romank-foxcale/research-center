@@ -1,6 +1,6 @@
 # Research Center
 
-An AI research assistant you run with your own Claude, ChatGPT and Cursor subscriptions, on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
+An AI research assistant you run with your own Claude subscription, natively on Windows (or macOS and Linux), on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
 
 ```text
 ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
@@ -15,8 +15,8 @@ ingest (optional) → grill → plan → search → screen → collect → analy
 | screen | Each result included or excluded against the criteria, with a reason; references and citations of the key works followed and screened too; retractions dropped | `screening.md` |
 | collect | Claude and GPT read the included records and search the web in parallel; every cited page is stored and every quote checked against it | `claims.md`, `sources/web-<topic>/` |
 | analyze | Each question answered from the claims ledger; competing hypotheses weighed in a matrix; key assumptions named | `analysis.md` |
-| critique | Claude, GPT and Grok try to disprove every claim and assumption the analysis uses | `critique/` |
-| judge | Grok settles the anonymous reviews, grades each claim's credibility and each answer's certainty; contested claims are flagged for you | `judgement.md` |
+| critique | Two sceptics (Claude Opus and Sonnet) independently try to disprove every claim and assumption the analysis uses | `critique/` |
+| judge | Claude settles the anonymous reviews, grades each claim's credibility and each answer's certainty; contested claims are flagged for you | `judgement.md` |
 | apply | Surviving ideas ranked ADOPT, TRIAL, ASSESS or HOLD against your repos and needs | `fit.md`, `handoff.md` |
 | report | The answer, citing only claims that survived, with calibrated likelihood words, the certainty of each answer and how the sources were found | `report.md` |
 
@@ -28,8 +28,8 @@ Ideas worth acting on leave as a [Control Center](https://github.com/romank-foxc
 
 The same way as the Control Center kit, and it can sit next to it:
 
-- Windows: in PowerShell as administrator, run `install/windows/install.ps1 -Tools claude,codex,cursor`
-- macOS / Linux / WSL: `curl -fsSL https://raw.githubusercontent.com/romank-foxcale/research-center/main/install/install.sh | bash -s -- --tools claude,codex,cursor`
+- Windows: in PowerShell (no administrator rights, no WSL), run `install\windows\install.ps1`. It installs git, the GitHub CLI, uv and Claude Code, and puts `rc-kit` on your PATH.
+- macOS / Linux / WSL: `curl -fsSL https://raw.githubusercontent.com/romank-foxcale/research-center/main/install/install.sh | sh`
 
 Then run `rc-kit doctor`. Step-by-step instructions for every tool are in [GUIDE.md](GUIDE.md).
 
@@ -50,7 +50,7 @@ Without the kit, the manual way is:
 mkdir my-project_RC
 cd my-project_RC
 git clone https://github.com/romank-foxcale/research-center rc_template
-claude   # or codex, opencode, cursor .
+claude   # or codex, opencode
 ```
 
 First prompt:
@@ -95,7 +95,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 
 ## How it stays honest
 
-- Agents only read: every file is written by the runner, and access is enforced by CLI flags. Claude runs in `dontAsk` with an allow-list, Codex in its read-only sandbox, Cursor in a throwaway snapshot with a deny config.
+- Agents only read: every file is written by the runner, and access is enforced by CLI flags. Claude runs in `dontAsk` with an allow-list of read tools; Codex, where it is used, in its read-only sandbox.
 - Every profile fact cites a stored source file, and every report claim cites a stored page whose quote was checked.
 - Sceptics review independently. The judge sees them only as Review A, B, C. A claim one sceptic refuted and the judge kept is shown to you as contested.
 - Questions with competing answers are weighed in a hypothesis matrix, every answer names its key assumptions, and the report says likelihood only on a fixed scale, marking what is evidence and what is assessment.

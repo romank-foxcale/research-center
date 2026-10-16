@@ -30,6 +30,7 @@ relations:
 - [0009 Living topics, refresh and deltas](decisions/0009-living-topics.md)
 - [0010 Evidence grading and staleness](decisions/0010-evidence-grading.md)
 - [0011 Competing hypotheses, assumptions and calibrated language](decisions/0011-structured-analysis.md)
+- [0012 Windows-native through uv and Python, Claude-only roles](decisions/0012-windows-native-uv.md)
 
 ## Rules
 

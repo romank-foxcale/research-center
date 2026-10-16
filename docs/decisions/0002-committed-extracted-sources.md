@@ -22,7 +22,7 @@ The user chose to keep everything the RC knows inside the instance repo, so rese
 
 ## Decision
 
-- Text files are stored as they are, under a `.txt` suffix (Markdown keeps `.md`), so no ingested file can act on Git or Nix. Characters outside `[A-Za-z0-9._/-]` in a path become `_`, so every path can be cited.
+- Text files are stored as they are, under a `.txt` suffix (Markdown keeps `.md`), so no ingested file can act on Git or the tools. Characters outside `[A-Za-z0-9._/-]` in a path become `_`, so every path can be cited.
 - PDF goes through pdftotext; DOCX, ODT, EPUB, RTF and HTML through pandoc (GFM, no raw HTML); PPTX through python-pptx; XLSX through openpyxl (200 rows per sheet). Other binaries are skipped and listed in the manifest.
 - Before anything is written, `secrets_scan.redact` replaces token formats (cloud keys, GitHub, Slack, OpenAI, Anthropic, Google, Stripe, JWT, private keys, URL credentials) and credential-looking assignments with `[REDACTED:<kind>]`. `sources/<id>/redactions.md` lists the kind and line, never the value.
 - `./rc check` fails on any unredacted pattern under sources/, knowledge/, research/ and catalog/, and on any binary under sources/.

@@ -39,9 +39,9 @@ End your reply with one fenced JSON block:
   "summary": "Two or three sentences: who this is and what they are about.",
   "notes": [
     {
-      "slug": "python-nix-stack",
+      "slug": "python-aws-stack",
       "kind": "stack",
-      "title": "Python services built and tested through Nix",
+      "title": "Python services deployed on AWS",
       "summary": "One sentence.",
       "body": "A short paragraph or bullets. Cite files inline like [sources/<id>/text/<file>].",
       "evidence": ["sources/<id>/text/<file>"]

@@ -1,16 +1,19 @@
 ---
 id: debt.instance-updates
 title: Instances do not receive template updates
-status: active
+status: superseded
 summary: An instance is a copy of the template's files, so an RC made before a template change keeps its old scripts, skills and settings; it needs the screener role, new settings, evidence types and a Living section in new briefs by hand.
-verified_at: 2026-10-11
+verified_at: 2026-10-16
 evidence:
   - scripts/materialize-template.py
   - install/rc-kit
 relations:
+  - docs/decisions/0012-windows-native-uv.md
   - docs/debt/index.md
   - docs/decisions/0001-template-and-instances.md
 ---
+
+> Superseded on 2026-10-16: `rc upgrade <instance>` (and `rc-kit upgrade <name>`) now replaces template-owned files, merges new settings and roles, and removes the Nix files. See [docs/decisions/0012-windows-native-uv.md](../../docs/decisions/0012-windows-native-uv.md).
 
 # Instances do not receive template updates
 

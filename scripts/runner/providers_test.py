@@ -1,46 +1,58 @@
 #!/usr/bin/env python3
-"""Test the Cursor provider with a fake cursor-agent: read-only is enforced by a snapshot that carries
-Cursor's deny config, a write that slips through fails the call, and the reply is the closing message."""
+"""Test the providers with fake claude and codex CLIs that run on Windows (as .cmd launchers) and POSIX alike:
+access levels map to read-only CLI flags, executables resolve the way the shell would, login state is read,
+streamed events become the reply and the log, agent output is decoded as UTF-8, and a failing CLI raises."""
 
 from __future__ import annotations
 
-import json
 import os
-import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-import providers
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import providers  # noqa: E402
 
-# The fake CLI answers status and models, and in --print mode does what FAKE_CURSOR_ACT says:
-# "reply" streams a preamble, a tool call and a closing message; "write" also writes into its workspace.
-FAKE_CURSOR = f"""#!{sys.executable}
-import json, os, sys
-from pathlib import Path
-if sys.argv[1:] == ["status"]:
-    print("\\u2713 Logged in as dev@example.com" if os.environ.get("FAKE_CURSOR_LOGIN") else "Not logged in")
+# The fake answers `auth status` / `login status`, and in --print / exec mode streams events like the real CLI.
+FAKE = '''import json, os, sys
+name, args = sys.argv[1], sys.argv[2:]
+logged_in = os.environ.get("FAKE_LOGIN") == "1"
+if args[:2] == ["auth", "status"]:
+    print(json.dumps({"loggedIn": logged_in, "authMethod": "claude.ai"}))
     sys.exit(0)
-if sys.argv[1:] == ["models"]:
-    print("Available models\\n\\nauto - Auto (default)\\ngrok-4.7-high - Grok 4.7  High\\nclaude-opus-5-thinking-high - Claude")
-    sys.exit(0)
-workspace = Path(sys.argv[sys.argv.index("--workspace") + 1])
-Path(os.environ["FAKE_CURSOR_SEEN"]).write_text(json.dumps({{
-    "argv": sys.argv[1:], "cwd": os.getcwd(), "prompt": sys.stdin.read(),
-    "config": (workspace / ".cursor" / "cli.json").read_text(),
-    "files": sorted(str(p.relative_to(workspace)) for p in workspace.rglob("*") if p.is_file())}}))
-if os.environ.get("FAKE_CURSOR_ACT") == "write":
-    (workspace / "app.py").write_text("tampered")
-def emit(event): print(json.dumps(event), flush=True)
-text = lambda words: {{"type": "assistant", "message": {{"content": [{{"type": "text", "text": words}}]}}}}
-emit({{"type": "system", "subtype": "init"}})
-emit(text("I'll check the code first."))
-emit({{"type": "tool_call", "subtype": "started", "tool_call": {{"readToolCall": {{"args": {{"path": str(workspace / "app.py")}}}}}}}})
-emit(text("DECISION: A"))
-emit(text("## Reasoning\\nA reuses the parser."))
-emit({{"type": "result", "subtype": "success", "result": "I'll check the code first.DECISION: A## Reasoning"}})
-"""
+if args[:2] == ["login", "status"]:
+    print("Logged in using ChatGPT" if logged_in else "Not logged in")
+    sys.exit(0 if logged_in else 1)
+prompt = sys.stdin.buffer.read().decode("utf-8")  # as the real CLIs do, whatever the console code page
+Path = __import__("pathlib").Path
+Path(os.environ["FAKE_SEEN"]).write_text(json.dumps({"args": args, "prompt": prompt}), encoding="utf-8")
+if os.environ.get("FAKE_FAIL"):
+    sys.exit(3)
+out = sys.stdout.buffer
+def emit(event):
+    out.write((json.dumps(event, ensure_ascii=False) + "\\n").encode("utf-8"))
+if name == "claude":
+    emit({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "brief.md"}}]}})
+    emit({"type": "assistant", "message": {"content": [{"type": "text", "text": "調査を始めます"}]}})
+    emit({"type": "result", "subtype": "success", "result": "答え: 週4日勤務 DONE"})
+else:
+    emit({"type": "item.completed", "item": {"type": "agent_message", "text": "reading"}})
+    Path(args[args.index("--output-last-message") + 1]).write_text("codex answer", encoding="utf-8")
+    emit({"type": "turn.completed"})
+'''
+
+
+def install_fake(bin_dir: Path, name: str) -> None:
+    """A fake CLI on PATH: name.cmd on Windows, an executable script elsewhere."""
+    script = bin_dir / "fake_cli.py"
+    script.write_text(FAKE, encoding="utf-8")
+    if os.name == "nt":
+        (bin_dir / f"{name}.cmd").write_text(f'@"{sys.executable}" "{script}" {name} %*\r\n', encoding="utf-8")
+    else:
+        launcher = bin_dir / name
+        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" {name} "$@"\n', encoding="utf-8")
+        launcher.chmod(0o755)
 
 
 def refused(role: dict) -> bool:
@@ -88,84 +100,55 @@ def check_access_flags() -> None:
     argv = providers.command({**codex, "access": "read-only"}, Path("."), Path("last.txt"))
     assert "--search" not in argv and argv[argv.index("--sandbox") + 1] == "read-only"
     assert refused({**codex, "access": "connector-read", "connectors": ["notion"]})
-    assert refused({"id": "j", "provider": "cursor", "model": "grok", "access": "web-read"})
+    assert refused({"id": "j", "provider": "cursor", "model": "grok", "access": "read-only"}), "cursor support is gone"
 
 
 def main() -> int:
+    check_access_flags()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)
         bin_dir = base / "bin"
         bin_dir.mkdir()
-        (bin_dir / "cursor-agent").write_text(FAKE_CURSOR)
-        (bin_dir / "cursor-agent").chmod(0o755)
+        for name in ("claude", "codex"):
+            install_fake(bin_dir, name)
         seen = base / "seen.json"
-        os.environ.update({"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "FAKE_CURSOR_SEEN": str(seen)})
+        os.environ.update({"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "FAKE_SEEN": str(seen)})
+        os.environ.pop("FAKE_LOGIN", None)
 
-        assert providers.login_status("cursor") == (False, "not logged in; run: cursor-agent login")
-        assert providers.models("cursor") == [], "no models while logged out"
-        os.environ["FAKE_CURSOR_LOGIN"] = "1"
-        assert providers.login_status("cursor")[0]
-        assert providers.models("cursor") == ["auto", "grok-4.7-high", "claude-opus-5-thinking-high"], providers.models("cursor")
+        resolved = Path(providers.executable("codex"))
+        assert resolved.parent == bin_dir, f"codex resolves to the launcher on PATH, .cmd on Windows: {resolved}"
+        assert providers.executable("no-such-cli") == "no-such-cli"
 
-        role = {"id": "judge", "provider": "cursor", "model": "grok-4.7-high", "access": "read-only"}
-        argv = providers.command(role, base, base / "last.txt")
-        assert "--force" not in argv and "--yolo" not in argv, "shell stays off"
-        assert argv[argv.index("--model") + 1] == "grok-4.7-high"
+        assert providers.login_status("claude") == (False, "not logged in; run: claude auth login")
+        assert providers.login_status("codex") == (False, "not logged in; run: codex login")
+        assert providers.models("claude") == [], "no models while logged out"
+        assert providers.login_status("cursor") == (False, "unknown provider cursor")
+        os.environ["FAKE_LOGIN"] = "1"
+        assert providers.login_status("claude") == (True, "logged in (claude.ai)")
+        assert providers.login_status("codex")[0]
+
+        work = base / "work"
+        work.mkdir()
+        said: list[str] = []
+        role = {"id": "analyst", "provider": "claude", "model": "opus", "access": "read-only"}
+        reply = providers.run(role, "プロンプト: 調べて", work, base / "logs" / "analyst.log", timeout=60, on_say=said.append)
+        assert reply == "答え: 週4日勤務 DONE", f"UTF-8 survives the console code page: {reply!r}"
+        assert said == ["調査を始めます"], said
+        log = (base / "logs" / "analyst.log").read_text(encoding="utf-8")
+        assert "tool: Read brief.md" in log and "say: 調査を始めます" in log, log
+        import json
+        assert json.loads(seen.read_text(encoding="utf-8"))["prompt"] == "プロンプト: 調べて", "the prompt reaches stdin as UTF-8"
+
+        codex = {"id": "researcher", "provider": "codex", "model": "gpt", "access": "web-read"}
+        assert providers.run(codex, "go", work, base / "logs" / "codex.log", timeout=60) == "codex answer"
+
+        os.environ["FAKE_FAIL"] = "1"
         try:
-            providers.command({**role, "access": "write-worktree"}, base, base / "last.txt")
-            raise AssertionError("a writing cursor role must be refused")
-        except providers.ProviderError:
-            pass
-
-        worktree = base / "worktree"
-        worktree.mkdir()
-        git = ["git", "-C", str(worktree), "-c", "user.name=t", "-c", "user.email=t@t"]
-        subprocess.run(["git", "init", "-q", str(worktree)], check=True)
-        (worktree / ".gitignore").write_text("build/\n")
-        (worktree / "app.py").write_text("print('app')\n")
-        (worktree / ".cursor").mkdir()
-        (worktree / ".cursor" / "cli.json").write_text('{"permissions": {"allow": ["Write(**)"]}}')
-        subprocess.run([*git, "add", "-A"], check=True)
-        subprocess.run([*git, "commit", "-q", "-m", "base"], check=True)
-        (worktree / "app.py").write_text("print('changed by the writer')\n")  # the diff under review
-        (worktree / "new.py").write_text("x = 1\n")
-        (worktree / "build").mkdir()
-        (worktree / "build" / "huge.bin").write_text("ignored")
-
-        log = base / "logs" / "verdict.log"
-        reply = providers.run(role, "# Task\n\nJudge.", worktree, log)
-        call = json.loads(seen.read_text())
-        assert reply == "DECISION: A\n\n## Reasoning\nA reuses the parser.", f"the closing messages, no preamble: {reply!r}"
-        assert call["prompt"] == "# Task\n\nJudge.", "the prompt goes on stdin, not argv"
-        assert Path(call["cwd"]) != worktree and Path(call["argv"][call["argv"].index("--workspace") + 1]) == Path(call["cwd"])
-        assert json.loads(call["config"]) == providers.CURSOR_DENY, "the project's own config is replaced by the deny config"
-        assert call["files"] == [".cursor/cli.json", ".gitignore", "app.py", "new.py"], call["files"]
-        assert not Path(call["cwd"]).exists(), "the snapshot is deleted"
-        assert "tool: read" in log.read_text()
-        assert (worktree / ".cursor" / "cli.json").read_text().startswith('{"permissions": {"allow"'), "the worktree is untouched"
-
-        os.environ["FAKE_CURSOR_ACT"] = "write"
-        try:
-            providers.run(role, "Judge.", worktree, log)
-            raise AssertionError("a write in the snapshot must fail the call")
+            providers.run(role, "go", work, base / "logs" / "fail.log", timeout=60)
+            raise AssertionError("a failing CLI must raise")
         except providers.ProviderError as error:
-            assert "changed its read-only snapshot" in str(error), error
-        assert (worktree / "app.py").read_text() == "print('changed by the writer')\n", "the worktree is untouched"
-        assert not Path(json.loads(seen.read_text())["cwd"]).exists(), "the snapshot is deleted after a failure too"
-
-        # A caller-owned snapshot: every call runs in it, none copies again, and the caller sees a write afterwards.
-        os.environ["FAKE_CURSOR_ACT"] = "reply"
-        shared, before = providers.snapshot(worktree)
-        for _ in range(2):
-            providers.run(role, "Judge.", worktree, log, shared=shared)
-            assert Path(json.loads(seen.read_text())["cwd"]) == shared, "the call runs in the shared snapshot"
-        assert shared.exists() and providers.fingerprint(shared) == before, "the caller owns the snapshot; no write"
-        os.environ["FAKE_CURSOR_ACT"] = "write"
-        providers.run(role, "Judge.", worktree, log, shared=shared)
-        assert providers.fingerprint(shared) != before, "a write in the shared snapshot shows in its fingerprint"
-        assert (worktree / "app.py").read_text() == "print('changed by the writer')\n", "the worktree is untouched"
-        shutil.rmtree(shared)
-    check_access_flags()
+            assert "failed; see" in str(error)
+        os.environ.pop("FAKE_FAIL")
     print("providers test passed")
     return 0
 

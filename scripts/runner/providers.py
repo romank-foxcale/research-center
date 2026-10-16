@@ -3,12 +3,13 @@
 
 Copied from command_center_template@6489510 (scripts/council/providers.py), see
 docs/decisions/0003-read-only-agents.md. RC roles never write; web and connector reading are access levels.
+Runs on native Windows as well as POSIX (docs/decisions/0012-windows-native-uv.md): executables are resolved
+the way the shell would (codex -> codex.cmd), and agent output is read as UTF-8 whatever the console code page.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -19,9 +20,10 @@ from typing import Any, Callable
 
 
 # Must match the role checks in scripts/validate-research-center.py.
-PROVIDERS = ("claude", "codex", "cursor")
+PROVIDERS = ("claude", "codex")
 ACCESS_LEVELS = ("read-only", "web-read", "connector-read")
-BINARIES = {"claude": "claude", "codex": "codex", "cursor": "cursor-agent"}
+BINARIES = {"claude": "claude", "codex": "codex"}
+TEXT = {"text": True, "encoding": "utf-8", "errors": "replace"}
 
 # Claude Code: --tools is the hard set of tools the model can call, and dontAsk refuses every call that
 # --allowedTools does not list. No role gets Bash, Edit or Write: the runner persists what roles return.
@@ -40,13 +42,6 @@ CONNECTOR_TOOLS = {
     ],
 }
 
-# Cursor: --print allows writes, and its modes only ask the model to hold back. Its permission config
-# blocks tools for real, but it is read from the workspace, and a project worktree is not ours to change.
-# So a Cursor role runs in a throwaway copy of the worktree that carries this config (read-only only).
-CURSOR_DENY = {"permissions": {"allow": ["Read(**)"], "deny": ["Write(**)", "Shell(*)"]}}
-CURSOR_MODEL = re.compile(r"^(\S+) - ")
-
-
 # The Claude CLI cannot list models, so these are maintained here: aliases follow the newest model
 # of each tier, full ids pin one. Update when Anthropic releases models.
 CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"]
@@ -56,16 +51,19 @@ class ProviderError(RuntimeError):
     pass
 
 
+def executable(name: str) -> str:
+    """The path the shell would run for name. Windows does not apply PATHEXT to subprocess argv, so an npm
+    launcher such as codex.cmd is only found this way; a name that is not installed is returned as is."""
+    return shutil.which(name) or name
+
+
 def models(provider: str) -> list[str]:
     """Models a role can use with this provider; empty when the provider is not logged in."""
     if not login_status(provider)[0]:
         return []
     if provider == "claude":
         return list(CLAUDE_MODELS)
-    if provider == "cursor":
-        listed = subprocess.run(["cursor-agent", "models"], capture_output=True, text=True).stdout
-        return [match.group(1) for line in listed.splitlines() if (match := CURSOR_MODEL.match(line.strip()))]
-    result = subprocess.run(["codex", "debug", "models"], capture_output=True, text=True)
+    result = subprocess.run([executable("codex"), "debug", "models"], capture_output=True, **TEXT)
     try:
         catalog = json.loads(result.stdout)["models"]
     except (json.JSONDecodeError, KeyError, TypeError):
@@ -79,14 +77,8 @@ def login_status(provider: str) -> tuple[bool, str]:
         return False, f"unknown provider {provider}"
     if shutil.which(BINARIES[provider]) is None:
         return False, f"{BINARIES[provider]} CLI is not installed"
-    if provider == "cursor":
-        result = subprocess.run(["cursor-agent", "status"], capture_output=True, text=True)
-        line = next((line for line in result.stdout.splitlines() if "logged in" in line.lower()), "")
-        if result.returncode == 0 and line and "not logged in" not in line.lower():
-            return True, line.lstrip("✓ ").lower()
-        return False, "not logged in; run: cursor-agent login"
     if provider == "claude":
-        result = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True)
+        result = subprocess.run([executable("claude"), "auth", "status"], capture_output=True, **TEXT)
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
@@ -94,7 +86,7 @@ def login_status(provider: str) -> tuple[bool, str]:
         if data.get("loggedIn"):
             return True, f"logged in ({data.get('authMethod', '?')})"
         return False, "not logged in; run: claude auth login"
-    result = subprocess.run(["codex", "login", "status"], capture_output=True, text=True)
+    result = subprocess.run([executable("codex"), "login", "status"], capture_output=True, **TEXT)
     message = (result.stdout + result.stderr).strip().splitlines()
     if result.returncode == 0 and message and "logged in" in message[-1].lower():
         return True, message[-1].lower()
@@ -114,7 +106,7 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
             "--model", model,
             "--permission-mode", "dontAsk",
             "--no-session-persistence",
-            # Streamed events let ./rc watch show what the agent is doing while it works.
+            # Streamed events let rc watch show what the agent is doing while it works.
             "--output-format", "stream-json",
             "--verbose",
         ]
@@ -130,6 +122,8 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
         tools = CLAUDE_TOOLS[access]
         return [*base, "--strict-mcp-config", "--tools", *tools, "--allowedTools", *tools]
     if provider == "codex":
+        # On native Windows codex's read-only sandbox also blocks the commands it reads files with (probed
+        # 2026-10-16 with codex-cli 0.163.0), so codex roles work only on macOS, Linux and WSL for now.
         return [
             # --search turns on the native web_search tool; it is a top-level flag (probed with codex-cli 0.160.1).
             "codex", *(["--search"] if access == "web-read" else []), "exec",
@@ -145,78 +139,20 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
             "--output-last-message", str(last_message),
             "-",
         ]
-    if provider == "cursor":
-        if access != "read-only":
-            raise ProviderError(f"role {role.get('id')}: cursor roles can only be read-only (no web, no connectors)")
-        # No --force: shell stays off even if the permission config were missing. cwd is the snapshot.
-        return [
-            "cursor-agent",
-            "--print",
-            "--trust",
-            "--workspace", str(cwd),
-            "--model", model,
-            "--output-format", "stream-json",
-        ]
     raise ProviderError(f"unsupported provider: {provider}")
-
-
-def snapshot(worktree: Path) -> tuple[Path, dict[str, tuple[int, int]]]:
-    """A throwaway copy of what Git would commit in the worktree, with Cursor's deny config, and a
-    fingerprint of every file in it, so a write that slips through is detected afterwards."""
-    directory = Path(tempfile.mkdtemp(prefix="cc-cursor-"))
-    listed = subprocess.run(
-        ["git", "-C", str(worktree), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        capture_output=True, text=True,
-    )
-    names = listed.stdout.split("\0") if listed.returncode == 0 else [
-        str(path.relative_to(worktree)) for path in worktree.rglob("*") if path.is_file()
-    ]
-    for name in filter(None, names):
-        source = worktree / name
-        if source.is_file() and not source.is_symlink():
-            target = directory / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-    config = directory / ".cursor" / "cli.json"  # replaces a project's own config in the copy
-    config.parent.mkdir(exist_ok=True)
-    config.write_text(json.dumps(CURSOR_DENY), encoding="utf-8")
-    return directory, fingerprint(directory)
-
-
-def fingerprint(directory: Path) -> dict[str, tuple[int, int]]:
-    return {
-        str(path.relative_to(directory)): (path.stat().st_size, path.stat().st_mtime_ns)
-        for path in directory.rglob("*")
-        if path.is_file()
-    }
 
 
 def run(
     role: dict[str, Any], prompt: str, cwd: Path, log: Path, timeout: int = 3600, on_say: Callable[[str], None] | None = None,
-    shared: Path | None = None,
 ) -> str:
     """Run the role non-interactively in cwd; return its final message. The prompt goes on stdin.
 
     on_say receives what the agent says while it works; tool calls only go to the log.
-    shared: a snapshot() of cwd owned by the caller, for many Cursor calls on one worktree. The caller
-    then compares its fingerprint once after the last call and removes it.
     """
     available, detail = login_status(role["provider"])
     if not available:
         raise ProviderError(f"role {role['id']}: {role['provider']} {detail}")
-    if role["provider"] != "cursor":
-        return stream_call(role, prompt, cwd, log, timeout, on_say)
-    if shared is not None:
-        return stream_call(role, prompt, shared, log, timeout, on_say)
-    workspace, before = snapshot(cwd)
-    try:
-        reply = stream_call(role, prompt, workspace, log, timeout, on_say)
-        # Fail closed: a write that got past the permission config voids the reply.
-        if fingerprint(workspace) != before:
-            raise ProviderError(f"role {role['id']} (cursor {role['model']}) changed its read-only snapshot; see {log}")
-        return reply
-    finally:
-        shutil.rmtree(workspace, ignore_errors=True)
+    return stream_call(role, prompt, cwd, log, timeout, on_say)
 
 
 def stream_call(
@@ -226,27 +162,22 @@ def stream_call(
     last_message = log.with_suffix(".last.txt")
     argv = command(role, cwd, last_message)
     final = ""
-    parse = {"claude": parse_claude_event, "codex": parse_codex_event, "cursor": parse_cursor_event}[role["provider"]]
-    # Cursor's result joins every message, preambles included; the reply is what it said after its last tool call.
-    closing: list[str] = []
+    parse = {"claude": parse_claude_event, "codex": parse_codex_event}[role["provider"]]
     with log.open("w", encoding="utf-8") as stream:
         stream.write(f"$ {' '.join(argv)}\n\n")
         stream.flush()
-        process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stream, cwd=cwd, text=True)
+        process = subprocess.Popen([executable(argv[0]), *argv[1:]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=stream, cwd=cwd, **TEXT)
         timer = threading.Timer(timeout, process.kill)
         timer.start()
         try:
             process.stdin.write(prompt)
             process.stdin.close()
-            # Write activity as it happens: the log is what ./rc watch reports stalls from.
+            # Write activity as it happens: the log is what rc watch reports stalls from.
             for line in process.stdout:
                 event, activity = parse(line)
                 if event.get("type") == "result":
                     final = str(event.get("result", ""))
-                elif event.get("type") == "tool_call":
-                    closing = []
-                elif event.get("type") == "assistant":
-                    closing.append(message_text(event))
                 if on_say:
                     for said in activity.splitlines():
                         if said.startswith("say: "):
@@ -260,33 +191,11 @@ def stream_call(
         raise ProviderError(f"role {role['id']} ({role['provider']} {role['model']}) failed; see {log}")
     if role["provider"] == "codex":
         return last_message.read_text(encoding="utf-8").strip()
-    if role["provider"] == "cursor":
-        return "\n\n".join(text for text in closing if text.strip()).strip() or final.strip()
     return final.strip()
 
 
 def message_text(event: dict[str, Any]) -> str:
     return "".join(item.get("text", "") for item in event.get("message", {}).get("content", []) if item.get("type") == "text")
-
-
-def parse_cursor_event(line: str) -> tuple[dict[str, Any], str]:
-    """One `cursor-agent --print --output-format stream-json` line: the event, and a short activity line."""
-    try:
-        event = json.loads(line)
-    except json.JSONDecodeError:
-        return {}, line.strip()
-    kind = event.get("type")
-    if kind == "result":
-        return event, f"result: {event.get('subtype', 'done')}"
-    if kind == "tool_call" and event.get("subtype") == "started":
-        call = event.get("tool_call", {})
-        name = next((key for key in call if key.endswith("ToolCall")), "tool")
-        arguments = call.get(name, {}).get("args", {})
-        target = next((str(arguments[key]) for key in ("path", "command", "pattern", "globPattern") if key in arguments), "")
-        return event, f"tool: {name.removesuffix('ToolCall')} {target}".strip()[:200]
-    if kind == "assistant" and message_text(event).strip():
-        return event, "say: " + " ".join(message_text(event).split())[:160]
-    return event, ""
 
 
 def parse_claude_event(line: str) -> tuple[dict[str, Any], str]:
@@ -345,18 +254,18 @@ def main() -> int:
             work = Path(directory)
             (work / "existing.txt").write_text("unchanged\n", encoding="utf-8")
             prompt = (
-                "Create a file named probe.txt containing 'written' and overwrite existing.txt with "
-                "'changed'. Use any tool available. Then reply with exactly DONE or BLOCKED."
+                "Read existing.txt and quote it. Then create a file named probe.txt containing 'written' and overwrite "
+                "existing.txt with 'changed', with any tool available, a shell command included. Then reply with what worked."
             )
             try:
                 reply = run(role, prompt, work, work / "logs" / "probe.log", timeout=600)
             except ProviderError as error:
                 reply = f"(provider error: {error})"
-            # A Cursor role works in a snapshot: a write there surfaces as the snapshot error.
-            wrote = (work / "probe.txt").exists() or (work / "existing.txt").read_text() != "unchanged\n" \
-                or "changed its read-only snapshot" in reply
-            print(f"{sys.argv[2]} {sys.argv[3]} read-only: {'WROTE FILES' if wrote else 'no writes'}; reply: {reply[:120]}")
-            return 1 if wrote else 0
+            wrote = (work / "probe.txt").exists() or (work / "existing.txt").read_text() != "unchanged\n"
+            read = "unchanged" in reply
+            print(f"{sys.argv[2]} {sys.argv[3]}: {'WROTE FILES' if wrote else 'no writes'}, {'reads' if read else 'COULD NOT READ'}; "
+                  f"reply: {reply[:120]}")
+            return 1 if wrote or not read else 0
     print("usage: providers.py status | models | probe <provider> <model>", file=sys.stderr)
     return 2
 

@@ -39,6 +39,6 @@ Collection by web search alone favours whatever ranks well and misses scholarly 
 
 ## Consequences
 
-- `./rc sources list|search|related` works in the template and in instances, with no Nix closure (standard library only).
+- `./rc sources list|search|related` works in the template and in instances with the standard library only.
 - Evidence types are the vocabulary in `kit.py`; their reliability ceilings and half-lives live in `catalog/evidence-types.json` (docs/decisions/0010-evidence-grading.md).
 - page-watch fingerprints the whole visible page text, so pages with rotating content (banners, dates) change on every check. Narrowing to a page region is left until a topic needs it.

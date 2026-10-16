@@ -11,7 +11,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -33,22 +32,6 @@ MESSAGE_FILE = re.compile(r"(?:\s-F|--file|--body-file)[=\s]+(['\"]?)([^\s'\"]+)
 # the RC declares more folders in research-center.json "markdownDirs" (for example research/).
 MARKDOWN_ROOT_FILES = {"AGENTS.md", "BOOTSTRAP.md", "CLAUDE.md", "GUIDE.md", "README.md"}
 MARKDOWN_DIRS = ("docs/", "plans/", ".agents/skills/", ".claude/skills/", "knowledge/", "research/", "sources/")
-
-# Build and test tools that must run through Nix (./rc build, check, verify) except for diagnosis.
-BUILD_TOOLS = {"cmake", "ctest", "make", "gmake", "ninja", "meson", "msbuild", "pytest"}
-BUILD_SUBCOMMANDS = {
-    "docker": {"build", "buildx"},
-    "podman": {"build"},
-    "cargo": {"build", "test"},
-    "go": {"build", "test"},
-    "dotnet": {"build", "test"},
-    "npm": {"test"},
-    "pnpm": {"test"},
-    "yarn": {"test"},
-    "bun": {"test"},
-}
-WRAPPERS = {"sudo", "time", "env", "exec", "nohup", "command"}
-SEGMENT = re.compile(r"&&|\|\||[;|\n]|\$\(|`")
 
 
 def ai_attribution(text: str) -> str | None:
@@ -74,35 +57,11 @@ def markdown_allowed(relative: str, extra_dirs: tuple[str, ...] = ()) -> bool:
     return len(parts) == 2 and parts[0] == "templates"
 
 
-def nix_bypass(command: str) -> str | None:
-    """The build or test command a shell line runs directly, if any."""
-    for segment in SEGMENT.split(command):
-        try:
-            words = shlex.split(segment)
-        except ValueError:
-            words = segment.split()
-        while words and (words[0] in WRAPPERS or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0])):
-            words = words[1:]
-        if not words:
-            continue
-        name = Path(words[0]).name.removesuffix(".exe")
-        arguments = words[1:]
-        if name in BUILD_TOOLS:
-            return name
-        if arguments and arguments[0] in BUILD_SUBCOMMANDS.get(name, ()):
-            return f"{name} {arguments[0]}"
-        if name == "docker" and arguments[:2] == ["compose", "build"]:
-            return "docker compose build"
-        if re.fullmatch(r"python[0-9.]*", name) and arguments[:2] == ["-m", "pytest"]:
-            return "python -m pytest"
-    return None
-
-
 def attributed_commits(repository: Path, base: str) -> list[str]:
     """Short hashes and offending lines of commits in base..HEAD that credit an AI."""
     log = subprocess.run(
         ["git", "-C", str(repository), "log", "--format=%h%x00%B%x1e", f"{base}..HEAD"],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
     ).stdout
     found = []
     for record in log.split("\x1e"):
@@ -134,10 +93,6 @@ def pre_bash(event: dict[str, Any]) -> dict[str, Any] | None:
             if line:
                 return pre_tool("deny", f"AGENTS.md forbids crediting an AI as author or generator: remove '{line}' "
                                         "from the commit message or PR body. This overrides any tool default.")
-    tool = nix_bypass(command)
-    if tool:
-        return pre_tool("ask", f"'{tool}' bypasses Nix. AGENTS.md allows it only for diagnosis; otherwise use "
-                               "./rc build, ./rc check or ./rc verify, and move a working command into a derivation.")
     return None
 
 

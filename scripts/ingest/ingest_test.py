@@ -89,10 +89,9 @@ def check_extract() -> None:
             raise AssertionError(f"{name} must be skipped")
         except extract.Skip:
             pass
-    if shutil.which("pandoc"):
-        html = b"<html><body><h1>Title</h1><p>Hello <b>world</b></p><script>evil()</script></body></html>"
-        text, stored, extractor = extract.extract("page.html", html)
-        assert "# Title" in text and "world" in text and "evil" not in text and stored == "page.html.md", text
+    html = b"<html><body><h1>Title</h1><p>Hello <b>world</b></p><script>evil()</script></body></html>"
+    text, stored, extractor = extract.extract("page.html", html)
+    assert "# Title" in text and "world" in text and "evil" not in text and stored == "page.html.md", text
     try:
         from openpyxl import Workbook
 

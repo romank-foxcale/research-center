@@ -11,7 +11,7 @@ Research is only as good as its brief. Your job is to turn "research X" into que
 
 - If knowledge/profile/index.md exists, read it and the notes relevant to the topic. Skim knowledge/digests/ for the sources that matter.
 - If there is no profile, ask once whether the user wants to point the RC at their material first (the rc-ingest skill). If they decline, grill from scratch.
-- Never ask what the profile already answers. State it instead ("your API is Python on Nix, so I'll scope to tools that fit that. Right?") and let the user correct it.
+- Never ask what the profile already answers. State it instead ("your API is Python on AWS, so I'll scope to tools that fit that. Right?") and let the user correct it.
 
 ## 1. Create the topic
 

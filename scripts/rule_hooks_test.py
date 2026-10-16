@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 import rule_hooks
-from rule_hooks import ai_attribution, markdown_allowed, nix_bypass, post_edit, pre_bash, pre_edit, stop
+from rule_hooks import ai_attribution, markdown_allowed, post_edit, pre_bash, pre_edit, stop
 
 SCRIPT = Path(__file__).resolve().parent / "rule_hooks.py"
 
@@ -39,18 +39,6 @@ def check_attribution(base: Path) -> None:
     assert bash("git commit -F msg.txt", base) == "deny", "message file"
     assert bash('git commit -m "Fix parser"') is None
     assert bash(f"grep -rn '{trailer}' docs") is None, "not a commit"
-
-
-def check_nix_bypass() -> None:
-    for command, tool in (("cmake --build build", "cmake"), ("cd api && make test", "make"),
-                          ("CC=clang ninja -C out", "ninja"), ("docker build -t x .", "docker build"),
-                          ("docker compose build api", "docker compose build"), ("python3 -m pytest tests", "python -m pytest"),
-                          ("sudo /usr/bin/cmake ..", "cmake"), ("ls | pytest -q", "pytest"), ("npm test", "npm test")):
-        assert nix_bypass(command) == tool, (command, nix_bypass(command))
-        assert bash(command) == "ask", command
-    for command in ("./rc build api", "nix build .#api", "cmake-format CMakeLists.txt", "git log -- Makefile",
-                    "docker run --rm x", "npm install", "cat make.log", "echo 'cmake is banned'"):
-        assert nix_bypass(command) is None, (command, nix_bypass(command))
 
 
 def check_markdown_allowlist() -> None:
@@ -119,9 +107,9 @@ def check_notes_and_drift() -> None:
 
 
 def check_cli() -> None:
-    event = json.dumps({"tool_input": {"command": "cmake .."}})
+    event = json.dumps({"tool_input": {"command": 'git commit -m "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"'}})
     result = subprocess.run([sys.executable, str(SCRIPT), "pre-bash"], input=event.encode(), capture_output=True)
-    assert result.returncode == 0 and json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert result.returncode == 0 and json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
     allowed = subprocess.run([sys.executable, str(SCRIPT), "pre-bash"], input=b'{"tool_input": {"command": "ls"}}',
                              capture_output=True)
     assert allowed.returncode == 0 and allowed.stdout == b"", "silence lets the normal permission flow decide"
@@ -143,7 +131,6 @@ def check_attributed_commits(base: Path) -> None:
 
 
 def main() -> int:
-    check_nix_bypass()
     check_markdown_allowlist()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)

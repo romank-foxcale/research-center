@@ -19,9 +19,9 @@ First read `BOOTSTRAP.md`. Keep grilling until every step below is verified, not
    - A non-GitHub remote can't be checked. The user confirms it is private, and only then do you set `"privateRemoteConfirmed": true`.
    - No remote yet is allowed: nothing is published.
 6. **Logins and models**:
-   - `./rc doctor` shows Nix, gh and the claude, codex and cursor-agent logins. The RC stores no credentials.
+   - `./rc doctor` shows Python, git, uv, gh and the claude and codex logins. The RC stores no credentials.
    - `./rc settings` shows each role and its pipeline slot. Ask which subscriptions the user has. Move roles off a missing provider with `./rc roles set <role> --provider ... --model ...`.
-   - Researchers need web access (claude or codex). The connector reader needs claude. Cursor roles are read-only.
+   - Every default role runs on Claude (Opus and Sonnet). Codex roles work only on macOS, Linux or WSL, because its read-only sandbox cannot read files on native Windows. The connector reader needs claude.
    - Notion and Drive ingest need those claude.ai connectors to be connected for the user's Claude account (`claude mcp list`).
 7. **Budgets and limits**: agree `budget.ingestCalls`, `budget.researchCalls`, `budget.refreshCalls`, `ingest.maxSourceBytes`, `research.maxSourcesPerResearcher`, `research.resultsPerQuery` and `research.snowballDepth` (0 turns snowballing off). A run that hits a budget stops and can resume.
 8. **Sources**:

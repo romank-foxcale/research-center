@@ -62,7 +62,7 @@ def fake_page(url: str):
     if "dead" in url:
         raise extract.Skip("HTTP 404")
     page = PHASE.get("page") or PAGE
-    return f"{ingest.url_slug(url)}.md", f"Source: {url}\n\n# Paper\n\n{page}\n", "pandoc", page.encode()
+    return f"{ingest.url_slug(url)}.md", f"Source: {url}\n\n# Paper\n\n{page}\n", "markdownify", page.encode()
 
 
 def graded(evidence: str, grade: str) -> dict[str, str]:
@@ -102,7 +102,7 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                  {"text": "Hybrid retrieval is production ready.", "source": "S1", "questions": ["Q1"],
                                   "quote": "a sentence that is nowhere on the page at all, really",
                                   "via": "the authors' own benchmark table, https://www.example.org/paper/"}]})
-    if role_id == "researcher-gpt":
+    if role_id == "researcher-sonnet":
         # The first reply is malformed (a claim that is a bare string): a wrong shape is retried like a wrong answer.
         malformed = [] if retry else ["dense is better"]
         # Three web sources against a limit of 2 (EXTRA is dropped) plus an included record, which does not count.
@@ -131,7 +131,7 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
                                                {"claim": "C2", "ratings": {"H1": "C", "H2": "N"}}],
                                     "untested": ["Learned sparse retrieval alone"]}}]})
     if role_id.startswith("sceptic-"):
-        refute = role_id == "sceptic-grok"
+        refute = role_id == "sceptic-sonnet"
         update = [{"claim": "C5", "verdict": "HOLDS", "reason": "in the new trial's abstract"}] if PHASE["refresh"] else []
         return block({"claims": [{"claim": "C1", "verdict": "HOLDS", "reason": "on the page"},
                                  {"claim": "C2", "verdict": "REFUTED" if refute else "WEAK", "reason": "not on the page"},
@@ -283,7 +283,7 @@ def test_living(root: Path, topic: Path) -> None:
     first_claim = next(claim for claim in json.loads((topic / "claims.json").read_text(encoding="utf-8"))["claims"] if claim["id"] == "C1")
     assert first_claim["drifted"]["reason"] == "the page no longer contains the quote" and not first_claim["quoteVerified"]
     assert delta["material"] and [claim["id"] for claim in delta["drifted"]] == ["C1"] and CALLS.count("judge") == 1, (delta["summary"], CALLS)
-    assert sum(call.startswith("sceptic-") for call in CALLS) == 3, "drifted evidence the report rests on is re-critiqued"
+    assert sum(call.startswith("sceptic-") for call in CALLS) == 2, "drifted evidence the report rests on is re-critiqued"
     assert "- C1: drifted, the page no longer contains the quote" in (topic / "delta" / f"{rc.today()}-3.md").read_text(encoding="utf-8")
     stored = root / json.loads((topic / "claims.json").read_text(encoding="utf-8"))["sources"][0]["stored"]
     assert "results are now in the appendix" in stored.read_text(encoding="utf-8"), "the stored page is what was checked today"
@@ -460,7 +460,7 @@ def main() -> int:
 
         ledger = json.loads((topic / "claims.json").read_text())
         assert [source["url"] for source in ledger["sources"]] == [PAPER, DEAD, RECORD], "PAPER and BLOG merge into one source"
-        assert ledger["sources"][0]["foundBy"] == ["researcher-claude", "researcher-gpt"]
+        assert ledger["sources"][0]["foundBy"] == ["researcher-claude", "researcher-sonnet"]
         assert ledger["sources"][1]["stored"] is None and ledger["sources"][1]["fetch"].startswith("failed")
         assert ledger["sources"][2]["record"] == included[0]["id"] and ledger["sources"][2]["stored"] == included[0]["stored"]
         assert [claim["quoteVerified"] for claim in ledger["claims"]] == [True, False, False, True], \
@@ -481,14 +481,14 @@ def main() -> int:
         assert json.loads((root / "catalog" / "sources" / "web-retrieval.json").read_text())["origin"] == "research:retrieval"
 
         assert CALLS.count("analyst") == 2 and CALLS.count("reporter") == 2, f"one retry each: {CALLS}"
-        assert CALLS.count("researcher-gpt") == 2, f"a malformed reply is retried: {CALLS}"
+        assert CALLS.count("researcher-sonnet") == 2, f"a malformed reply is retried: {CALLS}"
         assert EXTRA not in json.dumps(ledger), "a source past the limit is dropped with its claim"
         assert "C99" in SEEN_PROMPTS["analyst"], "the retry names the problem"
 
         reviews = sorted(path.name for path in (topic / "critique").glob("*.json"))
-        assert reviews == ["review-a.json", "review-b.json", "review-c.json"], reviews
+        assert reviews == ["review-a.json", "review-b.json"], reviews
         mapping = json.loads((root / ".rc-local" / "research" / "retrieval" / "reviewers.json").read_text())
-        assert sorted(mapping.values()) == ["sceptic-claude", "sceptic-gpt", "sceptic-grok"]
+        assert sorted(mapping.values()) == ["sceptic-claude", "sceptic-sonnet"]
         judge_prompt = SEEN_PROMPTS["judge"]
         assert "## Review A" in judge_prompt and "sceptic-" not in judge_prompt.split("# Task", 1)[1], "the judge sees labels only"
 
@@ -547,14 +547,14 @@ def main() -> int:
         # The budget stops a run; finished stages stay.
         CALLS.clear()
         try:
-            quiet(research.run_research, root, "retrieval", "critique", 2)
+            quiet(research.run_research, root, "retrieval", "critique", 1)
             raise AssertionError("the budget must stop the run")
         except rc.BudgetExceeded:
             pass
         assert (topic / "analysis.md").is_file() and not (topic / "report.md").exists()
         # The sceptics that answered before the budget ran out are not paid for again.
         replies = root / ".rc-local" / "research" / "retrieval" / "replies"
-        assert len(list((replies / "critique").glob("*.json"))) == 2, list(replies.rglob("*"))
+        assert len(list((replies / "critique").glob("*.json"))) == 1, list(replies.rglob("*"))
         CALLS.clear()
         quiet(research.run_research, root, "retrieval", None, None)
         assert sum(call.startswith("sceptic-") for call in CALLS) == 1 and CALLS[-1] == "reporter", CALLS

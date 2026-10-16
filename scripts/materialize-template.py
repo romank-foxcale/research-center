@@ -96,7 +96,7 @@ def materialize(source: Path, target: Path) -> None:
         "plans/completed",
     ):
         (target / relative).mkdir(parents=True, exist_ok=True)
-        # Git drops empty directories, and Nix flakes only see tracked files.
+        # Git drops empty directories.
         (target / relative / ".gitkeep").touch()
 
     if not (target / ".git").exists():

@@ -2,7 +2,7 @@
 id: decision.0005-rule-hooks
 title: Claude Code hooks enforce the hard rules at tool-call time
 status: accepted
-summary: The CC's rule hooks are reused - AI attribution in commits and PRs is denied, Nix bypasses ask, stray Markdown is denied, notes are validated on edit and skill drift is reported on stop - with knowledge/, research/ and sources/ added as Markdown folders.
+summary: The CC's rule hooks are reused - AI attribution in commits and PRs is denied, stray Markdown is denied, notes are validated on edit and skill drift is reported on stop - with knowledge/, research/ and sources/ added as Markdown folders.
 verified_at: 2026-10-09
 evidence:
   - scripts/rule_hooks.py

@@ -10,7 +10,7 @@ Ingest is optional and repeatable. It turns sources into committed text (sources
 ## Steps
 
 1. **Collect what to point at.** Ask the user which sources hold their context, and offer the kinds:
-   - `folder`: local documents, PDFs, books, slides, article dumps. A Windows path is reachable from WSL as `/mnt/c/...`.
+   - `folder`: local documents, PDFs, books, slides, article dumps. Use the path as the system shows it: `C:\Users\me\Papers` on Windows, `/mnt/c/...` from WSL.
    - `git`: repos, as a local path or a clone URL.
    - `url`: one or more web pages or PDFs.
    - `notion`: page URLs, or `search:<query>`.

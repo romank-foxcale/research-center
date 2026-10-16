@@ -5,9 +5,7 @@
 /rc_template/
 
 # Local and derived artifacts.
-/result
-/result-*
-/.direnv/
+/.venv/
 /docs/.obsidian/
 __pycache__/
 

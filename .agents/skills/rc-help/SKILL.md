@@ -15,7 +15,7 @@ ingest (optional, repeatable) → grill → plan → search → screen → colle
 
 1. **Ingest** (rc-ingest, `./rc ingest`): point at folders, repos, URLs, Notion, Drive. Their text is committed, with secrets redacted, then digested and reduced into a cited profile.
 2. **Grill** (grill-research-topic, `./rc research new|accept`): turn a topic into an accepted brief. The profile answers whatever it can, so the user is only asked the rest.
-3. **Research** (rc-research, `./rc research run`): a source plan; Claude and GPT search the web in parallel and every cited page is stored with its quotes checked; an analysis; sceptics (Claude, GPT, Grok) try to disprove each claim; an anonymous judge settles them; the surviving ideas are fitted to the user's repos; a cited report comes out.
+3. **Research** (rc-research, `./rc research run`): a source plan; two researchers (Claude Opus and Sonnet) search the web in parallel and every cited page is stored with its quotes checked; an analysis; sceptics (Claude, GPT, Grok) try to disprove each claim; an anonymous judge settles them; the surviving ideas are fitted to the user's repos; a cited report comes out.
 4. **Handoff**: ideas ranked ADOPT or TRIAL become a Control Center task plan (research/<topic>/handoff.md). Code changes happen in a CC, never in the RC.
 
 ## User-facing skills

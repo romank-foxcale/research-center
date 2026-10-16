@@ -28,9 +28,9 @@
     "profiler": "profiler",
     "sourcePlanner": "source-planner",
     "screener": "screener",
-    "researchers": ["researcher-claude", "researcher-gpt"],
+    "researchers": ["researcher-claude", "researcher-sonnet"],
     "analyst": "analyst",
-    "sceptics": ["sceptic-claude", "sceptic-gpt", "sceptic-grok"],
+    "sceptics": ["sceptic-claude", "sceptic-sonnet"],
     "judge": "judge",
     "applier": "applier",
     "reporter": "reporter"

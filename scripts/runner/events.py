@@ -115,8 +115,21 @@ def ended(path: Path) -> bool:
 
 
 def alive(pid: int | None) -> bool:
+    """Whether the run's process still exists. On Windows os.kill(pid, 0) would terminate it, so the process is
+    opened and its exit code read instead."""
     if not pid:
         return True
+    if os.name == "nt":
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

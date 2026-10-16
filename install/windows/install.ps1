@@ -1,159 +1,116 @@
 <#
 .SYNOPSIS
-  Sets up the Research Center kit on Windows: WSL2 + Ubuntu, then Nix and the kit inside WSL.
+  Sets up the Research Center kit natively on Windows: git, GitHub CLI, uv, Claude Code and the kit itself.
 
 .DESCRIPTION
-  Safe to re-run. Each step checks what is already there and skips it.
-  Installing WSL needs administrator rights and may need a reboot; after the
-  reboot, run this script again and it continues where it stopped.
+  No WSL, no administrator rights. Safe to re-run: each step checks what is already there and skips it.
+  The kit is cloned to %USERPROFILE%\.rc-kit and rc-kit is put on your PATH (%USERPROFILE%\.local\bin).
+  Research Centers are created under %USERPROFILE%\Projects (rc-kit new <name>).
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File install\windows\install.ps1
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File install\windows\install.ps1 -Tools claude,codex,cursor,opencode
+  powershell -ExecutionPolicy Bypass -File install\windows\install.ps1 -Tools claude,codex
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File install\windows\install.ps1 -KitSource C:\path\to\research-center
 #>
 [CmdletBinding()]
 param(
-    [string]$Distro = "Ubuntu",
     [string]$KitRepo = "https://github.com/romank-foxcale/research-center.git",
     [string]$KitBranch = "main",
-    # For testing: copy the kit from a local Windows folder instead of cloning it.
+    # For testing: copy the kit from a local folder instead of cloning it.
     [string]$KitSource = "",
-    # Command-line AI tools to install inside WSL: claude, codex, cursor, opencode.
-    [string[]]$Tools = @()
+    # Command-line AI tools to install: claude (needed by every default role), codex.
+    [string[]]$Tools = @("claude")
 )
 
 $ErrorActionPreference = "Stop"
-# Without this, wsl.exe prints UTF-16 text that PowerShell cannot compare.
-$env:WSL_UTF8 = "1"
+$Kit = Join-Path $env:USERPROFILE ".rc-kit"
+$Bin = Join-Path $env:USERPROFILE ".local\bin"
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 function Write-Note([string]$Message) { Write-Host "    $Message" }
 function Write-Warn([string]$Message) { Write-Host "!!  $Message" -ForegroundColor Yellow }
 
-function Test-Admin {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    (New-Object Security.Principal.WindowsPrincipal $identity).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)
+# The PATH of a fresh process: tools installed a moment ago become visible without a new window.
+function Update-SessionPath {
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
 }
 
-# Runs a native command, dropping its error output. PowerShell 5.1 turns any
-# redirected stderr into a terminating error under ErrorActionPreference=Stop.
-function Invoke-Quiet([scriptblock]$Block) {
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try { & $Block 2>$null } finally { $ErrorActionPreference = $previous }
-}
-
-function Get-Distros {
-    $output = Invoke-Quiet { wsl.exe --list --quiet }
-    if ($LASTEXITCODE -ne 0) { return @() }
-    @($output | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-}
-
-function Invoke-Wsl([string]$Command) {
-    & wsl.exe -d $Distro -- bash -lc $Command
-    if ($LASTEXITCODE -ne 0) { throw "WSL command failed ($LASTEXITCODE): $Command" }
-}
-
-# 1. Windows version: WSL2 needs Windows 10 build 19041+ or Windows 11.
-Write-Step "Checking Windows"
-$build = [Environment]::OSVersion.Version.Build
-if ($build -lt 19041) {
-    throw "Windows build $build is too old for WSL2. Update Windows first (build 19041 or newer)."
-}
-Write-Note "Windows build $build OK"
-
-# 2. WSL itself and the Linux distribution.
-Write-Step "Checking WSL2 and $Distro"
-$wslReady = $false
-if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
-    Invoke-Quiet { wsl.exe --status } | Out-Null
-    $wslReady = ($LASTEXITCODE -eq 0)
-}
-if (-not $wslReady -or -not ((Get-Distros) -contains $Distro)) {
-    if (-not (Test-Admin)) {
-        Write-Warn "WSL or $Distro is missing. Installing it needs administrator rights."
-        Write-Note "Right-click PowerShell > 'Run as administrator', then run this script again."
-        exit 1
+function Install-WithWinget([string]$Command, [string]$PackageId, [string]$Label) {
+    if (Get-Command $Command -ErrorAction SilentlyContinue) { Write-Note "$Label found"; return }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        throw "$Label is missing and winget is not available. Install $Label yourself, then run this script again."
     }
-    Write-Note "Installing WSL2 with $Distro (this can take several minutes)"
-    Write-Note "If $Distro asks for a UNIX username and password, create them (the password stays invisible"
-    Write-Note "while you type), then type 'exit' to come back here."
-    # No --no-launch: on current WSL it can leave the distro unregistered.
-    & wsl.exe --install -d $Distro
-    if ($LASTEXITCODE -ne 0) { throw "wsl --install failed. See the message above." }
-    Write-Warn "If Windows asked for a reboot, reboot and run 'wsl --install -d $Distro' once more."
-    Write-Note "Then run this script again (no administrator rights needed the second time)."
-    exit 0
-}
-& wsl.exe --set-default-version 2 | Out-Null
-
-$version = (Invoke-Quiet { wsl.exe --list --verbose } | Where-Object { $_ -match "\b$([regex]::Escape($Distro))\b" }) -replace '.*\s(\d)\s*$', '$1'
-if ($version -eq "1") {
-    Write-Note "Converting $Distro from WSL1 to WSL2"
-    & wsl.exe --set-version $Distro 2
+    Write-Note "Installing $Label ($PackageId)"
+    & winget install --id $PackageId --exact --silent --accept-package-agreements --accept-source-agreements --scope user
+    if ($LASTEXITCODE -ne 0) {
+        # Some packages only offer a machine-wide installer.
+        & winget install --id $PackageId --exact --silent --accept-package-agreements --accept-source-agreements
+    }
+    Update-SessionPath
+    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
+        throw "$Label did not install. Open a new PowerShell window and run this script again."
+    }
 }
 
-# 3. The distro must have a normal user; Nix and the tools must not run as root.
-$linuxUser = (Invoke-Quiet { wsl.exe -d $Distro -- whoami } | Select-Object -First 1)
-if (-not $linuxUser -or $linuxUser.Trim() -eq "root") {
-    Write-Warn "$Distro has no regular Linux user yet."
-    Write-Note "Run 'wsl -d $Distro', create a user and password, type 'exit', and run this script again."
-    exit 1
-}
-Write-Note "$Distro is ready (user: $($linuxUser.Trim()))"
+# 1. The tools every RC needs.
+Write-Step "Checking git, GitHub CLI and uv"
+Install-WithWinget "git" "Git.Git" "Git for Windows"
+Install-WithWinget "gh" "GitHub.cli" "GitHub CLI"
+Install-WithWinget "uv" "astral-sh.uv" "uv"
 
-# 4. Clone or update the kit inside the Linux filesystem, never under /mnt/c.
-Write-Step "Getting the Research Center kit inside WSL (~/.rc-kit)"
-Invoke-Wsl "command -v git >/dev/null || (sudo apt-get update && sudo apt-get install -y git)"
+# 2. AI command-line tools, from their official installers.
+Write-Step "Checking AI command-line tools ($($Tools -join ', '))"
+foreach ($tool in $Tools) {
+    switch ($tool) {
+        "claude" {
+            if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Note "Claude Code found" }
+            else { Write-Note "Installing Claude Code"; Invoke-RestMethod https://claude.ai/install.ps1 | Invoke-Expression; Update-SessionPath }
+        }
+        "codex" {
+            if (Get-Command codex -ErrorAction SilentlyContinue) { Write-Note "Codex CLI found" }
+            elseif (Get-Command npm -ErrorAction SilentlyContinue) { Write-Note "Installing Codex CLI"; & npm install -g @openai/codex; Update-SessionPath }
+            else { Write-Warn "Codex CLI needs Node.js (npm); skipped" }
+            Write-Warn "Codex's read-only sandbox cannot read files on native Windows yet, so the default roles do not use it."
+        }
+        default { Write-Warn "Unknown tool '$tool' skipped (known: claude, codex)" }
+    }
+}
+
+# 3. The kit: a clone of the template that rc-kit creates Research Centers from.
+Write-Step "Getting the Research Center kit ($Kit)"
 if ($KitSource) {
-    # Copies the folder as-is, including uncommitted changes, replacing any previous kit.
-    if (-not (Test-Path (Join-Path $KitSource "install\rc-kit"))) { throw "$KitSource is not a kit folder" }
-    $linuxSource = (& wsl.exe -d $Distro -- wslpath -a ((Resolve-Path $KitSource).Path -replace '\\', '/')).Trim()
-    Write-Note "Copying the kit from $KitSource"
-    Invoke-Wsl "rm -rf ~/.rc-kit && cp -r '$linuxSource' ~/.rc-kit && git -C ~/.rc-kit config core.fileMode false"
+    if (-not (Test-Path (Join-Path $KitSource "install\rc_kit.py"))) { throw "$KitSource is not a kit folder" }
+    if (Test-Path $Kit) { Remove-Item -Recurse -Force $Kit }
+    Copy-Item -Recurse $KitSource $Kit
+    Write-Note "Copied from $KitSource"
+} elseif (Test-Path (Join-Path $Kit ".git")) {
+    & git -C $Kit pull --ff-only
+    if ($LASTEXITCODE -ne 0) { throw "Updating the kit failed. See the message above." }
 } else {
-    Invoke-Wsl ("if [ -d ~/.rc-kit/.git ]; then git -C ~/.rc-kit pull --ff-only; " +
-        "else git clone --branch '$KitBranch' '$KitRepo' ~/.rc-kit; fi")
+    & git clone --branch $KitBranch $KitRepo $Kit
+    if ($LASTEXITCODE -ne 0) { throw "Cloning the kit failed. See the message above." }
 }
+Write-Note "Preparing the kit's Python environment"
+& uv sync --project $Kit --frozen --quiet
+if ($LASTEXITCODE -ne 0) { throw "uv could not prepare the kit's environment. See the message above." }
 
-# 5. Everything else happens inside Linux. sudo will ask for the Linux password.
-Write-Step "Running the Linux installer inside $Distro"
-$toolArgument = if ($Tools.Count) { "--tools " + ($Tools -join ",") } else { "" }
-$linuxInstall = "~/.rc-kit/install/install.sh $toolArgument"
-& wsl.exe -d $Distro -- bash -lc $linuxInstall
-if ($LASTEXITCODE -eq 10) {
-    # install.sh turned on systemd, which only takes effect after WSL restarts.
-    Write-Note "Restarting WSL to turn on systemd"
-    & wsl.exe --shutdown
-    & wsl.exe -d $Distro -- bash -lc $linuxInstall
+# 4. rc-kit on PATH.
+Write-Step "Putting rc-kit on your PATH ($Bin)"
+New-Item -ItemType Directory -Force -Path $Bin | Out-Null
+Set-Content -Path (Join-Path $Bin "rc-kit.cmd") -Encoding ASCII -Value "@call `"$Kit\install\rc-kit.cmd`" %*"
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (-not (($userPath -split ";") -contains $Bin)) {
+    [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(";") + ";" + $Bin), "User")
+    Write-Note "Added $Bin to your user PATH (new windows see it)"
 }
-if ($LASTEXITCODE -ne 0) { throw "The Linux installer failed. Read the message above, fix it, and run this script again." }
+Update-SessionPath
 
-# 6. Windows-side editors: make sure they can open folders inside WSL.
-Write-Step "Checking editors and AI apps on Windows"
-if (Get-Command code -ErrorAction SilentlyContinue) {
-    & code --install-extension ms-vscode-remote.remote-wsl --force | Out-Null
-    Write-Note "VS Code: WSL extension installed"
-} else {
-    Write-Note "VS Code: not found (optional)"
-}
-if (Get-Command cursor -ErrorAction SilentlyContinue) {
-    Invoke-Quiet { cursor --install-extension anysphere.remote-wsl --force } | Out-Null
-    Write-Note "Cursor: WSL extension installed"
-} else {
-    Write-Note "Cursor: not found (optional)"
-}
-# Newer builds install as an app package; older ones as a per-user folder.
-$claudeDesktop = [bool](Get-AppxPackage -Name "Claude" -ErrorAction SilentlyContinue) -or
-    (Test-Path "$env:LOCALAPPDATA\AnthropicClaude")
-Write-Note ("Claude desktop: " + $(if ($claudeDesktop) { "found" } else { "not found (optional)" }))
+Write-Step "Checking the setup"
+& (Join-Path $Bin "rc-kit.cmd") doctor
 
 Write-Step "Done"
-Write-Note "Create your first Research Center inside WSL:"
-Write-Host  "      wsl -d $Distro"
+Write-Note "Log in where doctor says so (gh auth login, claude), then create your first Research Center:"
 Write-Host  "      rc-kit new my-project"
-Write-Note "Then open it in your AI tool. See GUIDE.md in the kit for each tool."
+Write-Note "and open it in your AI tool: rc-kit open my-project claude (or code). See GUIDE.md in the kit."

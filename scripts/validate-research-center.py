@@ -28,7 +28,7 @@ _spec.loader.exec_module(_knowledge)
 def parse_frontmatter(text: str) -> tuple[dict[str, str], dict[str, list[str]]]:
     return _knowledge.parse_frontmatter(Path("note.md"), text)
 
-PROVIDERS = ("claude", "codex", "cursor")
+PROVIDERS = ("claude", "codex")
 # The same lifecycle as a Control Center's control-center.json; rc-kit list shows it.
 STATUSES = ("discovery", "adapting", "ready")
 ACCESS = ("read-only", "web-read", "connector-read")
@@ -79,8 +79,6 @@ def check_role(root: Path, path: Path, role: dict[str, Any], errors: list[str]) 
         errors.append(f"{name}: access must be one of {ACCESS}")
     if not role.get("model"):
         errors.append(f"{name}: model is empty")
-    if role.get("provider") == "cursor" and role.get("access") != "read-only":
-        errors.append(f"{name}: cursor roles can only be read-only")
     if role.get("access") == "connector-read":
         if role.get("provider") != "claude":
             errors.append(f"{name}: only claude roles can read connectors")
