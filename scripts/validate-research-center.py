@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "ingest"), str(HERE / "runner"), str(HERE / "sources")]
 import kit  # noqa: E402
 import secrets_scan  # noqa: E402
+import usecases  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("validate_knowledge", HERE / "validate-knowledge.py")
 _knowledge = importlib.util.module_from_spec(_spec)
@@ -53,7 +54,7 @@ NUMBERS = {
 COUNTS = ("snowballDepth", "snowballSeeds", "snowballPerSeed")  # optional; 0 is allowed
 GRADES = ("A", "B", "C", "D", "E", "F")
 CERTAINTIES = ("very low", "low", "moderate", "high")
-DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources")
+DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "usecases")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 ADAPTER_FIELDS = {"schemaVersion": int, "id": str, "module": str, "family": str, "covers": str, "evidenceTypes": list,
@@ -240,6 +241,21 @@ def check_reports(root: Path, errors: list[str]) -> None:
                 errors.append(f"{name}/report.md: relies on {claim}, judged {verdicts[claim]}")
 
 
+def check_use_case(root: Path, space: Path, errors: list[str]) -> None:
+    """A use case names itself after its folder and has a scope; an accepted scope has every section filled."""
+    name = space.relative_to(root).as_posix()
+    meta = load(space / "usecase.json", errors, root)
+    if not isinstance(meta, dict) or meta.get("id") != space.name or not meta.get("title"):
+        errors.append(f"{name}/usecase.json: id must equal the folder name, with a title")
+    scope = space / "scope.md"
+    if not scope.is_file():
+        errors.append(f"{name}/scope.md is missing")
+        return
+    text = scope.read_text(encoding="utf-8")
+    if re.search(r"^Status:\s*accepted", text, flags=re.MULTILINE):
+        errors += [f"{name}/scope.md: {problem}" for problem in usecases.scope_problems(text)]
+
+
 def validate(root: Path) -> list[str]:
     errors: list[str] = []
     settings_path = root / "research-center.json"
@@ -250,10 +266,16 @@ def validate(root: Path) -> list[str]:
         check_adapters(root, root / "catalog" / "adapters", errors)
         if (root / "catalog" / "evidence-types.json").is_file():
             check_evidence_types(root, root / "catalog" / "evidence-types.json", errors)
-        check_sources(root, errors)
-        check_notes(root, errors)
-        check_reports(root, errors)
-        errors += secrets_scan.scan(root, ["sources", "knowledge", "research", "catalog"])
+        errors += secrets_scan.scan(root, ["catalog"])
+        # The instance root holds data when it has no use cases; every use case holds its own (ADR 0013).
+        for space in [root, *sorted(path.parent for path in (root / "usecases").glob("*/usecase.json"))]:
+            if space != root:
+                check_use_case(root, space, errors)
+            check_sources(space, errors)
+            check_notes(space, errors)
+            check_reports(space, errors)
+            errors += [f"{space.relative_to(root).as_posix()}/{error}" if space != root else error
+                       for error in secrets_scan.scan(space, ["sources", "knowledge", "research", "catalog/sources"])]
     else:
         template = load(root / "templates" / "research-center.json", errors, root)
         if isinstance(template, dict):

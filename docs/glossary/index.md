@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, pack, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, competing hypotheses matrix, diagnostic claim, key assumption, assessment, handoff.
+summary: Terms of the Research Center - use case, scope, instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, pack, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, competing hypotheses matrix, diagnostic claim, key assumption, assessment, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -13,6 +13,8 @@ relations:
 
 # Glossary
 
+- **Use case**: a scoped part of an instance (usecases/&lt;id&gt;/) with its own scope, sources, profile and research; config is shared by the instance.
+- **Scope**: a use case's scope.md: whom it serves, products and plug-in points, hard constraints, how value is measured, out of scope, scouting lens, source preferences. Research runs only against an accepted scope.
 - **Instance**: a private repo made from the template with `./rc bootstrap install`. Only an instance holds data.
 - **Source**: something ingested (folder, git, url, notion, gdrive), described in catalog/sources/&lt;id&gt;.json and stored as text in sources/&lt;id&gt;/.
 - **Digest**: one source's key facts, open problems and terms, every bullet cited.

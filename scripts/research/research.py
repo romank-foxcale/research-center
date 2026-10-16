@@ -110,7 +110,7 @@ NEGATIONS = frozenset({"not", "no", "never", "none", "nor", "without", "cannot",
 
 def evidence_types(root: Path) -> dict[str, dict[str, Any]]:
     """The instance's evidence types (catalog/evidence-types.json), or the template's defaults."""
-    path = root / "catalog" / "evidence-types.json"
+    path = rc.instance(root) / "catalog" / "evidence-types.json"
     if not path.is_file():
         path = HERE.parent.parent / "templates" / "evidence-types.json"
     return {item["id"]: item for item in rc.load_json(path)["types"]}
@@ -317,7 +317,7 @@ def command_new(root: Path, args: argparse.Namespace) -> None:
     directory = topic_dir(root, args.topic)
     if directory.exists():
         raise rc.RcError(f"topic already exists: {args.topic}")
-    template = (root / "templates" / "brief.md").read_text(encoding="utf-8")
+    template = (rc.instance(root) / "templates" / "brief.md").read_text(encoding="utf-8")
     title = " ".join(args.title.split())
     rc.write_text(directory / "brief.md", template.replace("<topic-id>", args.topic).replace("<title>", title))
     print(f"created research/{args.topic}/brief.md; fill it with the grill-research-topic skill, then ./rc research accept {args.topic}")
@@ -376,9 +376,22 @@ def command_show(root: Path, args: argparse.Namespace) -> None:
 # Shared context -------------------------------------------------------------------------------------------
 
 
+def require_scope(root: Path) -> None:
+    """Research in a use case runs only against its accepted scope: the scope is what the results are judged by."""
+    scope = root / "scope.md"
+    if (root / "usecase.json").is_file() and (not scope.is_file() or brief_status(scope.read_text(encoding="utf-8")) != "accepted"):
+        raise rc.RcError(f"the scope of use case {root.name} is not accepted; finish usecases/{root.name}/scope.md "
+                         f"(grill-use-case skill), then rc usecase accept {root.name}")
+
+
 def context(root: Path, topic: str) -> str:
-    """What every research role reads first: the brief, the profile, and the ingested sources."""
-    lines = [f"Topic: {topic}. Brief: research/{topic}/brief.md (read it first)."]
+    """What every research role reads first: the use case's scope, the brief, the profile, and the ingested sources."""
+    lines = []
+    if (root / "scope.md").is_file():
+        lines.append("Use case scope: scope.md (read it first). It says whom this research serves, their products and the "
+                     "components a new technology could plug into, the hard constraints every recommendation must meet, "
+                     "and how value is measured.")
+    lines.append(f"Topic: {topic}. Brief: research/{topic}/brief.md (read it first).")
     if (root / "knowledge" / "profile" / "index.md").is_file():
         lines.append("Profile of the user or company: knowledge/profile/index.md and the notes it links.")
     else:
@@ -1301,7 +1314,7 @@ def handoff(root: Path, topic: str, chosen: list[dict[str, Any]], names: dict[st
     The RC never writes into a CC: the user copies this into the CC's plans/active and grills it there."""
     title = (topic_dir(root, topic) / "brief.md").read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
     plan_id = f"rc-{topic}"[:60].strip("-")
-    text = (root / "templates" / "task-plan.md").read_text(encoding="utf-8")
+    text = (rc.instance(root) / "templates" / "task-plan.md").read_text(encoding="utf-8")
     text = text.replace("<task-id>", plan_id).replace("<outcome>", f"apply the research '{title}'")
 
     def fill(heading: str, body: str) -> None:
@@ -1436,6 +1449,7 @@ def clear_from(root: Path, topic: str, stage: str, keep_replies: bool = False) -
 
 def run_research(root: Path, topic: str, start: str | None, budget: int | None) -> int:
     config = rc.settings(root)
+    require_scope(root)
     directory = topic_dir(root, topic)
     text = (directory / "brief.md").read_text(encoding="utf-8")
     if brief_status(text) == "retired":

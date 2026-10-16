@@ -5,6 +5,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 ## Triggers
 
 - Create, set up, configure or migrate an RC: read `BOOTSTRAP.md`, load `grill-rc-bootstrap`, determine the mode (`new` or `migration`), and keep grilling until the state is verifiable.
+- Create a use case or write its scope (a company, a product line, a personal area): load `grill-use-case`.
 - Point the RC at folders, repos, URLs, Notion or Drive, or refresh the profile: load `rc-ingest`.
 - Research a subject, start a topic, "do an AI search on X": load `grill-research-topic`, then `rc-research`.
 - Run, follow or explain research: load `rc-research`.
@@ -14,7 +15,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 
 1. Read `docs/index.md`, and only the notes relevant to the task.
 2. Run `./rc help` for the executable interface, and `./rc doctor` for logins.
-3. In an instance, read `knowledge/profile/index.md` before asking the user anything about themselves.
+3. In an instance, work inside a use case (`./rc usecase list`, `./rc -u <id> ...`): read its `scope.md` and `knowledge/profile/index.md` before asking the user anything about themselves.
 
 ## Sources of truth
 

@@ -31,7 +31,7 @@ MESSAGE_FILE = re.compile(r"(?:\s-F|--file|--body-file)[=\s]+(['\"]?)([^\s'\"]+)
 # Markdown the RC may track outside the knowledge folders. Everything else belongs in a note, unless
 # the RC declares more folders in research-center.json "markdownDirs" (for example research/).
 MARKDOWN_ROOT_FILES = {"AGENTS.md", "BOOTSTRAP.md", "CLAUDE.md", "GUIDE.md", "README.md"}
-MARKDOWN_DIRS = ("docs/", "plans/", ".agents/skills/", ".claude/skills/", "knowledge/", "research/", "sources/")
+MARKDOWN_DIRS = ("docs/", "plans/", ".agents/skills/", ".claude/skills/", "knowledge/", "research/", "sources/", "usecases/")
 
 
 def ai_attribution(text: str) -> str | None:

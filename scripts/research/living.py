@@ -233,6 +233,7 @@ def screen_new(session: rc.Session, root: Path, topic: str, fresh: list[dict[str
 
 def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]:
     """Refresh one living topic; returns the delta it wrote."""
+    research.require_scope(root)
     directory = research.topic_dir(root, topic)
     text = (directory / "brief.md").read_text(encoding="utf-8")
     status = research.brief_status(text)

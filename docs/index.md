@@ -31,6 +31,7 @@ relations:
 - [0010 Evidence grading and staleness](decisions/0010-evidence-grading.md)
 - [0011 Competing hypotheses, assumptions and calibrated language](decisions/0011-structured-analysis.md)
 - [0012 Windows-native through uv and Python, Claude-only roles](decisions/0012-windows-native-uv.md)
+- [0013 Use cases with their own scope, sources and research](decisions/0013-use-case-scopes.md)
 
 ## Rules
 

@@ -3,11 +3,12 @@
 An AI research assistant you run with your own Claude subscription, natively on Windows (or macOS and Linux), on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
 
 ```text
-ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
+use case (scope) → ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
 ```
 
 | Stage | What happens | Output |
 | --- | --- | --- |
+| use case | A scope for whom the research serves: their products and where new technology could plug in, hard constraints, how value is measured. Each use case keeps its own sources and research | `usecases/<id>/scope.md` |
 | ingest | Folders, repos, URLs, Notion and Drive become committed text (secrets redacted), one digest per source, and a cited profile of you or your company | `sources/`, `knowledge/` |
 | grill | An agent turns your topic into numbered questions, scope, needs and success criteria, asking only what your profile cannot answer | `research/<topic>/brief.md` |
 | plan | Hypotheses, a disconfirming search for each, adapter queries per question, exclusion criteria | `source-plan.md` |
@@ -77,6 +78,8 @@ This template is public and holds no data. Your RC commits the text of everythin
 
 ```text
 ./rc doctor                                   logins and tools
+./rc usecase new acme --title "Acme's products"   then the grill-use-case skill writes its scope
+./rc -u acme ingest add ...                   work inside a use case (or set defaultUseCase)
 ./rc ingest add git https://github.com/org/api --note "our main API"
 ./rc ingest add folder /mnt/c/Users/me/Papers --include '*.pdf'
 ./rc ingest add notion https://www.notion.so/... --depth 2

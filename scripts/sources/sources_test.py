@@ -255,9 +255,8 @@ def test_packs_and_own_adapters() -> None:
         raises(ValueError, sources.set_pack, root, "astrology", True)
         # A folder without research-center.json is the template: packs are enabled only in instances. (Not REPO
         # itself: this test also runs inside instances, where enabling would change the instance.)
-        template_like = Path(directory) / "template"
-        template_like.mkdir()
-        raises(ValueError, sources.set_pack, template_like, "medicine", True)
+        with tempfile.TemporaryDirectory() as elsewhere:  # outside the instance: a folder inside it belongs to it
+            raises(ValueError, sources.set_pack, Path(elsewhere), "medicine", True)
 
         written = sources.scaffold(root, "city-council", "regulatory", "regulation")
         assert [path.name for path in written] == ["city-council.json", "city_council.py", "city-council.fixture.json"]

@@ -66,22 +66,32 @@ def write_text(path: Path, text: str) -> list[dict[str, Any]]:
     return found
 
 
+def instance(path: Path) -> Path:
+    """The instance a data root belongs to: the nearest folder upward with research-center.json. A use case
+    (usecases/<id>/) is a data root inside its instance; settings, roles, adapters, templates and skills are the
+    instance's (docs/decisions/0013-use-case-scopes.md). Without one, the path itself (the template)."""
+    for candidate in (path, *path.parents):
+        if (candidate / SETTINGS).is_file():
+            return candidate
+    return path
+
+
 def settings(root: Path) -> dict[str, Any]:
-    path = root / SETTINGS
+    path = instance(root) / SETTINGS
     if not path.is_file():
         raise RcError(f"{SETTINGS} is missing: this is the template, not an instance; create one with rc-kit new <name> (or ./rc bootstrap install <dir>)")
     return load_json(path)
 
 
 def role(root: Path, identifier: str) -> dict[str, Any]:
-    path = root / "catalog" / "agents" / f"{identifier}.json"
+    path = instance(root) / "catalog" / "agents" / f"{identifier}.json"
     if not path.is_file():
-        raise RcError(f"role {identifier}: {path.relative_to(root)} is missing")
+        raise RcError(f"role {identifier}: catalog/agents/{identifier}.json is missing")
     return load_json(path)
 
 
 def skill_text(root: Path, name: str) -> str:
-    text = (root / ".agents" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+    text = (instance(root) / ".agents" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
     return re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.DOTALL).strip()
 
 

@@ -30,13 +30,23 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "adapters"), str(HERE.parent / "runner")]
 import kit  # noqa: E402
 
+
+def instance(root: Path) -> Path:
+    """The instance a data root (an instance, or a use case inside one) belongs to; adapters are shared by the
+    whole instance. Without research-center.json above, the path itself (the template)."""
+    for candidate in (root, *root.parents):
+        if (candidate / "research-center.json").is_file():
+            return candidate
+    return root
+
 ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 DEFAULT_LIMIT = 20
 
 
 def adapters_dir(root: Path) -> Path:
     """An instance's own catalog; the template's defaults when run in the template itself."""
-    return root / "catalog" / "adapters" if (root / "research-center.json").is_file() else root / "templates" / "adapters"
+    base = instance(root)
+    return base / "catalog" / "adapters" if (base / "research-center.json").is_file() else base / "templates" / "adapters"
 
 
 def descriptors(root: Path) -> dict[str, dict[str, Any]]:
@@ -58,7 +68,7 @@ def module(spec: dict[str, Any], root: Path | None = None):
         raise ValueError(f"adapter {spec['id']}: module {spec['module']!r} is not a plain module name")
     if (HERE / "adapters" / f"{spec['module']}.py").is_file() or root is None:
         return importlib.import_module(spec["module"])
-    path = root / "catalog" / "adapters" / "code" / f"{spec['module']}.py"
+    path = instance(root) / "catalog" / "adapters" / "code" / f"{spec['module']}.py"
     if not path.is_file():
         raise ValueError(f"adapter {spec['id']}: no module {spec['module']} in scripts/sources/adapters or catalog/adapters/code")
     loaded = importlib.util.spec_from_file_location(f"rc_adapter_{spec['module']}", path)
@@ -84,7 +94,7 @@ def packs() -> dict[str, dict[str, Any]]:
 
 
 def instance_only(root: Path) -> None:
-    if not (root / "research-center.json").is_file():
+    if not (instance(root) / "research-center.json").is_file():
         raise ValueError("this changes an instance's catalog/adapters; run it in an instance, not the template")
 
 
@@ -117,7 +127,7 @@ def scaffold(root: Path, identifier: str, family: str, evidence: str) -> list[Pa
         raise ValueError(f"{identifier} is already an adapter id or module name")
     if family not in kit.FAMILIES or evidence not in kit.EVIDENCE_TYPES:
         raise ValueError(f"family must be one of {kit.FAMILIES} and the evidence type one of {kit.EVIDENCE_TYPES}")
-    code = root / "catalog" / "adapters" / "code"
+    code = instance(root) / "catalog" / "adapters" / "code"
     code.mkdir(parents=True, exist_ok=True)
     written = []
     for source, target in (("adapter.json", adapters_dir(root) / f"{identifier}.json"), ("adapter.py", code / f"{name}.py"),
@@ -131,7 +141,7 @@ def scaffold(root: Path, identifier: str, family: str, evidence: str) -> list[Pa
 
 
 def fixture_path(root: Path, identifier: str) -> Path:
-    own = root / "catalog" / "adapters" / "code" / f"{identifier}.fixture.json"
+    own = instance(root) / "catalog" / "adapters" / "code" / f"{identifier}.fixture.json"
     return own if own.is_file() else HERE / "fixtures" / f"{identifier}.fixture.json"
 
 
@@ -179,7 +189,7 @@ def run_fixture(root: Path, identifier: str) -> list[str]:
 def options(root: Path, spec: dict[str, Any]) -> dict[str, Any]:
     """What an adapter may know: its rate limit, its key from the environment, and the polite-pool contact
     email only when the user set research.contactEmail. Nothing else of the instance reaches a third party."""
-    settings_path = root / "research-center.json"
+    settings_path = instance(root) / "research-center.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
     found = {"interval": float(spec.get("rateLimit", 1.0)), "contactEmail": settings.get("research", {}).get("contactEmail") or None}
     if spec.get("needsKeyEnv"):

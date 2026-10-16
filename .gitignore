@@ -1,5 +1,5 @@
 # Local run state: event streams, agent logs, reviewer mappings, git clone cache. Never committed.
-/.rc-local/
+.rc-local/
 
 # The temporary template clone used to create or migrate an RC (see BOOTSTRAP.md).
 /rc_template/
