@@ -3,9 +3,10 @@ name = "research-center"
 version = "0.2.0"
 description = "Research Center: ingest what you know, grill a topic, research it with critiqued, cited evidence"
 requires-python = ">=3.12"
-# Document conversion only; everything else is the standard library. Permissive licences only (no AGPL).
+# Document conversion and report rendering only; everything else is the standard library. Permissive licences only (no AGPL).
 dependencies = [
     "mammoth>=1.8",        # DOCX -> HTML (BSD-2-Clause)
+    "markdown-it-py>=3.0", # Markdown -> HTML for rc report, raw HTML escaped (MIT)
     "markdownify>=0.13",   # HTML -> Markdown (MIT)
     "openpyxl>=3.1",       # XLSX (MIT)
     "pypdfium2>=4.30",     # PDF text (Apache-2.0 / BSD-3-Clause)

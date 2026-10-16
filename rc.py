@@ -20,7 +20,7 @@ SCRIPTS = ROOT / "scripts"
 
 USAGE = """Usage: rc [-u <use case>] <command> [arguments]
 
-Use cases: ingest, research and watch work on one use case (usecases/<id>/), chosen with -u <id>, else RC_USE_CASE,
+Use cases: ingest, research, report and watch work on one use case (usecases/<id>/), chosen with -u <id>, else RC_USE_CASE,
 else defaultUseCase in research-center.json, else the only one there is. Everything else is the whole instance.
 
 Commands:
@@ -38,6 +38,7 @@ Commands:
   research run <topic> [--from plan|search|screen|collect|analyze|critique|judge|apply|report] [--budget N]
   research refresh <topic> | refresh --due [--budget N]  Re-search a living topic; write research/<topic>/delta/<date>.md
   research pause|resume|retire <topic>
+  report <topic> [--output F]  A topic as one self-contained HTML page (.rc-local/reports/<topic>.html)
   sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward
   sources packs | enable <pack> | disable <pack> | new <adapter> --family F --evidence-type T | test [<adapter>]
   watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result
@@ -58,6 +59,7 @@ CHECKS = [
     ("extract test", ["ingest/extract_test.py"]),
     ("ingest test", ["ingest/ingest_test.py"]),
     ("research test", ["research/research_test.py"]),
+    ("report test", ["report/report_test.py"]),
     ("sources test", ["sources/sources_test.py"]),
     ("upgrade test", ["upgrade_instance_test.py"]),
     ("use cases test", ["usecases_test.py"]),
@@ -66,10 +68,10 @@ CHECKS = [
 SCRIPT_COMMANDS = {
     "ingest": "ingest/ingest.py", "research": "research/research.py", "sources": "sources/sources.py",
     "watch": "runner/events.py", "roles": "roles.py", "plan": "plans.py", "agents": "agent-configs.py",
-    "usecase": "usecases.py",
+    "usecase": "usecases.py", "report": "report/report.py",
 }
 # Commands whose data lives in a use case: they get its folder as their root (docs/decisions/0013-use-case-scopes.md).
-DATA_COMMANDS = {"ingest", "research", "watch"}
+DATA_COMMANDS = {"ingest", "research", "watch", "report"}
 
 
 def use_cases() -> list[str]:

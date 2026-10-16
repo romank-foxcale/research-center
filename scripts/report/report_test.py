@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Test ./rc report: a fixture topic renders every section, with claim links, the hypothesis matrix ranked and
+refuted rows struck out, and a living topic's history; text from the web stays text (no injected HTML, no
+javascript: links); secrets are redacted; a topic whose stages have not run renders what exists; and the same
+outputs give the same bytes."""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+import tempfile
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE)]
+import report  # noqa: E402
+
+SECRET = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+INJECTED = "<script>alert(1)</script>"
+BRIEF = """# Which retrieval for product search?
+
+Topic: retrieval
+Status: living
+
+## Topic
+
+Retrieval.
+
+## Questions
+
+- Q1: Which retrieval approach gives the best recall for us?
+- Q2: Which vendors offer it?
+"""
+REPORT = f"""# Which retrieval for product search?
+
+Topic: retrieval · Date: 2026-10-16 · Claims: 3 · Sources: 2 · Version 2
+
+## TL;DR
+
+- Hybrid retrieval wins on recall [C1, C2]. <img src=x onerror=alert(1)>
+- Assessment: shadow-run it first.
+
+## Q1: Which retrieval approach gives the best recall for us?
+
+Certainty: low. Hybrid [C1]; dense alone is refuted [C3].
+"""
+
+
+def write(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(data if isinstance(data, str) else json.dumps(data), encoding="utf-8")
+
+
+def fixture(root: Path) -> Path:
+    topic = root / "research" / "retrieval"
+    write(root / "usecase.json", {"id": "acme", "title": "Acme product scouting"})
+    write(topic / "brief.md", BRIEF)
+    write(topic / "source-plan.json", {
+        "hypotheses": [{"id": "H1", "statement": "Hybrid gives the best recall", "questions": ["Q1"]},
+                       {"id": "H2", "statement": "Dense alone gives the best recall", "questions": ["Q1"]}],
+        "noAlternatives": [{"question": "Q2", "why": "a list of vendors to compile"}]})
+    write(topic / "screening.json", {
+        "flow": {"identified": 40, "duplicates": 2, "citationIdentified": 10, "citationDuplicates": 1, "screened": 47,
+                 "excluded": 44, "excludedBy": {"X0": 30, "X1": 14}, "included": 3},
+        "criteria": [{"id": "X0", "text": "Bears on none of the brief's questions"}, {"id": "X1", "text": "Published before 2025"}]})
+    write(topic / "claims.json", {
+        "sources": [{"id": "S1", "url": "https://example.org/paper", "title": "Hybrid paper", "evidenceType": "peer-reviewed",
+                     "reliability": "B", "published": "2026-01-01"},
+                    {"id": "S2", "url": "javascript:alert(1)", "title": f"Vendor post {INJECTED}", "evidenceType": "vendor", "reliability": "D"}],
+        "claims": [{"id": "C1", "text": "Hybrid retrieval improves recall.", "source": "S1", "quote": "improves recall on every benchmark",
+                    "questions": ["Q1"], "quoteVerified": True},
+                   {"id": "C2", "text": f"Our key {SECRET} leaked in a blog.", "source": "S1", "quote": "a quote here",
+                    "questions": ["Q1"], "quoteVerified": True},
+                   {"id": "C3", "text": f"Dense always wins {INJECTED}", "source": "S2", "quote": "dense always wins",
+                    "questions": ["Q1"], "quoteVerified": False}]})
+    write(topic / "ideas.json", {
+        "ideas": [{"id": "I1", "name": "Hybrid retrieval", "summary": "BM25 plus dense.", "claims": ["C1"]},
+                  {"id": "I2", "name": "Dense only", "summary": "Embeddings only.", "claims": ["C3"]}],
+        "questions": [{"question": "Q1",
+                       "assumptions": [{"id": "A1", "text": "Benchmarks predict our catalogue", "claims": ["C1"]}],
+                       "ach": {"hypotheses": ["H1", "H2"],
+                               "matrix": [{"claim": "C1", "ratings": {"H1": "C", "H2": "I"}},
+                                          {"claim": "C2", "ratings": {"H1": "C", "H2": "N"}},
+                                          {"claim": "C3", "ratings": {"H1": "I", "H2": "C"}}],
+                               "untested": ["Learned sparse retrieval alone"]}}]})
+    write(topic / "judgement.json", {
+        "claims": [{"claim": "C1", "verdict": "HOLDS", "credibility": 2, "reason": "on the page"},
+                   {"claim": "C2", "verdict": "WEAK", "credibility": 3, "reason": "one benchmark"},
+                   {"claim": "C3", "verdict": "REFUTED", "credibility": 5, "reason": "not on the page"}],
+        "ideas": [{"idea": "I1", "verdict": "SURVIVES", "reason": "C1 holds",
+                   "history": [{"version": 1, "date": "2026-09-01", "verdict": "WEAKENED"}, {"version": 2, "date": "2026-10-16", "verdict": "SURVIVES"}]},
+                  {"idea": "I2", "verdict": "FALLS", "reason": "C3 refuted"}],
+        "assumptions": [{"assumption": "A1", "verdict": "WEAK", "reason": "untested on our catalogue"}],
+        "answers": [{"question": "Q1", "certainty": "low",
+                     "downgrades": [{"domain": "imprecision", "levels": 1, "reason": "one benchmark", "claims": ["C1"]}], "upgrades": []}],
+        "contested": [{"claim": "C2", "refutedBy": ["Review b"]}], "notes": "Do not overstate C1."})
+    write(topic / "fit.json", {"fits": [{"idea": "I1", "ring": "TRIAL", "replaces": "keyword search", "effort": "M", "risks": "embedding cost",
+                                         "rationale": "Recall matters for us [C1].", "nextStep": "Shadow-run it.",
+                                         "history": [{"version": 1, "date": "2026-09-01", "ring": "ASSESS"},
+                                                     {"version": 2, "date": "2026-10-16", "ring": "TRIAL"}]}]})
+    write(topic / "watch.json", {"cadence": "monthly", "cadenceDays": 30, "retireWhen": "we chose", "lastChecked": "2026-10-16",
+                                 "lastChanged": "2026-10-16", "log": [{"date": "2026-09-01", "version": 1, "kind": "run"},
+                                                                      {"date": "2026-10-16", "version": 2, "kind": "refresh", "material": True}]})
+    write(topic / "delta" / "2026-10-16.json", {"stamp": "2026-10-16", "material": True, "summary": "a new trial weakened C1"})
+    write(topic / "delta" / "2026-10-16-searches.json", {"searches": []})
+    write(topic / "report.md", REPORT)
+    return topic
+
+
+def main() -> int:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        fixture(root)
+        path = report.command_topic(root, "retrieval", None)
+        assert path == root / ".rc-local" / "reports" / "retrieval.html", path
+        page = path.read_text(encoding="utf-8")
+
+        # Every section, in decision order.
+        anchors = ["bottom-line", "ideas", "answers", "evidence", "hypotheses", "report", "claims", "sources", "history"]
+        positions = [page.find(f'id="{anchor}"') for anchor in anchors]
+        assert all(position > 0 for position in positions) and positions == sorted(positions), dict(zip(anchors, positions))
+        assert "Acme product scouting" in page and "<title>Which retrieval for product search?</title>" in page
+
+        # Text from the web stays text, links are http(s) only, secrets are redacted.
+        assert page.count("<script>") == 1, "only the page's own script"
+        assert "<img" not in page and "&lt;img src=x onerror=alert(1)&gt;" in page
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+        assert 'href="javascript:' not in page and "Vendor post" in page
+        assert SECRET not in page, "a secret in the outputs is redacted from the page"
+
+        # Claims cited anywhere link to the appendix, with the claim as tooltip.
+        assert re.search(r'<a class="cref cv-holds" href="#C1" title="Hybrid retrieval improves recall. \(HOLDS\)">C1</a>', page)
+        assert '<tr id="C3" data-verdict="REFUTED">' in page and "quote not found on the stored page" in page
+        assert "contested</span>" in page
+
+        # Ideas by ring then verdict; ring and verdict history; certainty and its downgrades.
+        assert page.find("Hybrid retrieval</h3>") < page.find("Dense only</h3>")
+        assert "ASSESS (2026-09-01) → TRIAL (2026-10-16)" in page and "WEAKENED (2026-09-01) → SURVIVES (2026-10-16)" in page
+        assert "certainty-low" in page and "−1 imprecision" in page and "Do not overstate" in page
+
+        # The matrix: H1 ranks first (C3, which is inconsistent with it, was refuted); the refuted row is struck out.
+        ranking = page[page.find('<ol class="ranking">'):]
+        assert ranking.find("<b>H1</b>") < ranking.find("<b>H2</b>")
+        assert '<tr class="out"><th scope="row">[<a class="cref cv-refuted" href="#C3"' in page
+        assert "Learned sparse retrieval alone" in page and "a list of vendors to compile" in page
+
+        # Screening and history.
+        assert "Published before 2025" in page and ">47<" in page
+        assert "a new trial weakened C1" in page and "-searches" not in page
+
+        # The same outputs give the same bytes.
+        assert report.render_topic(root, "retrieval") == report.render_topic(root, "retrieval")
+
+        # A topic whose stages have not run renders what exists and says what is missing.
+        partial = root / "research" / "early"
+        partial.mkdir(parents=True)
+        (partial / "brief.md").write_text(BRIEF.replace("Status: living", "Status: accepted"), encoding="utf-8")
+        early = report.render_topic(root, "early")
+        assert "Not produced yet: the report stage" in early and "Not produced yet: the analyze stage" in early
+        assert 'id="claims"' not in early and "Not judged yet." in early
+
+        # A topic that does not exist is an error, not an empty page.
+        try:
+            report.render_topic(root, "nothing")
+            raise AssertionError("a missing topic must fail")
+        except report.rc.RcError as error:
+            assert "no topic nothing" in str(error)
+    print("report test passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
