@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "id": "news",
+  "description": "News that works where GDELT is throttled: The Guardian's archive (free key in GUARDIAN_API_KEY)."
+}

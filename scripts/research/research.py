@@ -29,6 +29,7 @@ import datetime
 import hashlib
 import http.client
 import json
+import os
 import random
 import re
 import shutil
@@ -401,10 +402,17 @@ def json_reply(check):
 # Stages ---------------------------------------------------------------------------------------------------
 
 
+def usable_adapters(root: Path) -> dict[str, dict[str, Any]]:
+    """The enabled adapters that can run here: one whose key is not in the environment would only fail, so the
+    planner is not offered it."""
+    return {identifier: spec for identifier, spec in registry.descriptors(root).items()
+            if not spec.get("needsKeyEnv") or os.environ.get(spec["needsKeyEnv"])}
+
+
 def adapter_menu(root: Path) -> str:
-    """What the planner may choose from: every adapter's coverage, query syntax and filters, plus the web."""
+    """What the planner may choose from: every usable adapter's coverage, query syntax and filters, plus the web."""
     lines = [f"- `{WEB}`: the researcher roles search the open web themselves (Claude and GPT). Use it for what no adapter covers."]
-    for identifier, spec in registry.descriptors(root).items():
+    for identifier, spec in usable_adapters(root).items():
         filters = "; ".join(f"{name}: {text}" for name, text in spec.get("filters", {}).items()) or "none"
         lines.append(f"- `{identifier}` ({spec['family']}): {spec['covers']} Query: {spec['queryHelp']} Filters: {filters}.")
     return "\n".join(lines)
@@ -484,7 +492,7 @@ def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]
 
 def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
     config = rc.settings(root)
-    known, adapters = set(questions(root, topic)), registry.descriptors(root)
+    known, adapters = set(questions(root, topic)), usable_adapters(root)
 
     def check(data: Any) -> dict[str, Any]:
         problems = plan_problems(data, known, adapters)

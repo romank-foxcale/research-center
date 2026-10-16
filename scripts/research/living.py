@@ -359,7 +359,7 @@ def write_delta(directory: Path, stamp: str, delta: dict[str, Any], watch: dict[
     if delta["added"]:
         lines += ["", "## New claims", "", "| Claim | Text | Quote verified |", "| --- | --- | --- |"]
         lines += [f"| {claim['id']} | {cell(claim['text'])} | {'yes' if claim['quoteVerified'] else 'no'} |" for claim in delta["added"]]
-    lines += ["", f"Retire when: {watch['retireWhen']}. If that has happened, `./rc research retire {delta['topic']}`.",
+    lines += ["", f"Retire when: {watch['retireWhen'].rstrip('.')}. If that has happened, `./rc research retire {delta['topic']}`.",
               f"Next refresh due {(datetime.date.fromisoformat(watch['lastChecked']) + datetime.timedelta(days=watch['cadenceDays'])).isoformat()}."]
     rc.write_text(directory / "delta" / f"{stamp}.md", "\n".join(lines))
 

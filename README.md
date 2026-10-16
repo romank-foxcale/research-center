@@ -87,7 +87,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc research refresh --due                   keep living topics current (schedule it)
 ./rc sources list                             adapters beyond web search
 ./rc sources search openalex "four-day work week" --since 2023-01-01
-./rc sources enable medicine                  domain packs: medicine (PubMed), software (GitHub)
+./rc sources enable medicine                  domain packs: medicine (PubMed), software (GitHub), news (Guardian, free key)
 ./rc sources new city-council --family regulatory --evidence-type regulation   your own adapter
 ./rc roles set judge --provider claude --model opus
 ./rc check

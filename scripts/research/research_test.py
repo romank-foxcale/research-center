@@ -394,6 +394,20 @@ def main() -> int:
     assert research.plan_problems({**lone, "noAlternatives": [{"question": "Q1", "why": " "}]}, {"Q1"}, adapters) != [], "a reason is required"
     untagged = {**PLAN, "hypotheses": [{**PLAN["hypotheses"][0], "questions": []}, PLAN["hypotheses"][1]]}
     assert "H1: questions must name the brief questions" in " ".join(research.plan_problems(untagged, {"Q1"}, adapters))
+    # An adapter whose key is not in the environment is not offered to the planner.
+    with tempfile.TemporaryDirectory() as directory:
+        keyed = Path(directory)
+        (keyed / "catalog" / "adapters").mkdir(parents=True)
+        (keyed / "research-center.json").write_text("{}")
+        shutil.copyfile(REPO / "templates" / "packs" / "news" / "adapters" / "guardian.json", keyed / "catalog" / "adapters" / "guardian.json")
+        shutil.copyfile(REPO / "templates" / "adapters" / "openalex.json", keyed / "catalog" / "adapters" / "openalex.json")
+        saved = research.os.environ.pop("GUARDIAN_API_KEY", None)
+        assert list(research.usable_adapters(keyed)) == ["openalex"] and "guardian" not in research.adapter_menu(keyed)
+        research.os.environ["GUARDIAN_API_KEY"] = "test-key"
+        assert list(research.usable_adapters(keyed)) == ["guardian", "openalex"]
+        research.os.environ.pop("GUARDIAN_API_KEY")
+        if saved is not None:
+            research.os.environ["GUARDIAN_API_KEY"] = saved
     web_only = {**PLAN, "avenues": [avenue for avenue in PLAN["avenues"] if avenue["adapter"] in ("web", "openalex", "crossref")]}
     assert "two families" in " ".join(research.plan_problems(web_only, {"Q1"}, adapters)), "scholarly alone is one family"
 

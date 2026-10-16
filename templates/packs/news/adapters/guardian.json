@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "guardian",
+  "module": "guardian",
+  "family": "news",
+  "covers": "News reporting, analysis and opinion from The Guardian since 1999, worldwide coverage in English: events, announcements, trials and their reversals, policy and public debate.",
+  "evidenceTypes": [
+    "journalism",
+    "commentary"
+  ],
+  "queryHelp": "Keywords; quote exact phrases (\"four-day week\"); AND, OR, NOT between terms.",
+  "filters": {
+    "section": "Guardian section id, e.g. business, world, money, society"
+  },
+  "watchable": true,
+  "related": false,
+  "needsKeyEnv": "GUARDIAN_API_KEY",
+  "rateLimit": 1.1
+}

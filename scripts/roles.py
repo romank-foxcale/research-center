@@ -42,7 +42,8 @@ def command_show(root: Path) -> None:
     config = json.loads((path if path.is_file() else root / "templates" / "research-center.json").read_text(encoding="utf-8"))
     print(f"Research Center {config.get('name')}  status {config.get('status', 'unknown')}"
           f"{'' if path.is_file() else '  (template)'}")
-    print(f"\nBudgets   ingest {config['budget']['ingestCalls']} calls · research {config['budget']['researchCalls']} calls")
+    print(f"\nBudgets   ingest {config['budget']['ingestCalls']} calls · research {config['budget']['researchCalls']} calls"
+          f" · refresh {config['budget'].get('refreshCalls', 16)} calls")
     ingest = config["ingest"]
     print(f"Ingest    max file {ingest['maxFileBytes']} B · max source {ingest['maxSourceBytes']} B · chunk {ingest['chunkBytes']} B")
     print(f"Research  max {config['research']['maxSourcesPerResearcher']} sources per researcher")
