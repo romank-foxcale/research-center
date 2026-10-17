@@ -176,6 +176,19 @@ def main() -> int:
         beside = (index.parent / "retrieval.html").read_text(encoding="utf-8")
         assert '<a href="index.html">&larr; All topics</a>' in beside and (index.parent / "early.html").is_file()
         assert 'href="index.html"' not in page, "a single topic's page has no dashboard to link back to"
+        # A share publishes the dashboard with the pages beside it, and remembers its link so the next share updates it.
+        shared = report.manifest(root, None, index)
+        assert shared["page"] == str(index) and shared["title"] == "Acme product scouting" and shared["sharedAt"] is None
+        assert set(shared["files"]) == {"retrieval.html", "early.html"} and all(Path(path).is_file() for path in shared["files"].values())
+        report.remember_share(index.parent, "index", "https://claude.ai/code/artifact/0b1c")
+        assert report.manifest(root, None, index)["sharedAt"]["url"] == "https://claude.ai/code/artifact/0b1c"
+        assert report.manifest(root, "retrieval", path)["files"] == {} and report.manifest(root, "retrieval", path)["sharedAt"] is None
+        try:
+            report.remember_share(index.parent, "index", "https://example.org/x")
+            raise AssertionError("only claude.ai artifact links are recorded")
+        except report.rc.RcError as error:
+            assert "not a claude.ai artifact link" in str(error)
+
         (root / "research" / "index").mkdir()
         (root / "research" / "index" / "brief.md").write_text(BRIEF, encoding="utf-8")
         try:

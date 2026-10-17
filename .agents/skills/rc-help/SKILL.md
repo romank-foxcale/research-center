@@ -10,22 +10,27 @@ Explain the RC in this order, briefly, then offer a pick list of where to start.
 ## The pipeline
 
 ```
-use case (scope) → ingest (optional, repeatable) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report
+use case (scope) → ingest (optional, repeatable) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
 ```
+
+0. **Use case** (grill-use-case, `./rc usecase new|accept`): research happens inside a use case (a company, a product line, a personal area) with its own scope, sources and topics. The scope says whom the research serves, their products and plug-in points, hard constraints and how value is measured.
 
 1. **Ingest** (rc-ingest, `./rc ingest`): point at folders, repos, URLs, Notion, Drive. Their text is committed, with secrets redacted, then digested and reduced into a cited profile.
 2. **Grill** (grill-research-topic, `./rc research new|accept`): turn a topic into an accepted brief. The profile answers whatever it can, so the user is only asked the rest.
-3. **Research** (rc-research, `./rc research run`): a source plan; two researchers (Claude Opus and Sonnet) search the web in parallel and every cited page is stored with its quotes checked; an analysis; sceptics (Claude, GPT, Grok) try to disprove each claim; an anonymous judge settles them; the surviving ideas are fitted to the user's repos; a cited report comes out.
+3. **Research** (rc-research, `./rc research run`): a source plan with competing hypotheses; the adapters search and a screener includes or excludes each record; two researchers (Claude Opus and Sonnet) read them and search the web, and every cited page is stored with its quotes checked; an analysis; two sceptics (Claude Opus and Sonnet) try to disprove each claim; an anonymous judge settles them; the surviving ideas are fitted to the user's repos; a cited report comes out. A topic with a cadence stays living: `./rc research refresh` re-searches it.
 4. **Handoff**: ideas ranked ADOPT or TRIAL become a Control Center task plan (research/<topic>/handoff.md). Code changes happen in a CC, never in the RC.
+5. **Share** (rc-share, `./rc report`): a topic's page or the use case's dashboard, as self-contained HTML, published as a private claude.ai link for people without the repository.
 
 ## User-facing skills
 
 | Skill | Use it to |
 | --- | --- |
 | grill-rc-bootstrap | create and set up an instance (private remote, logins, models, budgets) |
+| grill-use-case | create a use case and write its scope |
 | rc-ingest | add and ingest sources, read the profile |
 | grill-research-topic | turn a topic into an accepted brief |
 | rc-research | run, follow and present research |
+| rc-share | share a topic or the use case's dashboard as a link |
 | rc-help | this overview |
 
 The ingest-*, research-* skills are role instructions the runners load for agents. They are not for direct use.
@@ -34,7 +39,7 @@ The ingest-*, research-* skills are role instructions the runners load for agent
 
 Outside an RC, the `rc-kit` command works like the Control Center's `cc-kit`: `rc-kit new <name>` creates `~/Projects/<name>_RC`, and `rc-kit list`, `rc-kit open <name> <tool>`, `rc-kit doctor` and `rc-kit update` do what their names say. GUIDE.md covers installing it.
 
-Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc ingest add|run|list`, `./rc research new|accept|run|show|refresh`, `./rc sources list|search|packs|enable|new|test`, `./rc watch`, `./rc roles`, `./rc validate`, `./rc check`.
+Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc usecase list|new|accept`, `./rc ingest add|run|list`, `./rc research new|accept|run|show|refresh`, `./rc report`, `./rc sources list|search|packs|enable|new|test`, `./rc watch`, `./rc roles`, `./rc validate`, `./rc check`.
 
 ## Where things live
 
@@ -44,4 +49,6 @@ Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc i
 - research/<topic>/: brief, ledger, analysis, critique, judgement, fit, report, handoff
 - docs/: the RC's own decisions and rules
 
-Finish by asking which to start with: bootstrap, ingest, or a research topic.
+In an instance with use cases, these folders live under `usecases/<id>/`, and commands take `-u <id>`.
+
+Finish by asking which to start with: bootstrap, a use case, ingest, a research topic, or sharing results.

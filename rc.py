@@ -40,6 +40,7 @@ Commands:
   research pause|resume|retire <topic>
   report [<topic>] [--output P]  A topic as one HTML page, or without a topic the dashboard and every topic's
                  page (.rc-local/reports/index.html)
+  report [<topic>] --manifest | --shared-at <url>  What a share publishes; record the link it was shared at
   sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward
   sources packs | enable <pack> | disable <pack> | new <adapter> --family F --evidence-type T | test [<adapter>]
   watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result

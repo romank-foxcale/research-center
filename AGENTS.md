@@ -9,6 +9,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 - Point the RC at folders, repos, URLs, Notion or Drive, or refresh the profile: load `rc-ingest`.
 - Research a subject, start a topic, "do an AI search on X": load `grill-research-topic`, then `rc-research`.
 - Run, follow or explain research: load `rc-research`.
+- Share results with people outside the repository, or make a page, link or dashboard of them: load `rc-share`.
 - Help, or what the RC can do: load `rc-help`.
 
 ## Getting started

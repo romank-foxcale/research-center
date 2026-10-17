@@ -600,6 +600,29 @@ def command_topic(root: Path, topic: str, output: Path | None) -> Path:
     return write_page(output or output_path(root, topic), render_topic(root, topic))
 
 
+SHARES = "shares.json"  # beside the pages: the artifact link each page was shared at, so an update keeps the link
+
+
+def shares(folder: Path) -> dict[str, Any]:
+    return load(folder, SHARES) or {}
+
+
+def remember_share(folder: Path, name: str, url: str) -> None:
+    """Record where a page was shared (a claude.ai artifact link), so the next share updates it in place."""
+    if not re.fullmatch(r"https://claude\.ai/\S+", url):
+        raise rc.RcError(f"not a claude.ai artifact link: {url}")
+    rc.write_json(folder / SHARES, {**shares(folder), name: {"url": url, "sharedAt": rc.today()}})
+
+
+def manifest(root: Path, topic: str | None, page_path: Path) -> dict[str, Any]:
+    """What a share publishes: the page, the pages beside it (for the dashboard), its title, and the link it was
+    shared at before, if any."""
+    folder, name = page_path.parent, topic or DASHBOARD
+    beside = {} if topic else {f"{other}.html": str(folder / f"{other}.html") for other in topic_ids(root)}
+    title = Topic(root, topic).title if topic else (load(root, "usecase.json") or {}).get("title") or rc.settings(root).get("name")
+    return {"page": str(page_path), "files": beside, "title": title, "sharedAt": shares(folder).get(name)}
+
+
 def command_dashboard(root: Path, output: Path | None) -> Path:
     """The dashboard and every topic's page beside it, linked both ways: one folder that can be shared whole."""
     ids = topic_ids(root)
@@ -616,10 +639,20 @@ def main() -> int:
     parser.add_argument("root", type=Path)
     parser.add_argument("topic", nargs="?", help="one topic's page; without it, the dashboard and every topic's page")
     parser.add_argument("--output", type=Path, help="the page (with a topic) or the folder (without); default .rc-local/reports/")
+    parser.add_argument("--manifest", action="store_true", help="after writing, print what a share publishes, as JSON")
+    parser.add_argument("--shared-at", metavar="URL", help="record the artifact link the page was shared at; writes no page")
     args = parser.parse_args()
     root = args.root.resolve()
     try:
+        if args.shared_at:
+            folder = (args.output.parent if args.topic else args.output) if args.output else output_path(root, DASHBOARD).parent
+            remember_share(folder, args.topic or DASHBOARD, args.shared_at)
+            print(f"recorded: {args.topic or 'the dashboard'} is shared at {args.shared_at}")
+            return 0
         path = command_topic(root, args.topic, args.output) if args.topic else command_dashboard(root, args.output)
+        if args.manifest:
+            print(json.dumps(manifest(root, args.topic, path), ensure_ascii=False, indent=2))
+            return 0
     except (rc.RcError, OSError, ValueError, KeyError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
