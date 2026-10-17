@@ -240,9 +240,18 @@ def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
                 if CERTAINTIES.index(LIKELIHOOD[word]) > have:
                     problems.append(f"'{heading.strip()}' says '{word}', which needs {LIKELIHOOD[word]} certainty; "
                                     f"the judgement gives {certainty[question.group(1)]}")
+        assessed = False  # the bullets under an "Assessment: ...:" lead-in are that assessment
         for unit in re.split(r"\n\s*\n|\n(?=\s*[-*] )", body.strip()):
             text = unit.strip()
+            bullet = re.match(r"^[-*]\s", text)
+            if not bullet:
+                assessed = False
             if BOLD_LABEL.fullmatch(text):  # a label on its own line heads what follows; it states nothing
+                continue
+            if not bullet and text.endswith(":") and "\n" not in text:  # a lead-in introduces the list after it
+                assessed = bool(re.match(r"^(?:\*\*)?Assessment\b", text))
+                continue
+            if bullet and assessed:
                 continue
             if text and not claim_refs(text) and not re.match(r"^(?:[-*]\s*)?(?:\*\*)?(Assessment|Certainty)\b", text):
                 problems.append(f"'{heading.strip()}': \"{text[:70]}\" neither cites a claim [C#] nor starts with 'Assessment:'")
