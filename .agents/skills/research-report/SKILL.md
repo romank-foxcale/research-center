@@ -16,7 +16,7 @@ brief.md, analysis.md, ideas.json, judgement.md and fit.md under research/<topic
 Markdown, in this order:
 
 1. `# <the brief's title>`
-2. `## In plain words`: for a decision-maker who reads nothing else, such as a CEO. At most 300 words, in everyday English, with no claim ids. Spell out every abbreviation or term of art, or leave it out. Short labelled lists, in this order:
+2. `## In plain words`: for a decision-maker who reads nothing else, such as a CEO. About 250 words (the runner rejects more than 350), in everyday English, with no claim ids. Spell out every abbreviation or term of art, or leave it out. Short labelled lists, in this order:
    - **The short answer**: one or two sentences.
    - **What is wrong now, and why**: only when the topic is about something the user already has (a product, a process, a component). Name each problem and why it matters to them.
    - **What to try**: in order of value. For each, what it is in one line, what it costs and what it should gain.

@@ -28,7 +28,7 @@ Research results lived only as Markdown in the repository. People who decide on 
 
   It makes no model call, so it costs no budget, and the same outputs give the same bytes. A stage that has not run shows as missing and is never guessed.
 - **Decisions first.** The first screen holds:
-  - the report's "In plain words" summary (added 2026-10-18 after the first foxcale report proved too dense for a leader to read): at most 300 words, no claim ids, and checked by the runner like the rest of the report;
+  - the report's "In plain words" summary (added 2026-10-18 after the first foxcale report proved too dense for a leader to read): about 250 words (at most 350), no claim ids, and checked by the runner like the rest of the report;
   - the bottom line with its evidence (the report's TL;DR);
   - the ideas by ring, with the judge's verdict, effort, what each replaces, risks and next step;
   - each question's certainty, with its downgrades.

@@ -87,7 +87,7 @@ UPGRADES = ("large-effect", "convergence")
 RATINGS = ("C", "I", "N")
 BOLD_LABEL = re.compile(r"\*\*[^*\n]+\*\*:?")
 PLAIN = "In plain words"  # the report's first section: the answer for a reader who reads nothing else
-PLAIN_MAX_WORDS = 300
+PLAIN_MAX_WORDS = 350  # the reporter aims at about 250 words; writers miscount, so the hard limit leaves room
 ASSUMPTION_ID = re.compile(r"A\d+")
 # ICD 203 likelihood words and the least certainty each may be said with; longest phrases are matched first.
 LIKELIHOOD = {
@@ -246,7 +246,7 @@ def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
             bullet = re.match(r"^[-*]\s", text)
             if not bullet:
                 assessed = False
-            if BOLD_LABEL.fullmatch(text):  # a label on its own line heads what follows; it states nothing
+            if BOLD_LABEL.fullmatch(text) or text.startswith("#"):  # a label or sub-heading heads what follows; it states nothing
                 continue
             if not bullet and text.endswith(":") and "\n" not in text:  # a lead-in introduces the list after it
                 assessed = bool(re.match(r"^(?:\*\*)?Assessment\b", text))

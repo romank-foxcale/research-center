@@ -381,6 +381,8 @@ def main() -> int:
     assert research.language_problems("## Q1: x\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == []
     assert research.language_problems("## Q1: x\n\n**Ranking**\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == [], \
         "a bold label on its own line heads a paragraph; it is not one"
+    assert research.language_problems("## Q1: x\n\n### Ranking\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == [], \
+        "a sub-heading heads a paragraph; it is not one"
     lead_ins = ("## Q1: x\n\nDense results are mixed:\n\n- one way [C1]\n- uncited bullet\n\n"
                 "Assessment: what we would do:\n\n- hash the features\n- score in chunks\n\nAn uncited paragraph.")
     problems = " ".join(research.language_problems(lead_ins, {"Q1": "low"}))
@@ -389,7 +391,7 @@ def main() -> int:
         "a lead-in introduces its list, and bullets under an Assessment lead-in are that assessment"
     # The plain summary comes first, stays short, cites nothing and still hedges only with the scale.
     assert "start with a '## In plain words'" in " ".join(research.plain_problems("## TL;DR\n\n- x [C1]."))
-    plain = research.plain_problems("## In plain words\n\nIt is probably fine [C1]. " + "word " * 300 + "\n\n## TL;DR\n\n- x [C1].")
+    plain = research.plain_problems("## In plain words\n\nIt is probably fine [C1]. " + "word " * 350 + "\n\n## TL;DR\n\n- x [C1].")
     assert len(plain) == 3 and "cites claims" in plain[1] and "'probably'" in plain[2], plain
     assert research.plain_problems("## In plain words\n\n**The short answer**: it is likely fine.\n\n## TL;DR\n\n- x [C1].") == []
     assert research.source_key(PAPER) == research.source_key(BLOG)
