@@ -508,9 +508,11 @@ def profile(session: rc.Session, root: Path) -> None:
             lines.append(f"\n## {kind.capitalize()}\n")
             lines += [f"- [{one_line(note['title'])}]({note['slug']}.md): {one_line(note['summary'])}" for note in members]
     digest_list = "".join(f"  - {path.relative_to(root).as_posix()}\n" for path in digests)
+    # A use case's profile belongs to its scope; the settings file lives at the instance root, not beside it.
+    anchor = "scope.md" if (root / "scope.md").is_file() else rc.SETTINGS
     rc.write_text(directory / "index.md", (
         f"---\nid: profile.index\ntitle: Profile\nstatus: active\nsummary: {one_line(data.get('summary', 'What the ingested sources say about the user or company.'))}\n"
-        f"verified_at: {rc.today()}\nevidence:\n{digest_list}relations:\n  - research-center.json\n---\n\n"
+        f"verified_at: {rc.today()}\nevidence:\n{digest_list}relations:\n  - {anchor}\n---\n\n"
         f"# Profile\n\n{data.get('summary', '').strip()}\n" + "\n".join(lines) + "\n"
     ))
     session.say(f"profile: {len(data['notes'])} notes in knowledge/profile")

@@ -182,7 +182,10 @@ class Session:
         self.reserve(label)
         spec = role(self.root, role_id)
         skills = "\n\n".join(skill_text(self.root, name) for name in spec.get("skills", []))
-        prompt = f"{skills}\n\n# Context\n\nThe current directory is the research center root. You can read files; you cannot write any.\n\n{body}"
+        # Named outright: in a use case the current directory is usecases/<id>/, not the repository root, and an
+        # agent that guesses the root reads the wrong paths first.
+        prompt = (f"{skills}\n\n# Context\n\nThe current directory is {self.root}. Every relative path in this task is "
+                  f"relative to it. You can read files; you cannot write any.\n\n{body}")
         log = self.logs / f"{label}.log"
         with self.lock:
             self.active[f"{label} ({spec['provider']} {spec['model']})"] = log

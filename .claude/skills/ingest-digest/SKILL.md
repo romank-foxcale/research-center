@@ -29,6 +29,8 @@ One plain sentence on what this source is (a product repo, a research paper, a t
 - Term: meaning in this source. [sources/<id>/text/<file>]
 ```
 
+Start with that sentence. Say nothing about how you read the files, which paths you tried or what follows: the digest is stored as you write it.
+
 ## Citation rules (the runner enforces them)
 
 - Every bullet ends with at least one citation `[sources/...]`: the exact path of a file you read, as listed in the task. A path may carry an anchor such as `#L10-40`.
