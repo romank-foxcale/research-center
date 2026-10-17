@@ -2,7 +2,8 @@
 """Test ./rc report: a fixture topic renders every section, with claim links, the hypothesis matrix ranked and
 refuted rows struck out, and a living topic's history; text from the web stays text (no injected HTML, no
 javascript: links); secrets are redacted; a topic whose stages have not run renders what exists; and the same
-outputs give the same bytes."""
+outputs give the same bytes. Without a topic: a dashboard of every topic, living first, linked both ways with
+the topic pages beside it, showing the scope without its evidence paths."""
 
 from __future__ import annotations
 
@@ -159,6 +160,29 @@ def main() -> int:
         early = report.render_topic(root, "early")
         assert "Not produced yet: the report stage" in early and "Not produced yet: the analyze stage" in early
         assert 'id="claims"' not in early and "Not judged yet." in early
+
+        # The dashboard: every topic, living first, each linked to its page beside it, which links back.
+        (root / "scope.md").write_text("# Acme\n\nUse case: acme\nStatus: accepted\n\n## Who\n\nAcme sells parts online "
+                                       "[acme.example/about].\n\nSecond paragraph.\n", encoding="utf-8")
+        index = report.command_dashboard(root, None)
+        assert index == root / ".rc-local" / "reports" / "index.html"
+        board = index.read_text(encoding="utf-8")
+        assert "<title>Acme product scouting</title>" in board and "2 topics, 1 living" in board
+        assert board.find('href="retrieval.html"') < board.find('href="early.html"'), "living topics first"
+        assert "1 TRIAL" in board and "Hybrid retrieval" in board and "Dense only" not in board, "leading ideas are ADOPT or TRIAL"
+        assert "certainty-low" in board and "not run" in board and "3 claims, 2 sources" in board
+        assert "Acme sells parts online." in board and "acme.example" not in board and "Second paragraph" not in board
+        assert "<script>" not in board
+        beside = (index.parent / "retrieval.html").read_text(encoding="utf-8")
+        assert '<a href="index.html">&larr; All topics</a>' in beside and (index.parent / "early.html").is_file()
+        assert 'href="index.html"' not in page, "a single topic's page has no dashboard to link back to"
+        (root / "research" / "index").mkdir()
+        (root / "research" / "index" / "brief.md").write_text(BRIEF, encoding="utf-8")
+        try:
+            report.command_dashboard(root, None)
+            raise AssertionError("a topic named index must not overwrite the dashboard")
+        except report.rc.RcError as error:
+            assert "collides" in str(error)
 
         # A topic that does not exist is an error, not an empty page.
         try:

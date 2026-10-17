@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""./rc report <topic>: a research topic as one self-contained HTML page for people without the repository.
+"""./rc report [<topic>]: research as self-contained HTML pages for people without the repository. With a topic, its
+page; without, a dashboard of the use case's topics (index.html) with every topic's page beside it.
 
 The page is computed from the topic's committed outputs, never written by an agent, so it costs no budget and the
 same outputs always give the same bytes. The first screen is for decisions: the bottom line, the ideas by ring with
@@ -442,6 +443,7 @@ nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem;margin-bottom:8
 .idea-id{font-weight:700;color:var(--muted)}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:10px 0 0}dt{color:var(--muted);font-size:.85rem;padding-top:2px}dd{margin:0}
 @media (max-width:600px){dl{grid-template-columns:1fr}dt{padding-top:6px}section{padding:14px 12px}td,th{padding:6px 5px}}
+.leading{margin:.5em 0;padding-left:1.1em}.leading li{margin:.2em 0}
 .trail{font-size:.85rem;color:var(--muted);margin:.5em 0 0}
 .answer{padding:10px 0;border-top:1px solid var(--line)}.answer:first-of-type{border-top:0}.q{margin:0 0 .3em}
 .down{color:var(--bad);font-weight:600;font-size:.85rem}.up{color:var(--ok);font-weight:600;font-size:.85rem}
@@ -489,44 +491,135 @@ if(r){q.value='';v.value='';f();var d=r.querySelector('details');if(d)d.open=tru
 """
 
 
-def render_topic(root: Path, topic_id: str) -> str:
+def page(title: str, body: str, script: bool = True) -> str:
+    return ("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            f"<title>{esc(title)}</title><style>{STYLE}</style></head><body><main>{body}</main>"
+            + (f"<script>{SCRIPT}</script>" if script else "") + "</body></html>\n")
+
+
+def render_topic(root: Path, topic_id: str, dashboard: bool = False) -> str:
+    """A topic's page; with dashboard, it links back to the use case's dashboard (index.html) beside it."""
     topic = Topic(root, topic_id)
     toc = [("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
            ("hypotheses", "Hypotheses"), ("report", "Full report"), ("claims", "Claims"), ("sources", "Sources"), ("history", "History")]
     body = [section_bottom_line(topic), section_ideas(topic), section_answers(topic), section_evidence(topic),
             section_hypotheses(topic), section_report(topic), section_claims(topic), section_sources(topic), section_history(topic)]
     present = [(anchor, name) for anchor, name in toc if any(f'id="{anchor}"' in part for part in body)]
-    nav = '<nav class="toc">' + "".join(f'<a href="#{anchor}">{name}</a>' for anchor, name in present) + "</nav>"
-    return ("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-            f"<title>{esc(topic.title)}</title><style>{STYLE}</style></head><body><main>"
-            + section_header(topic) + nav + "".join(body)
-            + f"<footer>Research Center report for topic {esc(topic.id)}. Built from the topic's committed outputs; "
-              "every statement traces to a claim and its stored source.</footer>"
-            + f"</main><script>{SCRIPT}</script></body></html>\n")
+    back = '<a href="index.html">&larr; All topics</a>' if dashboard else ""
+    nav = '<nav class="toc">' + back + "".join(f'<a href="#{anchor}">{name}</a>' for anchor, name in present) + "</nav>"
+    return page(topic.title, section_header(topic) + nav + "".join(body)
+                + f"<footer>Research Center report for topic {esc(topic.id)}. Built from the topic's committed outputs; "
+                  "every statement traces to a claim and its stored source.</footer>")
 
 
-def output_path(root: Path, topic: str) -> Path:
-    return root / ".rc-local" / "reports" / f"{topic}.html"
+# The dashboard --------------------------------------------------------------------------------------------
+
+DASHBOARD = "index"  # the dashboard's file name; a topic of that name would collide with it
+STATUS_ORDER = {status: index for index, status in enumerate(("living", "accepted", "paused", "draft", "retired"))}
 
 
-def command_topic(root: Path, topic: str, output: Path | None) -> Path:
-    page = render_topic(root, topic)
-    path = output or output_path(root, topic)
-    found = rc.write_text(path, page)
+def topic_ids(root: Path) -> list[str]:
+    return sorted(path.parent.name for path in (root / "research").glob("*/brief.md"))
+
+
+def progress(topic: Topic) -> str:
+    """How far the pipeline got: the last stage with its outputs, or done."""
+    done = [stage for stage in research.STAGES if research.stage_done(topic.dir, stage)]
+    if not done:
+        return "not run"
+    return "done" if done[-1] == research.STAGES[-1] else f"{done[-1]} done"
+
+
+def topic_card(topic: Topic) -> str:
+    rows = idea_rows(topic)
+    rings = {ring: sum(row["fit"].get("ring") == ring for row in rows) for ring in research.RINGS}
+    ring_html = "".join(f'<span class="badge ring-{ring.lower()}">{count} {ring}</span>' for ring, count in rings.items() if count)
+    leading = [row for row in rows if row["fit"].get("ring") in ("ADOPT", "TRIAL")][:3]
+    leading_html = "".join(f'<li>{badge("ring", row["fit"]["ring"])} {esc(row["name"])}'
+                           + (f' <span class="hint">{esc(row["judged"]["verdict"].lower())}</span>' if row["judged"].get("verdict") else "")
+                           + "</li>" for row in leading)
+    answers = {item["question"]: item["certainty"] for item in (topic.judgement or {}).get("answers", [])}
+    certainty = "".join(f'<span class="key"><b>{esc(question)}</b> {badge("certainty", answers[question])}</span>'
+                        for question in topic.questions if question in answers)
+    watch = topic.watch or {}
+    facts = [f"{len(topic.questions)} question{'s' if len(topic.questions) != 1 else ''}"]
+    if topic.ledger:
+        facts.append(f"{len(topic.claims)} claims, {len(topic.sources)} sources")
+    if watch.get("lastChecked"):
+        facts.append(f"checked {watch['lastChecked']}, changed {watch.get('lastChanged', '?')}")
+    state = progress(topic)
+    ring = leading[0]["fit"]["ring"] if leading else "none"
+    return (f'<article class="card ring-{esc(ring.lower())}">'
+            f'<div class="card-head"><h3><a href="{esc(topic.id)}.html">{esc(topic.title)}</a></h3>{badge("status", topic.status)}'
+            + (badge("change", state) if state != "done" else "") + "</div>"
+            + f'<p class="hint">{esc(topic.id)} · {esc(" · ".join(facts))}</p>'
+            + (f'<div class="legend">{ring_html}</div>' if ring_html else "")
+            + (f'<ul class="leading">{leading_html}</ul>' if leading_html else "")
+            + (f'<div class="legend">Certainty {certainty}</div>' if certainty else "") + "</article>")
+
+
+def scope_line(root: Path) -> str:
+    """The use case's scope status and the first paragraph of whom it serves, without its evidence paths."""
+    scope = read(root, "scope.md")
+    if not scope:
+        return ""
+    status = re.search(r"^Status:\s*(\S+)", scope, re.MULTILINE)
+    who = research.sections(scope).get("Who", "").strip().split("\n\n")[0]
+    who = re.sub(r"\s*\[[^\]]*\]", "", who)  # evidence paths mean nothing outside the repository
+    return (f'<p class="meta">Scope {badge("status", status.group(1) if status else "unknown")}</p>'
+            + (f'<div class="md">{MARKDOWN.render(who)}</div>' if who else ""))
+
+
+def render_dashboard(root: Path) -> str:
+    topics = [Topic(root, topic_id) for topic_id in topic_ids(root)]
+    topics.sort(key=lambda topic: (STATUS_ORDER.get(topic.status, len(STATUS_ORDER)), topic.id))
+    usecase = load(root, "usecase.json") or {}
+    title = usecase.get("title") or rc.settings(root).get("name") or "Research"
+    cards = "".join(topic_card(topic) for topic in topics) or '<p class="missing">No research topics yet.</p>'
+    living = sum(topic.status == "living" for topic in topics)
+    summary = f"{len(topics)} topic{'s' if len(topics) != 1 else ''}, {living} living"
+    return page(title, f'<header class="top"><p class="crumbs">Research Center</p><h1>{esc(title)}</h1>'
+                f'<p class="meta">{esc(summary)}</p>{scope_line(root)}</header>'
+                f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
+                "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False)
+
+
+def output_path(root: Path, name: str) -> Path:
+    return root / ".rc-local" / "reports" / f"{name}.html"
+
+
+def write_page(path: Path, text: str) -> Path:
+    found = rc.write_text(path, text)
     if found:
-        print(f"redacted {len(found)} secret(s) from the page")
+        print(f"redacted {len(found)} secret(s) from {path.name}")
     return path
 
 
+def command_topic(root: Path, topic: str, output: Path | None) -> Path:
+    return write_page(output or output_path(root, topic), render_topic(root, topic))
+
+
+def command_dashboard(root: Path, output: Path | None) -> Path:
+    """The dashboard and every topic's page beside it, linked both ways: one folder that can be shared whole."""
+    ids = topic_ids(root)
+    if DASHBOARD in ids:
+        raise rc.RcError(f"a topic named {DASHBOARD} collides with the dashboard page; rename the topic")
+    folder = output or output_path(root, DASHBOARD).parent
+    for topic in ids:
+        write_page(folder / f"{topic}.html", render_topic(root, topic, dashboard=True))
+    return write_page(folder / f"{DASHBOARD}.html", render_dashboard(root))
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="./rc report", description="Render a research topic as one self-contained HTML page")
+    parser = argparse.ArgumentParser(prog="./rc report", description="Render research as self-contained HTML pages")
     parser.add_argument("root", type=Path)
-    parser.add_argument("topic")
-    parser.add_argument("--output", type=Path, help="where to write the page (default: .rc-local/reports/<topic>.html)")
+    parser.add_argument("topic", nargs="?", help="one topic's page; without it, the dashboard and every topic's page")
+    parser.add_argument("--output", type=Path, help="the page (with a topic) or the folder (without); default .rc-local/reports/")
     args = parser.parse_args()
+    root = args.root.resolve()
     try:
-        path = command_topic(args.root.resolve(), args.topic, args.output)
+        path = command_topic(root, args.topic, args.output) if args.topic else command_dashboard(root, args.output)
     except (rc.RcError, OSError, ValueError, KeyError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

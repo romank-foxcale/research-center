@@ -38,7 +38,8 @@ Commands:
   research run <topic> [--from plan|search|screen|collect|analyze|critique|judge|apply|report] [--budget N]
   research refresh <topic> | refresh --due [--budget N]  Re-search a living topic; write research/<topic>/delta/<date>.md
   research pause|resume|retire <topic>
-  report <topic> [--output F]  A topic as one self-contained HTML page (.rc-local/reports/<topic>.html)
+  report [<topic>] [--output P]  A topic as one HTML page, or without a topic the dashboard and every topic's
+                 page (.rc-local/reports/index.html)
   sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward
   sources packs | enable <pack> | disable <pack> | new <adapter> --family F --evidence-type T | test [<adapter>]
   watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result
