@@ -56,6 +56,7 @@ Leadership (a CTO or CEO) can read a research topic without opening the reposito
 
 | Question | Impact | Owner/next evidence |
 | --- | --- | --- |
+| Is WP4 (explainer briefs) worth building? | Deferred on 2026-10-17 until a real use-case topic exists to test it on | The user, after the first foxcale topic |
 | Is a Japanese summary layer needed for leadership? | Pages are English, per the repository rule; a translated summary would be a second derived page | Ask once the first foxcale topic is shared |
 
 ## Work packages

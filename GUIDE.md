@@ -131,7 +131,13 @@ The `grill-research-topic` skill writes the brief with you, then `rc-research` r
 ./rc watch                          # live: stages, what each agent says, stalls
 ```
 
-Read `research/<topic>/report.md`. Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it into your Control Center's `plans/active/` and refine it there with `grill-task-planning`.
+Read `research/<topic>/report.md`, or see it as a page: `./rc report <topic>` writes `.rc-local/reports/<topic>.html`, and `./rc report` writes a dashboard of every topic (`index.html`) with their pages beside it. To show it to someone without the repository:
+
+> Share the support-memory research with my CTO. Use the rc-share skill.
+
+The agent builds the page, tells you what it says, and after your yes publishes it as a private claude.ai link. Only you can open it until you share it from the page's Share menu. Sharing again later updates the same link.
+
+Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it into your Control Center's `plans/active/` and refine it there with `grill-task-planning`.
 
 | Command | What it does |
 |---|---|
@@ -144,6 +150,7 @@ Read `research/<topic>/report.md`. Ideas ranked ADOPT or TRIAL come with `resear
 | `./rc roles set <role> --provider claude --model opus` | Move a role to another provider or model |
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |
 | `./rc research list` / `show <topic>` | Topics and their stages |
+| `./rc report [<topic>]` | A topic as one HTML page, or the dashboard of every topic, in `.rc-local/reports/` |
 | `./rc research run <topic> --from judge` | Redo a stage and everything after it |
 | `./rc sources packs` / `enable <pack>` | Domain packs: medicine (PubMed), software (GitHub), news (The Guardian; set GUARDIAN_API_KEY to a free Open Platform key) |
 | `./rc sources new <id> --family F --evidence-type T` | Scaffold your own adapter for a site or API; `./rc sources test <id>` checks it |

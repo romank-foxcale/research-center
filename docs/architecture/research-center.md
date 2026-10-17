@@ -3,7 +3,7 @@ id: architecture.research-center
 title: Research Center architecture
 status: active
 summary: The RC is a runner that drives read-only agent roles through ingest (fetch, digest, profile) and research (plan, search, screen, collect, analyze, critique, judge, apply, report); every file is written by the runner and every fact is traced to stored text.
-verified_at: 2026-10-16
+verified_at: 2026-10-17
 evidence:
   - scripts/runner/rc.py
   - scripts/ingest/ingest.py
@@ -33,15 +33,16 @@ relations:
 | knowledge/digests/ | one cited digest per user source, with the manifest fingerprint | ingest runner (digester role) |
 | knowledge/profile/ | atomic cited notes about the user or company, and an index | ingest runner (profiler role) |
 | research/&lt;topic&gt;/ | brief, source plan, searches, candidates, screening and citations, claims ledger, analysis with its assumptions and matrices, critique, judgement with credibility and certainty, fit, report, handoff; for a living topic watch.json and delta/ | grilling session, research runner |
-| .rc-local/ | event streams, agent logs, git clone cache, reviewer mapping, accepted replies of unfinished stages, refresh snapshots (ignored) | runners |
+| .rc-local/ | event streams, agent logs, git clone cache, reviewer mapping, accepted replies of unfinished stages, refresh snapshots, report pages and their share links in reports/ (ignored) | runners, `rc report` |
 
 ## Flow
 
-1. **Ingest** (`scripts/ingest/ingest.py`): each source is fetched by kind. Folders and repos are read by the runner, URLs are downloaded, and Notion and Drive are read by the connector role. Text is extracted (`extract.py`), redacted (`secrets_scan.py`) and stored with a manifest. A source whose manifest fingerprint changed is digested in chunks; then the profiler rebuilds the profile from all digests.
 1. **Use case**: `grill-use-case` writes `usecases/<id>/scope.md`, and `rc usecase accept` gates research on it. The steps below run inside one use case (`rc -u <id>`).
-2. **Grill**: an interactive session follows `grill-research-topic`, reads the profile, and writes and accepts the brief.
-3. **Research** (`scripts/research/research.py`): nine stages, each committing its output. Search runs the planned adapter queries without an agent; screen includes or excludes every result with a logged reason (docs/decisions/0008-search-and-screen.md). The runner checks every reply against the stage's contract and gives the role one retry with the problems listed.
-4. **Refresh** (`scripts/research/living.py`): stored pages past their evidence type's half-life are re-checked for drift; a living topic's saved searches re-run since the last check; only new records are screened and collected; and the conclusions are re-derived when new verified evidence arrives or relied-on evidence drifted (docs/decisions/0009-living-topics.md, 0010-evidence-grading.md).
+2. **Ingest** (`scripts/ingest/ingest.py`): each source is fetched by kind. Folders and repos are read by the runner, URLs are downloaded, and Notion and Drive are read by the connector role. Text is extracted (`extract.py`), redacted (`secrets_scan.py`) and stored with a manifest. A source whose manifest fingerprint changed is digested in chunks; then the profiler rebuilds the profile from all digests.
+3. **Grill**: an interactive session follows `grill-research-topic`, reads the profile, and writes and accepts the brief.
+4. **Research** (`scripts/research/research.py`): nine stages, each committing its output. Search runs the planned adapter queries without an agent; screen includes or excludes every result with a logged reason (docs/decisions/0008-search-and-screen.md). The runner checks every reply against the stage's contract and gives the role one retry with the problems listed.
+5. **Refresh** (`scripts/research/living.py`): stored pages past their evidence type's half-life are re-checked for drift; a living topic's saved searches re-run since the last check; only new records are screened and collected; and the conclusions are re-derived when new verified evidence arrives or relied-on evidence drifted (docs/decisions/0009-living-topics.md, 0010-evidence-grading.md).
+6. **Share** (`scripts/report/report.py`, rc-share): `rc report` renders a topic, or the use case's dashboard, into self-contained HTML from the committed outputs, with no agent call; the rc-share skill publishes it as a private artifact after the user confirms (docs/decisions/0014-report-pages.md).
 
 ## Runtime
 
@@ -50,4 +51,5 @@ relations:
 - `scripts/sources/`: source adapters the runner searches besides the web (`./rc sources`), one record shape keyed by DOI or canonical URL, every search logged; domain packs in `templates/packs/`, the scaffold for an instance's own adapters in `templates/adapter-template/` (docs/decisions/0007-source-adapters.md).
 - `scripts/research/research.py`: the pipeline and its contracts: plan, screening, grading (0010), competing hypotheses and calibrated language (0011). `living.py`: watch, refresh, drift and deltas (0009).
 - `rc.py` with the `rc.cmd`, `rc.ps1` and `./rc` launchers: the command line, run by uv in the environment of `pyproject.toml` and `uv.lock`. Document conversion is pure Python (pypdfium2, mammoth, markdownify, striprtf, python-pptx, openpyxl), so nothing else is installed (docs/decisions/0012-windows-native-uv.md).
+- `scripts/report/report.py`: report pages and the dashboard, share copies and recorded share links (0014).
 - `scripts/upgrade-instance.py` (`rc upgrade`, `rc-kit upgrade`): brings an existing instance's template-owned files up to the template.
