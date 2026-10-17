@@ -178,7 +178,14 @@ def main() -> int:
         assert 'href="index.html"' not in page, "a single topic's page has no dashboard to link back to"
         # A share publishes the dashboard with the pages beside it, and remembers its link so the next share updates it.
         shared = report.manifest(root, None, index)
-        assert shared["page"] == str(index) and shared["title"] == "Acme product scouting" and shared["sharedAt"] is None
+        assert shared["page"] == str(index.parent / "share" / "index.html") and shared["sharedAt"] is None
+        assert shared["title"] == "Acme product scouting"
+        content = Path(shared["page"]).read_text(encoding="utf-8")
+        assert content.startswith("<title>Acme product scouting</title>") and "<!doctype" not in content and "<body" not in content, \
+            "an artifact wraps the page it publishes in its own document"
+        assert all(Path(path).read_text(encoding="utf-8").startswith("<!doctype html>") for path in shared["files"].values()), \
+            "pages published beside it are served as they are, so they are whole documents"
+        assert 'name="claude:viewport-fit-sides"' in content and "max(16px,env(safe-area-inset-left" in content
         assert set(shared["files"]) == {"retrieval.html", "early.html"} and all(Path(path).is_file() for path in shared["files"].values())
         report.remember_share(index.parent, "index", "https://claude.ai/code/artifact/0b1c")
         assert report.manifest(root, None, index)["sharedAt"]["url"] == "https://claude.ai/code/artifact/0b1c"

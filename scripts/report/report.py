@@ -411,13 +411,13 @@ STYLE = """
 --adopt:#2e7d4f;--trial:#2f5d8a;--assess:#b7791f;--hold:#8a8a8f;--bar:#9db7d0;--in:#2e7d4f;--out:#d9a29b}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141416;--panel:#1d1d20;--ink:#ecebe8;--muted:#a1a1a8;
 --line:#2f2f34;--accent:#8db7e0;--ok:#6cc58f;--weak:#e0b25a;--bad:#f08a80;--none:#8a8a8f;--c:#1f3d2b;--i:#4a2522;--n:#2a2a2e;
---adopt:#6cc58f;--trial:#8db7e0;--assess:#e0b25a;--hold:#8a8a8f;--bar:#4f6f8f;--in:#6cc58f;--out:#9a5a52}}
+--adopt:#6cc58f;--trial:#8db7e0;--assess:#e0b25a;--hold:#8a8a8f;--bar:#4f6f8f;--in:#6cc58f;--out:#9a5a52;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#141416;--panel:#1d1d20;--ink:#ecebe8;--muted:#a1a1a8;--line:#2f2f34;--accent:#8db7e0;--ok:#6cc58f;
 --weak:#e0b25a;--bad:#f08a80;--none:#8a8a8f;--c:#1f3d2b;--i:#4a2522;--n:#2a2a2e;--adopt:#6cc58f;--trial:#8db7e0;--assess:#e0b25a;
---hold:#8a8a8f;--bar:#4f6f8f;--in:#6cc58f;--out:#9a5a52}
+--hold:#8a8a8f;--bar:#4f6f8f;--in:#6cc58f;--out:#9a5a52;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
-main{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+main{max-width:980px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-size:1.75rem;line-height:1.25;margin:.2em 0}
 h2{font-size:1.3rem;margin:0 0 .6em}
 h3{font-size:1.05rem;margin:.2em 0 .5em}
@@ -491,14 +491,19 @@ if(r){q.value='';v.value='';f();var d=r.querySelector('details');if(d)d.open=tru
 """
 
 
-def page(title: str, body: str, script: bool = True) -> str:
-    return ("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-            f"<title>{esc(title)}</title><style>{STYLE}</style></head><body><main>{body}</main>"
-            + (f"<script>{SCRIPT}</script>" if script else "") + "</body></html>\n")
+def page(title: str, body: str, script: bool = True, fragment: bool = False) -> str:
+    """A whole document, or with fragment the page's content only: an artifact wraps the page it publishes in its
+    own document, while the pages published beside it are served as they are."""
+    head = (f'<title>{esc(title)}</title><meta name="claude:viewport-fit-sides" content="cover"><style>{STYLE}</style>')
+    content = f"<main>{body}</main>" + (f"<script>{SCRIPT}</script>" if script else "")
+    if fragment:
+        return head + content + "\n"
+    return ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+            f"{head}</head><body>{content}</body></html>\n")
 
 
-def render_topic(root: Path, topic_id: str, dashboard: bool = False) -> str:
+def render_topic(root: Path, topic_id: str, dashboard: bool = False, fragment: bool = False) -> str:
     """A topic's page; with dashboard, it links back to the use case's dashboard (index.html) beside it."""
     topic = Topic(root, topic_id)
     toc = [("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
@@ -510,7 +515,7 @@ def render_topic(root: Path, topic_id: str, dashboard: bool = False) -> str:
     nav = '<nav class="toc">' + back + "".join(f'<a href="#{anchor}">{name}</a>' for anchor, name in present) + "</nav>"
     return page(topic.title, section_header(topic) + nav + "".join(body)
                 + f"<footer>Research Center report for topic {esc(topic.id)}. Built from the topic's committed outputs; "
-                  "every statement traces to a claim and its stored source.</footer>")
+                  "every statement traces to a claim and its stored source.</footer>", fragment=fragment)
 
 
 # The dashboard --------------------------------------------------------------------------------------------
@@ -571,7 +576,7 @@ def scope_line(root: Path) -> str:
             + (f'<div class="md">{MARKDOWN.render(who)}</div>' if who else ""))
 
 
-def render_dashboard(root: Path) -> str:
+def render_dashboard(root: Path, fragment: bool = False) -> str:
     topics = [Topic(root, topic_id) for topic_id in topic_ids(root)]
     topics.sort(key=lambda topic: (STATUS_ORDER.get(topic.status, len(STATUS_ORDER)), topic.id))
     usecase = load(root, "usecase.json") or {}
@@ -582,7 +587,7 @@ def render_dashboard(root: Path) -> str:
     return page(title, f'<header class="top"><p class="crumbs">Research Center</p><h1>{esc(title)}</h1>'
                 f'<p class="meta">{esc(summary)}</p>{scope_line(root)}</header>'
                 f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
-                "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False)
+                "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False, fragment=fragment)
 
 
 def output_path(root: Path, name: str) -> Path:
@@ -615,12 +620,14 @@ def remember_share(folder: Path, name: str, url: str) -> None:
 
 
 def manifest(root: Path, topic: str | None, page_path: Path) -> dict[str, Any]:
-    """What a share publishes: the page, the pages beside it (for the dashboard), its title, and the link it was
-    shared at before, if any."""
+    """What a share publishes: the page as an artifact takes it (content only, in share/ beside the pages), the
+    whole pages beside it (for the dashboard), its title, and the link it was shared at before, if any."""
     folder, name = page_path.parent, topic or DASHBOARD
+    content = render_topic(root, topic, fragment=True) if topic else render_dashboard(root, fragment=True)
+    shared = write_page(folder / "share" / f"{name}.html", content)
     beside = {} if topic else {f"{other}.html": str(folder / f"{other}.html") for other in topic_ids(root)}
     title = Topic(root, topic).title if topic else (load(root, "usecase.json") or {}).get("title") or rc.settings(root).get("name")
-    return {"page": str(page_path), "files": beside, "title": title, "sharedAt": shares(folder).get(name)}
+    return {"page": str(shared), "files": beside, "title": title, "sharedAt": shares(folder).get(name)}
 
 
 def command_dashboard(root: Path, output: Path | None) -> Path:
