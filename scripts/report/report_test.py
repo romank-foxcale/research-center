@@ -37,6 +37,10 @@ REPORT = f"""# Which retrieval for product search?
 
 Topic: retrieval · Date: 2026-10-16 · Claims: 3 · Sources: 2 · Version 2
 
+## In plain words
+
+**The short answer**: use hybrid search; it finds more of what matters.
+
 ## TL;DR
 
 - Hybrid retrieval wins on recall [C1, C2]. <img src=x onerror=alert(1)>
@@ -118,9 +122,11 @@ def main() -> int:
         page = path.read_text(encoding="utf-8")
 
         # Every section, in decision order.
-        anchors = ["bottom-line", "ideas", "answers", "evidence", "hypotheses", "report", "claims", "sources", "history"]
+        anchors = ["plain", "bottom-line", "ideas", "answers", "evidence", "hypotheses", "report", "claims", "sources", "history"]
         positions = [page.find(f'id="{anchor}"') for anchor in anchors]
         assert all(position > 0 for position in positions) and positions == sorted(positions), dict(zip(anchors, positions))
+        assert "use hybrid search; it finds more of what matters." in page and "Bottom line, with its evidence" in page
+        assert page.count("The short answer") == 1, "the plain summary is not repeated in the full report"
         assert "Acme product scouting" in page and "<title>Which retrieval for product search?</title>" in page
 
         # Text from the web stays text, links are http(s) only, secrets are redacted.

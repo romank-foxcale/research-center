@@ -3,7 +3,7 @@ id: decision.0014-report-pages
 title: Research is shared as computed, self-contained HTML pages, published as private artifacts
 status: accepted
 summary: rc report renders a topic's committed outputs (or a use case's dashboard with every topic's page beside it) into self-contained HTML deterministically, with no agent call; pages are derived and kept in .rc-local/reports/, redacted on the way out, with web text escaped; the rc-share skill publishes them as private claude.ai artifacts after the user confirms, and records each link so a later share updates it.
-verified_at: 2026-10-17
+verified_at: 2026-10-18
 evidence:
   - scripts/report/report.py
   - scripts/report/report_test.py
@@ -28,7 +28,8 @@ Research results lived only as Markdown in the repository. People who decide on 
 
   It makes no model call, so it costs no budget, and the same outputs give the same bytes. A stage that has not run shows as missing and is never guessed.
 - **Decisions first.** The first screen holds:
-  - the bottom line (the report's TL;DR);
+  - the report's "In plain words" summary (added 2026-10-18 after the first foxcale report proved too dense for a leader to read): at most 300 words, no claim ids, and checked by the runner like the rest of the report;
+  - the bottom line with its evidence (the report's TL;DR);
   - the ideas by ring, with the judge's verdict, effort, what each replaces, risks and next step;
   - each question's certainty, with its downgrades.
 

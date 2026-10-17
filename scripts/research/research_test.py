@@ -156,8 +156,12 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
     if role_id == "reporter":
         cite = "[C1, C3]" if not retry else "the dense-only claim"
         hedge = "Hybrid is probably better." if not retry else "Assessment: hybrid is likely the better default for us."
-        return (f"# Retrieval\n\n## TL;DR\n\n- Hybrid [C1].\n\n## Q1: Which retrieval?\n\nCertainty: low, one benchmark.\n\n"
-                f"Hybrid [C1], weakly [C2]; not {cite}.\n\n{hedge}\n")
+        # The first reply has no plain summary; the retry has one, and a bold label on its own line, which states nothing.
+        plain = "" if not retry else ("## In plain words\n\n**The short answer**: use hybrid search.\n\n"
+                                      "**How sure we are**: low; one benchmark.\n\n")
+        label = "" if not retry else "**Benchmarks**\n\n"
+        return (f"# Retrieval\n\n{plain}## TL;DR\n\n- Hybrid [C1].\n\n## Q1: Which retrieval?\n\nCertainty: low, one benchmark.\n\n"
+                f"{label}Hybrid [C1], weakly [C2]; not {cite}.\n\n{hedge}\n")
     raise AssertionError(f"unexpected role {role_id}")
 
 
@@ -375,6 +379,13 @@ def main() -> int:
     assert "'Q1: Which?' says 'perhaps'" in problems and "'very likely', which needs moderate certainty" in problems, problems
     assert "\"Perhaps dense is fine.\" neither cites" in problems and "Caveats" not in problems and "says 'certainly'" not in problems, problems
     assert research.language_problems("## Q1: x\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == []
+    assert research.language_problems("## Q1: x\n\n**Ranking**\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == [], \
+        "a bold label on its own line heads a paragraph; it is not one"
+    # The plain summary comes first, stays short, cites nothing and still hedges only with the scale.
+    assert "start with a '## In plain words'" in " ".join(research.plain_problems("## TL;DR\n\n- x [C1]."))
+    plain = research.plain_problems("## In plain words\n\nIt is probably fine [C1]. " + "word " * 300 + "\n\n## TL;DR\n\n- x [C1].")
+    assert len(plain) == 3 and "cites claims" in plain[1] and "'probably'" in plain[2], plain
+    assert research.plain_problems("## In plain words\n\n**The short answer**: it is likely fine.\n\n## TL;DR\n\n- x [C1].") == []
     assert research.source_key(PAPER) == research.source_key(BLOG)
     assert research.source_key(RECORD) == "doi:10.5555/wt.2025.1"
     assert research.source_key("https://x.org/item?id=1") != research.source_key("https://x.org/item?id=2"), "queries stay apart"

@@ -85,6 +85,9 @@ DOWNGRADES = ("reliability", "inconsistency", "indirectness", "imprecision", "on
 UPGRADES = ("large-effect", "convergence")
 # Analysis of Competing Hypotheses: each relied-on claim is consistent (C), inconsistent (I) or neutral (N) with each.
 RATINGS = ("C", "I", "N")
+BOLD_LABEL = re.compile(r"\*\*[^*\n]+\*\*:?")
+PLAIN = "In plain words"  # the report's first section: the answer for a reader who reads nothing else
+PLAIN_MAX_WORDS = 300
 ASSUMPTION_ID = re.compile(r"A\d+")
 # ICD 203 likelihood words and the least certainty each may be said with; longest phrases are matched first.
 LIKELIHOOD = {
@@ -239,8 +242,28 @@ def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
                                     f"the judgement gives {certainty[question.group(1)]}")
         for unit in re.split(r"\n\s*\n|\n(?=\s*[-*] )", body.strip()):
             text = unit.strip()
+            if BOLD_LABEL.fullmatch(text):  # a label on its own line heads what follows; it states nothing
+                continue
             if text and not claim_refs(text) and not re.match(r"^(?:[-*]\s*)?(?:\*\*)?(Assessment|Certainty)\b", text):
                 problems.append(f"'{heading.strip()}': \"{text[:70]}\" neither cites a claim [C#] nor starts with 'Assessment:'")
+    return problems
+
+
+def plain_problems(markdown: str) -> list[str]:
+    """The plain summary opens the report, is short, and carries no claim ids: it restates the cited answer below it
+    for a reader who reads nothing else, so its hedges still use the likelihood scale."""
+    headings = re.findall(r"^## (.+)$", markdown, flags=re.MULTILINE)
+    if not headings or headings[0].strip() != PLAIN:
+        return [f"start with a '## {PLAIN}' section, before the TL;DR"]
+    body = re.split(r"^## .+$", markdown, flags=re.MULTILINE)[1]
+    problems = []
+    if len(body.split()) > PLAIN_MAX_WORDS:
+        problems.append(f"'{PLAIN}' has {len(body.split())} words; keep it under {PLAIN_MAX_WORDS}")
+    if claim_refs(body):
+        problems.append(f"'{PLAIN}' cites claims; leave the [C#] citations to the TL;DR and the answers below it")
+    lowered = body.lower()
+    problems += [f"'{PLAIN}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact"
+                 for word in sorted({match.group(0) for match in VAGUE.finditer(SCALE.sub(" ", lowered))})]
     return problems
 
 
@@ -1355,6 +1378,7 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
         if not cited:
             problems.append("cites no claim: every finding needs a [C#] citation")
         problems += language_problems(markdown, {item["question"]: item["certainty"] for item in judgement.get("answers", [])})
+        problems += plain_problems(markdown)
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return markdown

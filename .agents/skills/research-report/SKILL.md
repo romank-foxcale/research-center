@@ -16,11 +16,19 @@ brief.md, analysis.md, ideas.json, judgement.md and fit.md under research/<topic
 Markdown, in this order:
 
 1. `# <the brief's title>`
-2. `## TL;DR`: three to six bullets. The answer, the recommendation, the main caveat.
-3. One section per question, headed `## Q1: <question>`: the answer, how sure it is (the judgement's certainty for that question and its main reason, e.g. "Certainty: low, the trials are small and vendor-run"), then the evidence.
-4. `## Comparison`: the analysis's comparison, corrected by the judgement.
-5. `## What this means for us`: the fit. What to adopt, trial, assess or hold, where in the user's repos, and the next step for each.
-6. `## Caveats`: weak evidence, gaps, contested points.
+2. `## In plain words`: for a decision-maker who reads nothing else, such as a CEO. At most 300 words, in everyday English, with no claim ids. Spell out every abbreviation or term of art, or leave it out. Short labelled lists, in this order:
+   - **The short answer**: one or two sentences.
+   - **What is wrong now, and why**: only when the topic is about something the user already has (a product, a process, a component). Name each problem and why it matters to them.
+   - **What to try**: in order of value. For each, what it is in one line, what it costs and what it should gain.
+   - **What not to do**: the tempting options the evidence argues against, and why.
+   - **How sure we are**: which parts are well supported and which are not, in the judgement's terms.
+
+   It restates the cited answer below it and adds nothing new. Use the likelihood scale here too.
+3. `## TL;DR`: three to six bullets. The answer, the recommendation, the main caveat.
+4. One section per question, headed `## Q1: <question>`: the answer, how sure it is (the judgement's certainty for that question and its main reason, e.g. "Certainty: low, the trials are small and vendor-run"), then the evidence.
+5. `## Comparison`: the analysis's comparison, corrected by the judgement.
+6. `## What this means for us`: the fit. What to adopt, trial, assess or hold, where in the user's repos, and the next step for each.
+7. `## Caveats`: weak evidence, gaps, contested points.
 
 ## Rules (the runner enforces them)
 

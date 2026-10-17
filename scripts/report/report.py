@@ -178,11 +178,20 @@ def section_header(topic: Topic) -> str:
             + (f'<p class="meta">{esc(" · ".join(counts))}</p>' if counts else "") + "</header>")
 
 
+def section_plain(topic: Topic) -> str:
+    """The report's plain summary, for a reader who reads nothing else; reports written before it existed have none."""
+    _, parts = topic.report_parts()
+    body = parts.get(research.PLAIN)
+    return f'<section id="plain" class="lead plain"><h2>{research.PLAIN}</h2>{markdown(topic, body)}</section>' if body else ""
+
+
 def section_bottom_line(topic: Topic) -> str:
     _, parts = topic.report_parts()
     body = parts.get("TL;DR")
     content = markdown(topic, body) if body else missing("report")
-    return f'<section id="bottom-line" class="lead"><h2>Bottom line</h2>{content}</section>'
+    lead = "" if parts.get(research.PLAIN) else " lead"
+    title = "Bottom line, with its evidence" if parts.get(research.PLAIN) else "Bottom line"
+    return f'<section id="bottom-line" class="{lead.strip()}"><h2>{title}</h2>{content}</section>'
 
 
 def idea_rows(topic: Topic) -> list[dict[str, Any]]:
@@ -333,7 +342,7 @@ def section_hypotheses(topic: Topic) -> str:
 
 def section_report(topic: Topic) -> str:
     _, parts = topic.report_parts()
-    rest = {heading: body for heading, body in parts.items() if heading != "TL;DR"}
+    rest = {heading: body for heading, body in parts.items() if heading not in ("TL;DR", research.PLAIN)}
     if not rest:
         return ""
     text = "\n\n".join(f"## {heading}\n\n{body}" for heading, body in rest.items())
@@ -427,6 +436,7 @@ section{margin:28px 0;padding:20px;background:var(--panel);border:1px solid var(
 .top{margin:8px 0 20px}.crumbs{margin:0;color:var(--muted);font-size:.9rem}.meta{margin:.2em 0;color:var(--muted);font-size:.9rem}
 nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem;margin-bottom:8px}
 .lead{border-left:4px solid var(--accent)}
+.plain{font-size:1.05rem}.plain li{margin:.35em 0}
 .hint{color:var(--muted);font-size:.85rem}.missing{color:var(--muted);font-style:italic}.note{font-size:.92rem}
 .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.75rem;font-weight:600;border:1px solid currentColor;white-space:nowrap;vertical-align:middle}
 .ring-adopt{color:var(--adopt)}.ring-trial{color:var(--trial)}.ring-assess{color:var(--assess)}.ring-hold,.ring-not-applied{color:var(--hold)}
@@ -506,9 +516,9 @@ def page(title: str, body: str, script: bool = True, fragment: bool = False) -> 
 def render_topic(root: Path, topic_id: str, dashboard: bool = False, fragment: bool = False) -> str:
     """A topic's page; with dashboard, it links back to the use case's dashboard (index.html) beside it."""
     topic = Topic(root, topic_id)
-    toc = [("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
+    toc = [("plain", "In plain words"), ("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
            ("hypotheses", "Hypotheses"), ("report", "Full report"), ("claims", "Claims"), ("sources", "Sources"), ("history", "History")]
-    body = [section_bottom_line(topic), section_ideas(topic), section_answers(topic), section_evidence(topic),
+    body = [section_plain(topic), section_bottom_line(topic), section_ideas(topic), section_answers(topic), section_evidence(topic),
             section_hypotheses(topic), section_report(topic), section_claims(topic), section_sources(topic), section_history(topic)]
     present = [(anchor, name) for anchor, name in toc if any(f'id="{anchor}"' in part for part in body)]
     back = '<a href="index.html">&larr; All topics</a>' if dashboard else ""
