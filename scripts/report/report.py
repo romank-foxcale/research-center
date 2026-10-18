@@ -593,14 +593,16 @@ def profile_line(root: Path) -> str:
             + (f'<div class="legend tags">{tags}</div>' if tags else ""))
 
 
-def render_dashboard(root: Path, fragment: bool = False) -> str:
+def render_dashboard(root: Path, fragment: bool = False, up: str = "") -> str:
+    """The profile's research topics; with up, a link to the page above it (the main screen)."""
     topics = [Topic(root, topic_id) for topic_id in topic_ids(root)]
     topics.sort(key=lambda topic: (STATUS_ORDER.get(topic.status, len(STATUS_ORDER)), topic.id))
     title = (load(root, "profile.json") or {}).get("name") or rc.settings(root).get("name") or "Research"
     cards = "".join(topic_card(topic) for topic in topics) or '<p class="missing">No research topics yet.</p>'
     living = sum(topic.status == "living" for topic in topics)
     summary = f"{len(topics)} topic{'s' if len(topics) != 1 else ''}, {living} living"
-    return page(title, f'<header class="top"><p class="crumbs">Research Center</p><h1>{esc(title)}</h1>'
+    crumbs = f'<a href="{esc(up)}">&larr; Main screen</a>' if up else "Research Center"
+    return page(title, f'<header class="top"><p class="crumbs">{crumbs}</p><h1>{esc(title)}</h1>'
                 f'<p class="meta">{esc(summary)}</p>{profile_line(root)}</header>'
                 f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
                 "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False, fragment=fragment)

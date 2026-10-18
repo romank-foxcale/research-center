@@ -41,6 +41,7 @@ Commands:
   report [<topic>] [--output P]  A topic as one HTML page, or without a topic the dashboard and every topic's
                  page (.rc-local/reports/index.html)
   report [<topic>] --manifest | --shared-at <url>  What a share publishes; record the link it was shared at
+  home [--manifest | --shared-at <url>]  The main screen: every profile's tags and technology cards, one page per card
   sources list | search <adapter> <query> [--filter k=v] [--since D] | related <adapter> <id> --direction backward|forward
   sources packs | enable <pack> | disable <pack> | new <adapter> --family F --evidence-type T | test [<adapter>]
   watch [run]    Follow an ingest or research run live: steps, agent talk, stalls, result
@@ -68,6 +69,7 @@ CHECKS = [
     ("ingest test", ["ingest/ingest_test.py"]),
     ("research test", ["research/research_test.py"]),
     ("report test", ["report/report_test.py"]),
+    ("home test", ["report/home_test.py"]),
     ("sources test", ["sources/sources_test.py"]),
     ("upgrade test", ["upgrade_instance_test.py"]),
     ("profiles test", ["profiles_test.py"]),
@@ -79,7 +81,7 @@ CHECKS = [
 SCRIPT_COMMANDS = {
     "ingest": "ingest/ingest.py", "research": "research/research.py", "sources": "sources/sources.py",
     "watch": "runner/events.py", "roles": "roles.py", "plan": "plans.py", "agents": "agent-configs.py",
-    "profile": "profiles.py", "tags": "tags.py", "scout": "scout/scout.py", "report": "report/report.py",
+    "home": "report/home.py", "profile": "profiles.py", "tags": "tags.py", "scout": "scout/scout.py", "report": "report/report.py",
 }
 # Commands whose data lives in a profile: they get its folder as their root (docs/decisions/0015-profiles.md).
 DATA_COMMANDS = {"ingest", "research", "watch", "report", "tags", "scout"}

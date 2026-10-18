@@ -82,6 +82,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc profile new acme --name "Acme" --type company   a profile: whom the RC works for
 ./rc -p acme tags add "Japanese OCR"          an interest tag; or drop files into profiles/acme/inbox/ and run tags suggest
 ./rc -p acme scout                            technology cards: what is new for the profile's tags, and whether it fits
+./rc home                                     the main screen: every profile's cards, one page each, ready to share
 ./rc -p acme ingest add ...                   work inside a profile (or set defaultProfile)
 ./rc ingest add git https://github.com/org/api --note "our main API"
 ./rc ingest add folder /mnt/c/Users/me/Papers --include '*.pdf'

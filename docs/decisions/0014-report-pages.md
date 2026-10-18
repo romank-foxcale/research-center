@@ -7,6 +7,8 @@ verified_at: 2026-10-18
 evidence:
   - scripts/report/report.py
   - scripts/report/report_test.py
+  - scripts/report/home.py
+  - scripts/report/home_test.py
   - .agents/skills/rc-share/SKILL.md
   - rc.py
 relations:
@@ -41,6 +43,13 @@ Research results lived only as Markdown in the repository. People who decide on 
 - **A dashboard per profile.** `rc report` without a topic writes `index.html` with every topic's page beside it, linked both ways. It shows:
   - the profile's type, description and interest tags (or its scope's Who, without the scope's evidence paths);
   - each topic's status, progress, rings, leading ideas and certainty.
+- **The main screen** (`rc home`, added 2026-10-18 with scouting, ADR 0016) is written to `.rc-local/reports/home/`:
+  - every profile with its type, description and tags, and its open technology cards grouped by verdict;
+  - a flag on any card whose licence the profile cannot use, or whose verdict the sceptic changed;
+  - one page per card, with plain words before the engineers' part, the sceptic's review and the evidence quotes;
+  - each profile's research dashboard and topic pages under `<profile>/research/`, linked up to the main screen.
+
+  The folder is shared whole.
 - **Derived and local.** Pages go to `<data root>/.rc-local/reports/` through `rc.write_text`, so secrets are redacted like every runner write. They are not committed, and they can be rebuilt at any time.
 - **No injection, no dependencies at view time.**
   - Markdown is rendered by markdown-it-py with raw HTML off, and every other value is escaped. Links are http and https only.

@@ -154,6 +154,7 @@ Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it int
 | `./rc roles set <role> --provider claude --model opus` | Move a role to another provider or model |
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |
 | `./rc research list` / `show <topic>` | Topics and their stages |
+| `./rc home` | The main screen: every profile's tags and technology cards, one page per card (`.rc-local/reports/home/index.html`); share it with the rc-share skill |
 | `./rc report [<topic>]` | A topic as one HTML page, or the dashboard of every topic, in `.rc-local/reports/` |
 | `./rc research run <topic> --from judge` | Redo a stage and everything after it |
 | `./rc sources packs` / `enable <pack>` | Domain packs: medicine (PubMed), software (GitHub), news (The Guardian; set GUARDIAN_API_KEY to a free Open Platform key) |

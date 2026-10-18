@@ -9,6 +9,7 @@ The pages are computed by `./rc report` from the committed outputs, so sharing n
 
 ## Build
 
+- The main screen (every profile's tags and technology cards, a page per card, each profile's research): `./rc home --manifest`. This is what a CTO usually wants.
 - One topic: `./rc -p <profile> report <topic> --manifest`.
 - The whole profile (a dashboard with every topic's page beside it): `./rc -p <profile> report --manifest`.
 
@@ -19,9 +20,8 @@ Leave out `-p` in an RC without profiles or when `defaultProfile` covers it. The
 - `sharedAt`, the link the page was shared at before, if it was.
 
 Before asking, tell the user in two or three lines what the page says:
-- the bottom line;
-- the leading ideas;
-- the certainty.
+- for the main screen: each profile's cards by verdict;
+- for a topic: the bottom line, the leading ideas and the certainty.
 
 A topic whose run has not finished shows "Not produced yet" for its missing parts. Say so.
 
@@ -47,7 +47,7 @@ Pages describe the user's company and products. A published artifact is private 
   - `icon` is `chart` on the first publish;
   - `description` is one sentence: the topic's bottom line, or the profile's topic count.
 - If `sharedAt` has a link, pass it as `url` so the link stays the same. Read the artifact first when this conversation has not published it.
-- Record the link: `./rc -p <profile> report [<topic>] --shared-at <url>`. Records live in `.rc-local/reports/shares.json`, on this machine only. Another person shares from their own account under their own link.
+- Record the link: `./rc home --shared-at <url>` for the main screen, or `./rc -p <profile> report [<topic>] --shared-at <url>`. Records live in `.rc-local/reports/shares.json`, on this machine only. Another person shares from their own account under their own link.
 - Give the user the link. Mention that a refresh or re-run changes the page only when they share again.
 
 ## Never

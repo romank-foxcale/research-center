@@ -33,7 +33,7 @@ Lead with plain words. Engineers' detail is in the card when the user asks.
 
 - **Dismiss** a card the user does not want raised again: `./rc -p <id> scout dismiss <card>`.
 - **Deep dive:** when a card needs a real study, offer a research topic from it. Use grill-research-topic with the card's component, claims and evaluation plan as the starting brief.
-- **Share:** use rc-share for a link a CTO can read.
+- **See and share:** `./rc home` writes the main screen with a page per card (`.rc-local/reports/home/index.html`). Use rc-share for a link a CTO can read.
 - **Commit** `profiles/<id>/scout/` when the user asks.
 
 ## Never
