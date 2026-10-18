@@ -28,7 +28,7 @@ The user wants the job foxcale pays consultants for: hear about new technology t
   - `github-new`: repositories created since the last discovery, most starred first;
   - `github-active`: repositories with at least `scout.githubMinStars` stars pushed since then;
   - `arxiv`: the newest arXiv papers with the tag in the title or abstract, through the feed adapter;
-  - `openalex`: works published since then.
+  - `openalex`: works published since then, with the tag searched as a quoted phrase, because loose word matching floods it with unrelated fields.
 
   A source whose adapter is not enabled is skipped and named. The GitHub sources need the software pack.
 - **Since:** the last discovery date, from `scout/state.json`, or `scout.lookbackDays` (30) ago on the first run.

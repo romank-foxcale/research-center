@@ -74,7 +74,8 @@ def queries(tag: str, since: str, config: dict[str, Any], enabled: set[str]) -> 
         "github-new": ("github", tag, {"created": since, "sort": "stars"}, None),
         "github-active": ("github", tag, {"minStars": str(config["githubMinStars"]), "sort": "stars"}, since),
         "arxiv": ("feed", arxiv_url(tag, config["perQuery"]), {"evidenceType": "preprint"}, since),
-        "openalex": ("openalex", tag, {}, since),
+        # Quoted: OpenAlex matches loose words otherwise ("TAR stopping rules" found mean-field games).
+        "openalex": ("openalex", f'"{tag}"', {}, since),
     }
     return [(source, *planned[source]) for source in config["sources"] if source in planned and planned[source][0] in enabled]
 

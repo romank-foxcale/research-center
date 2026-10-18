@@ -75,7 +75,7 @@ def main() -> int:
         assert new == ("github", "Japanese OCR", {"created": "2026-09-18", "sort": "stars"}, None), new
         assert active == ("github", "Japanese OCR", {"minStars": "50", "sort": "stars"}, "2026-09-18"), active
         assert arxiv[0] == "feed" and "export.arxiv.org/api/query" in arxiv[1] and "Japanese+OCR" in arxiv[1] and "submittedDate" in arxiv[1]
-        assert works == ("openalex", "Japanese OCR", {}, "2026-09-18")
+        assert works == ("openalex", '"Japanese OCR"', {}, "2026-09-18"), "a tag is searched as a phrase"
         assert summary["failures"] == ["openalex for 'Japanese OCR': openalex: HTTP 429", "openalex for 'cross-encoder reranking': openalex: HTTP 429"]
 
         found = json.loads((alpha / "scout" / "candidates" / f"{summary['stamp']}.json").read_text(encoding="utf-8"))["candidates"]
