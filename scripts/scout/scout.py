@@ -40,7 +40,7 @@ import licences  # noqa: E402
 import rc  # noqa: E402
 import sources as registry  # noqa: E402
 
-DEFAULTS = {"lookbackDays": 30, "perQuery": 10, "githubMinStars": 50, "cardsPerRun": 6, "calls": 12,
+DEFAULTS = {"lookbackDays": 30, "perQuery": 10, "githubMinStars": 50, "cardsPerRun": 6, "calls": 12, "cadenceDays": 7,
             "sources": ["github-new", "github-active", "arxiv", "openalex"]}
 ROLES = ("scoutTriage", "scoutEvaluator", "scoutSceptic")
 ARXIV = "http://export.arxiv.org/api/query"
@@ -225,6 +225,8 @@ def command_run(root: Path, find: bool = True) -> dict[str, Any]:
         report_discovery(summary)
         stamp = summary["stamp"]
     result = carding.run(root, config, {role: pipeline[role] for role in ROLES}, stamp)
+    state_path = folder(root) / "state.json"
+    rc.write_json(state_path, {**load(state_path, {}), "lastRun": datetime.date.today().isoformat()})
     if not result["triaged"]:
         print("no open candidates to triage; run discovery first (rc scout discover)")
         return result
@@ -235,6 +237,82 @@ def command_run(root: Path, find: bool = True) -> dict[str, Any]:
     for line in result["failures"]:
         print(f"warning: no card for {line}")
     return result
+
+
+def is_due(root: Path, today: datetime.date | None = None) -> bool:
+    """A profile is due when it has tags and its last full scout is scout.cadenceDays or more ago (or never ran)."""
+    meta = profile(root)
+    if not meta.get("tags"):
+        return False
+    last = load(folder(root) / "state.json", {}).get("lastRun")
+    if not last:
+        return True
+    today = today or datetime.date.today()
+    return (today - datetime.date.fromisoformat(last)).days >= settings(root)["cadenceDays"]
+
+
+def command_due(root: Path) -> dict[str, Any] | None:
+    if not is_due(root):
+        print(f"{profile(root).get('name', root.name)}: not due")
+        return None
+    return command_run(root)
+
+
+def slug_topic(text: str) -> str:
+    return carding.slug(text)[:48].strip("-") or "card"
+
+
+def command_dive(root: Path, identifier: str, topic: str | None = None) -> Path:
+    """Turn a card into a draft research brief - the deep dive - pre-filled from the card: its component, what it
+    does today, the claims to test, the constraints, and the card's pass bar as the success criterion. The user
+    grills and accepts it (grill-research-topic); nothing runs until then."""
+    path = folder(root) / "cards" / f"{identifier}.json"
+    if not path.is_file():
+        raise rc.RcError(f"no card {identifier}; rc scout cards lists them")
+    if carding.is_trends(root):
+        raise rc.RcError("a trend card belongs to every profile; dive into it from the profile it affects (rc -p <id> research new)")
+    card = json.loads(path.read_text(encoding="utf-8"))
+    meta = profile(root)
+    engineers, plan = card["engineers"], card["engineers"]["evaluation"]
+    topic = topic or slug_topic(card["title"].split("/")[-1])
+    directory = root / "research" / topic
+    if directory.exists():
+        raise rc.RcError(f"topic {topic} already exists; pass another id")
+    licence = card.get("licence")
+    licence_line = (f" Its licence ({licence['spdx'] or 'none found'}, {licence['class']}) is "
+                    + ("usable by this profile." if licence["usable"] else f"not usable by this {meta.get('type')} profile: {licence['reason']}.")
+                    if licence else "")
+    sections = {
+        "Topic": (f"Whether {card['title']} ({card['url']}) should change {engineers['component']}. The scout's card ({card['date']}, "
+                  f"verdict: {card['verdict']}) says: {card['headline']} This study tests that verdict with cited evidence before "
+                  "anyone builds on it."),
+        "Questions": "\n".join([
+            f"- Q1: Does {card['title']} do better than what {engineers['component']} does today ({engineers['componentToday'].rstrip('.')}), "
+            f"measured as {plan['metric']}, and on data like ours?",
+            f"- Q2: Which constraints does it meet or break for us: licence, data residency, language, scale and maintenance?{licence_line}",
+            f"- Q3: What would integrating it take: what it replaces ({engineers['replaces']}), the effort and the risks?",
+            f"- Q4: How does it compare with the alternatives ({engineers['alternatives'].rstrip('.')})?"]),
+        "Scope": f"{card['title']}, its documented results and independent evaluations, and the alternatives the card names. Recent work first.",
+        "Out of scope": "Other uses of the technology that do not bear on the component above.",
+        "Our needs": (f"The component: {engineers['component']}. Today: {engineers['componentToday']} The card's evidence rests on "
+                      f"{card['evidence']}; the fit on {', '.join(card.get('profileBasis', []))}."),
+        "Success criteria": (f"A decision on the card's verdict. The card's evaluation plan is the bar: {plan['experiment']}; "
+                             f"metric {plan['metric']}; pass bar {plan['passBar']}; effort {plan['effort']}."),
+        "Source preferences": "The project's own documentation and code, peer-reviewed or reproduced evaluations, issue trackers for known "
+                              "problems; distrust vendor benchmarks without method.",
+        "Living": "Cadence: none\nRetire when: the verdict is decided.",
+    }
+    template = (rc.instance(root) / "templates" / "brief.md").read_text(encoding="utf-8")
+    head = template.split("\n## ", 1)[0].replace("<topic-id>", topic).replace("<title>", f"Should {card['title']} change {engineers['component']}?")
+    text = head + "".join(f"\n## {name}\n\n{body}\n" for name, body in sections.items())
+    text += "\n## Amendments\n\nNone. Log here every change made to the questions, scope or needs after acceptance, with its date; a changed brief redoes the research from plan.\n"
+    rc.write_text(directory / "brief.md", text)
+    card["status"] = "deep dive"
+    card["research"] = topic
+    carding.write_card(root, card)
+    print(f"drafted research/{topic}/brief.md from the card; review it with the grill-research-topic skill, then "
+          f"rc research accept {topic}")
+    return directory / "brief.md"
 
 
 def command_cards(root: Path) -> None:
@@ -269,6 +347,10 @@ def main() -> int:
     find.add_argument("--tag", action="append", help="only this tag; repeatable")
     commands.add_parser("cards", help="the profile's technology cards, newest first")
     commands.add_parser("init", help="start the instance's shared trend feed (rc trends init)")
+    commands.add_parser("due", help="a full scout if scout.cadenceDays have passed since the last one")
+    dive = commands.add_parser("dive", help="turn a card into a draft research brief")
+    dive.add_argument("card")
+    dive.add_argument("--topic", help="the research topic id (default: from the card's title)")
     commands.add_parser("dismiss", help="close a card; its find is never raised again").add_argument("card")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -279,6 +361,10 @@ def main() -> int:
             command_cards(root)
         elif args.command == "init":
             command_init_trends(root)
+        elif args.command == "due":
+            command_due(root)
+        elif args.command == "dive":
+            command_dive(root, args.card, args.topic)
         elif args.command == "dismiss":
             command_dismiss(root, args.card)
         else:

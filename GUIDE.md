@@ -155,6 +155,8 @@ Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it int
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |
 | `./rc research list` / `show <topic>` | Topics and their stages |
 | `./rc trends init` / `./rc trends` / `./rc trends tags add "<tag>"` | The shared trends feed: releases that may affect any profile, such as agent harnesses; each card names the profiles it affects |
+| `./rc scout --due` | Scout every profile and the trends feed that is due; for a weekly schedule |
+| `./rc -p <id> scout dive <card>` | Draft a research brief from a card, for a full study |
 | `./rc home` | The main screen: every profile's tags and technology cards, one page per card (`.rc-local/reports/home/index.html`); share it with the rc-share skill |
 | `./rc report [<topic>]` | A topic as one HTML page, or the dashboard of every topic, in `.rc-local/reports/` |
 | `./rc research run <topic> --from judge` | Redo a stage and everything after it |
@@ -179,6 +181,18 @@ schtasks /create /sc weekly /d MON /st 07:00 /tn rc-refresh /tr "cmd /c cd /d %U
 # macOS / Linux: crontab -e
 0 7 * * 1  cd ~/Projects/my-project_RC && ./rc research refresh --due >> .rc-local/refresh.log 2>&1
 ```
+
+**Scout every week.** `rc scout --due` scouts every profile and the trends feed whose cadence (`scout.cadenceDays`, 7) has passed and skips the rest, at about 12 agent calls each. Schedule it next to the refresh; the machine must be on and your logins valid:
+
+```bat
+schtasks /create /sc weekly /d MON /st 07:30 /tn rc-scout /tr "cmd /c cd /d %USERPROFILE%\Projects\my-project_RC && rc scout --due >> .rc-local\scout.log 2>&1"
+```
+
+```bash
+30 7 * * 1  cd ~/Projects/my-project_RC && ./rc scout --due >> .rc-local/scout.log 2>&1
+```
+
+**From a card to a study.** When a card deserves more than a verdict, `rc -p <id> scout dive <card>` drafts a research brief from it: its component and what it does today, four questions (does it do better on the card's metric, which constraints it meets or breaks, what integrating it takes, how it compares with the alternatives), and the card's pass bar as the success criterion. Review it with the grill-research-topic skill, accept it, and run it like any topic.
 
 Changing a living brief's questions, scope or needs stops its refreshes: log the change under `## Amendments`, and `./rc research run <topic>` redoes the research from plan as the next version.
 

@@ -54,7 +54,8 @@ Commands:
   tags suggest | accept [<tag>...|--all] | reject [<tag>...|--all]  Tags proposed from the profile's material
   scout [run] [--no-discover]  Discovery, then triage, technology cards and their challenge (about scout.calls agent calls)
   scout discover [--since D] [--tag T]  What is new for the profile's tags on GitHub, arXiv and OpenAlex (no agent)
-  scout cards | dismiss <card>  The profile's technology cards; close one for good
+  scout cards | dismiss <card> | dive <card> [--topic T]  Cards: close one for good, or draft a research brief from it
+  scout --due    Scout every profile and the trend feed whose cadence (scout.cadenceDays) has passed; for a weekly schedule
   trends init | [run] | discover | cards | dismiss <card> | tags ...  The shared trend feed, judged against every profile"""
 
 # The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
@@ -78,6 +79,7 @@ CHECKS = [
     ("scout test", ["scout/scout_test.py"]),
     ("cards test", ["scout/cards_test.py"]),
     ("trends test", ["scout/trends_test.py"]),
+    ("dive test", ["scout/dive_test.py"]),
 ]
 # Commands that hand over to one script with the root and the remaining arguments.
 SCRIPT_COMMANDS = {
@@ -187,6 +189,12 @@ def main(argv: list[str]) -> int:
         # Every profile's due topics; one failing does not stop the others.
         codes = [script(SCRIPT_COMMANDS["research"], str(ROOT / "profiles" / name), *args) for name in profiles()]
         return max(codes)
+    if command == "scout" and args[:1] == ["--due"] and not selected:
+        # The weekly schedule: every profile whose cadence has passed, then the trend feed; one failing does not stop
+        # the others (docs/decisions/0016-scouting.md).
+        roots = [ROOT / "profiles" / name for name in profiles()] + ([ROOT / "trends"] if (ROOT / "trends" / "profile.json").is_file() else [])
+        codes = [script(SCRIPT_COMMANDS["scout"], str(path), "due") for path in roots]
+        return max(codes, default=0)
     if command == "trends":
         # The shared trend feed: trends/ is scouted like a profile (docs/decisions/0016-scouting.md).
         if args[:1] == ["tags"]:

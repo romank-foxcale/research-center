@@ -13,6 +13,7 @@ evidence:
   - scripts/scout/cards.py
   - scripts/scout/cards_test.py
   - scripts/scout/trends_test.py
+  - scripts/scout/dive_test.py
   - .agents/skills/scout-card/SKILL.md
 relations:
   - docs/decisions/0015-profiles.md
@@ -58,6 +59,9 @@ The user wants the job foxcale pays consultants for: hear about new technology t
   - **Storage.** Cards are `scout/cards/<id>.json`, rendered to `.md` by the runner. `rc scout dismiss` closes one, and its find is never raised again.
 
 - **The shared trends feed** (`rc trends`). `trends/` at the instance root is scouted like a profile, with its own general tags (`rc trends init` seeds agent harnesses, open-weight models, local inference and similar; `rc trends tags` edits them) and the company licence rule, the strictest. Triage and the evaluator read every profile. A trend card must list in `affects` the profiles it may affect, with the component and how, naming only profiles that exist; a trend that affects none is not a fit. The main screen shows trends above the profiles.
+
+- **Schedule.** `rc scout --due` runs a full scout for every profile, and the trends feed, whose last full scout (`scout/state.json` `lastRun`) is `scout.cadenceDays` (7) or more ago and that has tags; the rest are skipped. One failing does not stop the others. It is meant for a weekly Task Scheduler or cron entry.
+- **Deep dive.** `rc scout dive <card>` turns a profile's card into a draft research brief, written by the runner from the card: the component and what it does today; four questions (does it do better on the card's metric, which constraints it meets or breaks, what integrating it takes, how it compares with the alternatives); the card's evaluation plan as the success criterion; and no cadence. The brief passes the brief check and stays a draft until the user accepts it. The card is marked `deep dive` with the topic id. A trend card is dived from the profile it affects.
 
 ## Consequences
 

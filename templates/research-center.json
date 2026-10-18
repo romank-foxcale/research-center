@@ -28,6 +28,7 @@
     "githubMinStars": 50,
     "cardsPerRun": 6,
     "calls": 12,
+    "cadenceDays": 7,
     "sources": ["github-new", "github-active", "arxiv", "openalex"]
   },
   "pipeline": {

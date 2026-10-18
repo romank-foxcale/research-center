@@ -36,7 +36,8 @@ Lead with plain words. Engineers' detail is in the card when the user asks.
 ## After
 
 - **Dismiss** a card the user does not want raised again: `./rc -p <id> scout dismiss <card>`.
-- **Deep dive:** when a card needs a real study, offer a research topic from it. Use grill-research-topic with the card's component, claims and evaluation plan as the starting brief.
+- **Deep dive:** when a card needs a real study, `./rc -p <id> scout dive <card>` drafts a research brief from it (component, four questions, the card's pass bar as the success criterion). Review it with the user through grill-research-topic, accept it, then run it with rc-research.
+- **Schedule:** offer to scout weekly. `./rc scout --due` runs every profile and the trends feed that is due; GUIDE.md has the Task Scheduler and cron lines. Creating the scheduled task changes the user's machine, so give them the line, or create it only on their explicit yes.
 - **See and share:** `./rc home` writes the main screen with a page per card (`.rc-local/reports/home/index.html`). Use rc-share for a link a CTO can read.
 - **Commit** `profiles/<id>/scout/` when the user asks.
 
