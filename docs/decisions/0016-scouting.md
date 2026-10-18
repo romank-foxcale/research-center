@@ -2,7 +2,7 @@
 id: decision.0016-scouting
 title: Scouting turns a profile's interest tags into candidates, then technology cards, starting with discovery that uses no agent
 status: accepted
-summary: rc scout discover asks, per interest tag, GitHub for new and for established active repositories, arXiv for its newest papers and OpenAlex for recent works since the last discovery; results merge by key across tags; repositories carry the profile's licence verdict; a seen-list makes each find a candidate once; a failing source is reported and never stops the rest; the user's gh token is lent to GitHub search for the run only. Triage and technology cards (scouting plan WP4) build on the candidates.
+summary: rc scout runs discovery, triage, technology cards and their challenge. Discovery asks, per interest tag, GitHub for new and for established active repositories, arXiv for its newest papers and OpenAlex for recent works since the last discovery; results merge by key across tags; repositories carry the profile's licence verdict; a seen-list makes each find a candidate once; a failing source is reported and never stops the rest; the user's gh token is lent to GitHub search for the run only. Triage (one call) picks the few finds worth a card; the runner stores each pick's README or paper page and sets its licence line; the evaluator writes a card for leaders and engineers with a verdict (worth testing, watch, not a fit), quoting the evidence word for word; a sceptic reviews every card and its verdict replaces a wrong one, visibly; about 12 calls a run.
 verified_at: 2026-10-18
 evidence:
   - scripts/scout/scout.py
@@ -10,6 +10,9 @@ evidence:
   - scripts/sources/adapters/github.py
   - templates/packs/software/adapters/github.json
   - templates/research-center.json
+  - scripts/scout/cards.py
+  - scripts/scout/cards_test.py
+  - .agents/skills/scout-card/SKILL.md
 relations:
   - docs/decisions/0015-profiles.md
   - docs/decisions/0007-source-adapters.md
@@ -41,6 +44,17 @@ The user wants the job foxcale pays consultants for: hear about new technology t
   - `scout/candidates/<stamp>.json`;
   - `scout/runs/<stamp>-searches.json`, every query and its status;
   - `scout/seen.json` and `scout/state.json`.
+
+- **Triage, cards and challenge** (`scripts/scout/cards.py`). `rc scout` runs discovery and then these steps, within `scout.calls` agent calls (12 by default):
+  - **Triage.** The scout-triage role sees every open candidate in one call: title, kind, tags, stars, licence class and summary. It picks at most `scout.cardsPerRun` (6), each with a reason and the component it bears on. The rest are marked `passed` in the seen-list.
+  - **Evidence.** For each pick the runner fetches what a card may rely on: a repository's README through the GitHub API, or a paper's arXiv page. It stores it in `scout/evidence/` with secrets redacted, together with the facts it holds, including the licence verdict. No agent sets the licence.
+  - **Card.** The scout-evaluator writes one card per pick, in parallel.
+    - For leaders: what it is, what it could do for the profile, where it plugs in, and the verdict (`worth testing`, `watch` or `not a fit`) with its reason.
+    - For engineers: how it works, the component and what it does today, what it replaces, alternatives, pros, cons, risks, maturity, and an evaluation plan (experiment, metric, pass bar, effort).
+
+    At least two claims quote the evidence word for word, checked like research quotes, and the fit names the profile files it rests on. "Not a fit" is a full result.
+  - **Challenge.** The scout-sceptic reviews every card in one call: holds, overstated (with issues) or wrong (with the verdict that does follow). A wrong card takes the sceptic's verdict, and the card says the sceptic changed it.
+  - **Storage.** Cards are `scout/cards/<id>.json`, rendered to `.md` by the runner. `rc scout dismiss` closes one, and its find is never raised again.
 
 ## Consequences
 

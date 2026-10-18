@@ -26,6 +26,8 @@
     "lookbackDays": 30,
     "perQuery": 10,
     "githubMinStars": 50,
+    "cardsPerRun": 6,
+    "calls": 12,
     "sources": ["github-new", "github-active", "arxiv", "openalex"]
   },
   "pipeline": {
@@ -33,6 +35,9 @@
     "digester": "digester",
     "profiler": "profiler",
     "tagger": "tagger",
+    "scoutTriage": "scout-triage",
+    "scoutEvaluator": "scout-evaluator",
+    "scoutSceptic": "scout-sceptic",
     "sourcePlanner": "source-planner",
     "screener": "screener",
     "researchers": ["researcher-claude", "researcher-sonnet"],

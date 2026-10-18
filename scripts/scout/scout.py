@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""rc scout discover [--since D] [--tag T ...]: find what is new for a profile's interest tags, with no agent.
+"""rc scout [run] [--no-discover] | discover [--since D] [--tag T ...] | cards | dismiss <card>: scouting for a profile.
+
+`rc scout` runs discovery (below), then triage, technology cards and their challenge (cards.py), at about
+scout.calls agent calls. `rc scout discover` finds what is new for a profile's interest tags, with no agent.
 
 For every tag the runner asks the adapters for what appeared since the last discovery (plans/active/scouting.md):
 
@@ -31,13 +34,15 @@ from typing import Any, Callable
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent / "runner"), str(HERE.parent / "sources"), str(HERE.parent)]
+import cards as carding  # noqa: E402
 import kit  # noqa: E402
 import licences  # noqa: E402
 import rc  # noqa: E402
 import sources as registry  # noqa: E402
 
-DEFAULTS = {"lookbackDays": 30, "perQuery": 10, "githubMinStars": 50,
+DEFAULTS = {"lookbackDays": 30, "perQuery": 10, "githubMinStars": 50, "cardsPerRun": 6, "calls": 12,
             "sources": ["github-new", "github-active", "arxiv", "openalex"]}
+ROLES = ("scoutTriage", "scoutEvaluator", "scoutSceptic")
 ARXIV = "http://export.arxiv.org/api/query"
 KINDS = {"github": "repository", "feed": "paper", "openalex": "paper", "crossref": "paper", "guardian": "article", "gdelt": "article"}
 
@@ -173,26 +178,91 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
     return summary
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(prog="rc scout")
-    parser.add_argument("root", type=Path)
-    commands = parser.add_subparsers(dest="command", required=True)
-    find = commands.add_parser("discover", help="find what is new for the profile's tags, with no agent")
-    find.add_argument("--since", help="YYYY-MM-DD; default: the last discovery, else scout.lookbackDays ago")
-    find.add_argument("--tag", action="append", help="only this tag; repeatable")
-    args = parser.parse_args()
-    root = args.root.resolve()
-    try:
-        summary = discover(root, args.since, args.tag)
-    except (rc.RcError, OSError, ValueError, KeyError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 1
+def report_discovery(summary: dict[str, Any]) -> None:
     print(f"{summary['new']} new candidates from {summary['results']} results since {summary['since']}: "
           f"scout/candidates/{summary['stamp']}.json")
     for line in summary["failures"]:
         print(f"warning: {line}")
     if summary["sourcesSkipped"]:
         print(f"note: not searched, adapter not enabled: {', '.join(summary['sourcesSkipped'])} (rc sources packs)")
+
+
+def all_cards(root: Path) -> list[dict[str, Any]]:
+    return sorted((json.loads(path.read_text(encoding="utf-8")) for path in (folder(root) / "cards").glob("*.json")),
+                  key=lambda card: (card["date"], card["id"]), reverse=True)
+
+
+def command_run(root: Path, find: bool = True) -> dict[str, Any]:
+    profile(root)
+    config = settings(root)
+    pipeline = rc.settings(root)["pipeline"]
+    missing = [role for role in ROLES if role not in pipeline]
+    if missing:
+        raise rc.RcError(f"pipeline has no {', '.join(missing)}; run rc upgrade from the template")
+    stamp = datetime.date.today().isoformat()
+    if find:
+        summary = discover(root)
+        report_discovery(summary)
+        stamp = summary["stamp"]
+    result = carding.run(root, config, {role: pipeline[role] for role in ROLES}, stamp)
+    if not result["triaged"]:
+        print("no open candidates to triage; run discovery first (rc scout discover)")
+        return result
+    print(f"triaged {result['triaged']} candidates; {len(result['cards'])} cards in {result.get('calls', 0)} agent calls:")
+    for card in all_cards(root):
+        if card["id"] in result["cards"]:
+            print(f"  [{card['verdict']}] {card['title']}: {card['headline']}  (scout/cards/{card['id']}.md)")
+    for line in result["failures"]:
+        print(f"warning: no card for {line}")
+    return result
+
+
+def command_cards(root: Path) -> None:
+    cards = all_cards(root)
+    if not cards:
+        print("no cards yet: rc scout")
+    for card in cards:
+        status = "" if card.get("status", "open") == "open" else f" ({card['status']})"
+        print(f"{card['date']}  [{card['verdict']}]{status} {card['title']}  scout/cards/{card['id']}.md")
+
+
+def command_dismiss(root: Path, identifier: str) -> None:
+    """Close a card for good: its find is never raised again."""
+    path = folder(root) / "cards" / f"{identifier}.json"
+    if not path.is_file():
+        raise rc.RcError(f"no card {identifier}; rc scout cards lists them")
+    card = json.loads(path.read_text(encoding="utf-8"))
+    card["status"] = "dismissed"
+    carding.write_card(root, card)
+    carding.mark(root, [card["key"]], "dismissed", card["stamp"])
+    print(f"dismissed {card['title']}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="rc scout")
+    parser.add_argument("root", type=Path)
+    commands = parser.add_subparsers(dest="command")
+    run_parser = commands.add_parser("run", help="discovery, triage, cards and their challenge (the default)")
+    run_parser.add_argument("--no-discover", action="store_true", help="only triage the open candidates")
+    find = commands.add_parser("discover", help="find what is new for the profile's tags, with no agent")
+    find.add_argument("--since", help="YYYY-MM-DD; default: the last discovery, else scout.lookbackDays ago")
+    find.add_argument("--tag", action="append", help="only this tag; repeatable")
+    commands.add_parser("cards", help="the profile's technology cards, newest first")
+    commands.add_parser("dismiss", help="close a card; its find is never raised again").add_argument("card")
+    args = parser.parse_args()
+    root = args.root.resolve()
+    try:
+        if args.command == "discover":
+            report_discovery(discover(root, args.since, args.tag))
+        elif args.command == "cards":
+            command_cards(root)
+        elif args.command == "dismiss":
+            command_dismiss(root, args.card)
+        else:
+            command_run(root, not getattr(args, "no_discover", False))
+    except (rc.RcError, rc.providers.ProviderError, OSError, ValueError, KeyError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
     return 0
 
 

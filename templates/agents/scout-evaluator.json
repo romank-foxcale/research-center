@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "scout-evaluator",
+  "purpose": "Writes a technology card: what a find is, where it would plug in, the verdict and how to evaluate it",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "scout-card"
+  ]
+}

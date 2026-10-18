@@ -7,6 +7,7 @@ This repository is a Research Center (RC): it ingests what the user knows, grill
 - Create, set up, configure or migrate an RC: read `BOOTSTRAP.md`, load `grill-rc-bootstrap`, determine the mode (`new` or `migration`), and keep grilling until the state is verifiable.
 - Create, describe or retype a profile (a company, a product line, a person), add, edit or propose its interest tags, or write its scope: load `grill-profile`.
 - Point the RC at folders, repos, URLs, Notion or Drive, or refresh the profile: load `rc-ingest`.
+- Scout for a profile, "what is new for us", "does X fit us", or read, dismiss or deepen technology cards: load `rc-scout`.
 - Research a subject, start a topic, "do an AI search on X": load `grill-research-topic`, then `rc-research`.
 - Run, follow or explain research: load `rc-research`.
 - Share results with people outside the repository, or make a page, link or dashboard of them: load `rc-share`.

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "scout-triage",
+  "purpose": "Picks the few new finds that most deserve a technology card for the profile",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "scout-triage"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "scout-sceptic",
+  "purpose": "Challenges every technology card's verdict and fit against the profile and the evidence",
+  "provider": "claude",
+  "model": "sonnet",
+  "access": "read-only",
+  "skills": [
+    "scout-sceptic"
+  ]
+}
