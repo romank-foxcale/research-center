@@ -19,6 +19,7 @@ Ingest is optional and repeatable. It turns sources into committed text (sources
    Ask what each source is and why it matters. That goes into `--note` and steers the digest.
 2. **Register each source:**
    `./rc -p <profile> ingest add <kind> <locator...> [--id <id>] [--include '<glob>'] [--exclude '<glob>'] [--note "..."]`
+   A profile's `inbox/` folder needs no registration: whatever the user drops there is registered as the source `inbox` on the next `ingest run`.
    Sources belong to one profile (`./rc profile list`): its sources, digests and profile notes live in `profiles/<profile>/`, and only its research sees them. Leave out `-p` in an RC without profiles.
    For big repos, narrow with `--include` (for example `docs/*`, `src/*`, `*.md`) before running. The run refuses a source over `ingest.maxSourceBytes`.
 3. **Run it in the background, and follow it with `./rc watch`:**

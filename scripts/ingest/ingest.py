@@ -57,6 +57,29 @@ def derive_id(kind: str, locator: str) -> str:
     return "-".join([kind, *words])[:60].strip("-")
 
 
+INBOX = "inbox"  # a profile's drop folder: whatever the user puts there is ingested as the source "inbox"
+
+
+def local_folder(root: Path, locator: str) -> Path:
+    """A folder locator: an absolute path, or a path relative to the data root (a profile's inbox/)."""
+    path = Path(locator).expanduser()
+    return path if path.is_absolute() else root / path
+
+
+def ensure_inbox(root: Path) -> dict[str, Any] | None:
+    """Register the profile's inbox/ as a source the first time it holds a file; its locator is relative, so the
+    descriptor works on every machine the repository is cloned to."""
+    folder = root / INBOX
+    if source_path(root, INBOX).exists() or not folder.is_dir() or not folder_files(folder):
+        return None
+    descriptor = {"schemaVersion": 1, "id": INBOX, "kind": "folder", "locators": [INBOX], "include": [], "exclude": [],
+                  "depth": 1, "maxDocuments": 20, "origin": "user", "addedAt": rc.today(),
+                  "note": "Material the user dropped into this profile's inbox: read it for who they are, what they make "
+                          "or want, and what interests them."}
+    rc.write_json(source_path(root, INBOX), descriptor)
+    return descriptor
+
+
 def command_add(root: Path, args: argparse.Namespace) -> None:
     rc.settings(root)
     identifier = args.id or derive_id(args.kind, args.locators[0])
@@ -66,7 +89,7 @@ def command_add(root: Path, args: argparse.Namespace) -> None:
         raise rc.RcError(f"source already exists: {identifier}")
     if args.kind in ("folder", "git") and len(args.locators) != 1:
         raise rc.RcError(f"a {args.kind} source has exactly one locator")
-    if args.kind == "folder" and not Path(args.locators[0]).expanduser().is_dir():
+    if args.kind == "folder" and not local_folder(root, args.locators[0]).is_dir():
         raise rc.RcError(f"not a folder: {args.locators[0]}")
     descriptor = {
         "schemaVersion": 1,
@@ -276,7 +299,7 @@ def collect(session: rc.Session | None, root: Path, descriptor: dict[str, Any]) 
     kind = descriptor["kind"]
     if kind in ("folder", "git"):
         if kind == "folder":
-            base = Path(descriptor["locators"][0]).expanduser()
+            base = local_folder(root, descriptor["locators"][0])
             names = folder_files(base)
         else:
             base, sha = git_checkout(root, descriptor)
@@ -524,6 +547,8 @@ def profile(session: rc.Session, root: Path) -> None:
 def run_ingest(root: Path, wanted: list[str], budget: int | None, profile_mode: str, guard_lookup=visibility) -> int:
     config = rc.settings(root)
     guard(root, guard_lookup)
+    if ensure_inbox(root):
+        print(f"registered {INBOX}/ as the source {INBOX}")
     known = {descriptor["id"]: descriptor for descriptor in sources(root) if descriptor.get("origin", "user") == "user"}
     unknown = [identifier for identifier in wanted if identifier not in known]
     if unknown:

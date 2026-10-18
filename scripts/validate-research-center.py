@@ -38,6 +38,7 @@ SINGLE_ROLES = {
     "connectorReader": "connector-read",
     "digester": "read-only",
     "profiler": "read-only",
+    "tagger": "read-only",
     "sourcePlanner": "read-only",
     "screener": "read-only",
     "analyst": "read-only",

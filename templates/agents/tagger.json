@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "tagger",
+  "purpose": "Proposes a profile's interest tags, each with a reason and the profile files it rests on",
+  "provider": "claude",
+  "model": "opus",
+  "access": "read-only",
+  "skills": [
+    "profile-tags"
+  ]
+}

@@ -26,6 +26,7 @@
     "connectorReader": "connector-reader",
     "digester": "digester",
     "profiler": "profiler",
+    "tagger": "tagger",
     "sourcePlanner": "source-planner",
     "screener": "screener",
     "researchers": ["researcher-claude", "researcher-sonnet"],

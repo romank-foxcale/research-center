@@ -145,7 +145,9 @@ Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it int
 | `./rc validate` | The validators only, without the test suites |
 | `./rc doctor` | Check Python, git, uv, gh and the claude and codex logins |
 | `./rc profile list` / `show <id>` / `new <id> --name "..." --type company` / `edit <id>` | The profiles: name, type, description, tags |
-| `./rc -p <id> <command>` | Run ingest, research, report or watch in one profile |
+| `./rc -p <id> tags list` / `add "<tag>"` / `remove` / `rename` | A profile's interest tags: what the scout searches for |
+| `./rc -p <id> tags suggest` / `accept <tag>...` / `reject <tag>...` | Tags proposed from the profile's material, each with a reason |
+| `./rc -p <id> <command>` | Run ingest, research, report, tags or watch in one profile |
 | `./rc settings` | Status, budgets, limits, and which provider and model each role uses |
 | `./rc roles set <role> --provider claude --model opus` | Move a role to another provider or model |
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |

@@ -26,7 +26,7 @@ profile (type, tags) → ingest (optional, repeatable) → grill → plan → se
 | Skill | Use it to |
 | --- | --- |
 | grill-rc-bootstrap | create and set up an instance (private remote, logins, models, budgets) |
-| grill-profile | create a profile, set its type and description, write its scope |
+| grill-profile | create a profile, set its type and description, manage its interest tags, write its scope |
 | rc-ingest | add and ingest sources, read the profile |
 | grill-research-topic | turn a topic into an accepted brief |
 | rc-research | run, follow and present research |
@@ -39,7 +39,7 @@ The ingest-*, research-* skills are role instructions the runners load for agent
 
 Outside an RC, the `rc-kit` command works like the Control Center's `cc-kit`: `rc-kit new <name>` creates `~/Projects/<name>_RC`, and `rc-kit list`, `rc-kit open <name> <tool>`, `rc-kit doctor` and `rc-kit update` do what their names say. GUIDE.md covers installing it.
 
-Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc profile list|new|edit`, `./rc ingest add|run|list`, `./rc research new|accept|run|show|refresh`, `./rc report`, `./rc sources list|search|packs|enable|new|test`, `./rc watch`, `./rc roles`, `./rc validate`, `./rc check`.
+Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc profile list|new|edit`, `./rc tags list|add|suggest|accept`, `./rc ingest add|run|list`, `./rc research new|accept|run|show|refresh`, `./rc report`, `./rc sources list|search|packs|enable|new|test`, `./rc watch`, `./rc roles`, `./rc validate`, `./rc check`.
 
 ## Where things live
 

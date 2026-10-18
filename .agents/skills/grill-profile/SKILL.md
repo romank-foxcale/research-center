@@ -1,6 +1,6 @@
 ---
 name: grill-profile
-description: Create or change a profile in the Research Center - whom it scouts and researches for (a company, a product line, a person) - with its name, type (company or personal, which sets the licence rule), description and interest tags, grilling the user evidence-first; optionally write its longer scope.md. Use when the user wants a new profile, to describe or retype one, or to write or review its scope.
+description: Create or change a profile in the Research Center - whom it scouts and researches for (a company, a product line, a person) - with its name, type (company or personal, which sets the licence rule), description and interest tags, grilling the user evidence-first; optionally write its longer scope.md. Use when the user wants a new profile, to describe or retype one, to add, edit, remove or propose its interest tags, or to write or review its scope.
 ---
 
 # Grill a profile
@@ -26,7 +26,16 @@ Read what already describes the subject, and state it back instead of asking:
 
 The description is one to three plain sentences: who they are, what they make or want, and the constraint that matters most. Edit it with `./rc profile edit <id> --description "..."`.
 
-## 4. The longer scope, only when it helps
+## 4. Interest tags
+
+Tags are what the scout searches for every week, so they decide what the profile hears about.
+
+- **From the user:** `./rc -p <id> tags add "<tag>" --why "<one sentence>"`, and `tags rename <old> <new>` or `tags remove <tag>` to change them.
+- **From the material:** the user drops files into `profiles/<id>/inbox/`, and `./rc -p <id> ingest run` registers and digests them (rc-ingest). Then `./rc -p <id> tags suggest` has the tagger propose tags, each with a reason and the files it rests on, at one or two agent calls.
+- **Review with the user:** show each proposal with its reason. Accept with `tags accept <tag>...` (or `--all`), reject with `tags reject <tag>...`; a rejected tag is never proposed again. Offer to rename a proposal that is close but not right.
+- **A good tag** is two to four searchable words tied to something the profile has or wants: "Japanese OCR", "technology-assisted review". Push back on tags like "AI" that would flood the scout.
+
+## 5. The longer scope, only when it helps
 
 A company with products and hard constraints benefits from `scope.md`. `./rc profile scope <id>` starts it from the template, with these sections:
 - who;
@@ -43,4 +52,5 @@ Put each fact's source in brackets after it. Show it to the user, change it unti
 
 - Never set or change the type without the user saying so: it decides which licences the RC recommends.
 - Never accept a scope the user has not agreed to.
-- Then offer the next step: add interest tags, ingest the profile's material (rc-ingest), or run a scout.
+- Never accept proposed tags the user has not seen.
+- Then offer the next step: ingest the profile's material (rc-ingest), propose tags from it, or run a scout.

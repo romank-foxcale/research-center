@@ -12,6 +12,9 @@ evidence:
   - scripts/upgrade-instance.py
   - rc.py
   - .agents/skills/grill-profile/SKILL.md
+  - scripts/tags.py
+  - scripts/tags_test.py
+  - .agents/skills/profile-tags/SKILL.md
 relations:
   - docs/decisions/0013-use-case-scopes.md
   - docs/decisions/0001-template-and-instances.md
@@ -55,4 +58,10 @@ Use cases (ADR 0013) had the isolation right, but missed three things. They had 
 
 - `rc profile new|list|show|edit|scope|accept` and the `grill-profile` skill replace `rc usecase` and `grill-use-case`.
 - "Profile notes" (`knowledge/profile/`, built by ingest) are the profile's knowledge. "Profile" alone means the profile itself.
-- Interest tags, scouting and technology cards build on `profile.json` (plans/active/scouting.md).
+- **Interest tags** (added 2026-10-18), managed by `rc tags`:
+  - each tag is `{tag, why, source, evidence, added}` in `profile.json`;
+  - the user adds, renames and removes tags;
+  - `rc tags suggest` has the tagger role propose up to 15, each with a reason and evidence files the runner checks exist, at one call plus one retry;
+  - proposals wait in `suggestedTags` until accepted, and a rejected tag (`rejectedTags`) is never proposed again.
+- **The inbox.** `profiles/<id>/inbox/` is registered as the source `inbox`, with a relative locator, on the first `ingest run` after it holds a file.
+- Scouting and technology cards build on the tags (plans/active/scouting.md).

@@ -63,8 +63,11 @@ def meta_problems(meta: Any, name: str) -> list[str]:
         problems.append(f"{name}/{META}: needs a name")
     if meta.get("type") not in TYPES:
         problems.append(f"{name}/{META}: type must be one of {', '.join(TYPES)}")
-    if not isinstance(meta.get("tags", []), list):
+    tags = meta.get("tags", [])
+    if not isinstance(tags, list):
         problems.append(f"{name}/{META}: tags must be a list")
+    elif any(not isinstance(tag, dict) or not str(tag.get("tag", "")).strip() for tag in tags):
+        problems.append(f"{name}/{META}: every tag is an object with its tag text (rc tags add)")
     return problems
 
 

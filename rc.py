@@ -20,7 +20,7 @@ SCRIPTS = ROOT / "scripts"
 
 USAGE = """Usage: rc [-p <profile>] <command> [arguments]
 
-Profiles: ingest, research, report and watch work on one profile (profiles/<id>/), chosen with -p <id>, else RC_PROFILE,
+Profiles: ingest, research, report, tags and watch work on one profile (profiles/<id>/), chosen with -p <id>, else RC_PROFILE,
 else defaultProfile in research-center.json, else the only one there is. Everything else is the whole instance.
 
 Commands:
@@ -48,7 +48,9 @@ Commands:
   roles [list] | roles set <role> [--provider claude|codex] [--model M]
   plan <create|list|show|accept|archive|complete> ...  Plans for changing this RC itself
   profile new <id> --name "..." --type company|personal [--description "..."]  A profile: whom the RC scouts for
-  profile list | show <id> | edit <id> [--name] [--type] [--description] | scope <id> | accept <id>"""
+  profile list | show <id> | edit <id> [--name] [--type] [--description] | scope <id> | accept <id>
+  tags list | add "<tag>" [--why "..."] | remove <tag> | rename <old> <new>  A profile's interest tags
+  tags suggest | accept [<tag>...|--all] | reject [<tag>...|--all]  Tags proposed from the profile's material"""
 
 # The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
 CHECKS = [
@@ -66,15 +68,16 @@ CHECKS = [
     ("sources test", ["sources/sources_test.py"]),
     ("upgrade test", ["upgrade_instance_test.py"]),
     ("profiles test", ["profiles_test.py"]),
+    ("tags test", ["tags_test.py"]),
 ]
 # Commands that hand over to one script with the root and the remaining arguments.
 SCRIPT_COMMANDS = {
     "ingest": "ingest/ingest.py", "research": "research/research.py", "sources": "sources/sources.py",
     "watch": "runner/events.py", "roles": "roles.py", "plan": "plans.py", "agents": "agent-configs.py",
-    "profile": "profiles.py", "report": "report/report.py",
+    "profile": "profiles.py", "tags": "tags.py", "report": "report/report.py",
 }
 # Commands whose data lives in a profile: they get its folder as their root (docs/decisions/0015-profiles.md).
-DATA_COMMANDS = {"ingest", "research", "watch", "report"}
+DATA_COMMANDS = {"ingest", "research", "watch", "report", "tags"}
 # The flag that picks a profile; -u and --use-case are the names from before profiles, kept for one release.
 PROFILE_FLAGS = ("-p", "--profile", "-u", "--use-case")
 
