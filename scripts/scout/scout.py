@@ -287,14 +287,16 @@ def command_dive(root: Path, identifier: str, topic: str | None = None) -> Path:
                   f"verdict: {card['verdict']}) says: {card['headline']} This study tests that verdict with cited evidence before "
                   "anyone builds on it."),
         "Questions": "\n".join([
-            f"- Q1: Does {card['title']} do better than what {engineers['component']} does today ({engineers['componentToday'].rstrip('.')}), "
-            f"measured as {plan['metric']}, and on data like ours?",
+            # What the component does today stays in Our needs: pasted into a question it makes the question unreadable.
+            f"- Q1: Does {card['title']} do better than what {engineers['component']} does today, measured as "
+            f"{plan['metric'].rstrip('.')}, on data like ours?",
             f"- Q2: Which constraints does it meet or break for us: licence, data residency, language, scale and maintenance?{licence_line}",
             f"- Q3: What would integrating it take: what it replaces ({engineers['replaces']}), the effort and the risks?",
-            f"- Q4: How does it compare with the alternatives ({engineers['alternatives'].rstrip('.')})?"]),
+            "- Q4: How does it compare with the alternatives named under Our needs?"]),
         "Scope": f"{card['title']}, its documented results and independent evaluations, and the alternatives the card names. Recent work first.",
         "Out of scope": "Other uses of the technology that do not bear on the component above.",
-        "Our needs": (f"The component: {engineers['component']}. Today: {engineers['componentToday']} The card's evidence rests on "
+        "Our needs": (f"The component: {engineers['component']}. Today: {engineers['componentToday']} Alternatives: "
+                      f"{engineers['alternatives']} The card's evidence rests on "
                       f"{card['evidence']}; the fit on {', '.join(card.get('profileBasis', []))}."),
         "Success criteria": (f"A decision on the card's verdict. The card's evaluation plan is the bar: {plan['experiment']}; "
                              f"metric {plan['metric']}; pass bar {plan['passBar']}; effort {plan['effort']}."),

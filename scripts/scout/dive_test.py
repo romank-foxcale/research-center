@@ -74,7 +74,8 @@ def main() -> int:
         text = brief.read_text(encoding="utf-8")
         assert research.brief_problems(text) == [], research.brief_problems(text)
         assert "# Should acme/ocr-kit change DI OCR?" in text and "Status: draft" in text
-        assert "- Q1: Does acme/ocr-kit do better than what DI OCR does today (Tesseract), measured as character error rate" in text
+        assert "- Q1: Does acme/ocr-kit do better than what DI OCR does today, measured as character error rate, on data like ours?" in text
+        assert "Today: Tesseract. Alternatives: PaddleOCR" in text
         assert "pass bar below 3%" in text and "Cadence: none" in text and "Its licence (MIT, permissive) is usable" in text
         dived = json.loads((alpha / "scout" / "cards" / "acme-ocr.json").read_text(encoding="utf-8"))
         assert dived["status"] == "deep dive" and dived["research"] == "ocr-kit"
