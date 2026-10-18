@@ -1,15 +1,34 @@
 # Research Center
 
-An AI research assistant you run with your own Claude subscription, natively on Windows (or macOS and Linux), on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
+A technology scout and research assistant you run with your own Claude subscription, natively on Windows (or macOS and Linux). Tell it whom it works for (your company, a product line, yourself) and what they care about, and every week it finds what is new on GitHub, arXiv and in papers. It then says plainly whether each find fits, and why. When a find deserves more, it runs a full study on any subject (medicine, law, markets, engineering, software), in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects.
+
+## Scout
 
 ```text
-profile (type, tags) → ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
+profile (type, tags) → discover → triage → technology cards → sceptic → main screen
+```
+
+| Step | What happens | Output |
+| --- | --- | --- |
+| profile | Whom the RC works for, with a description and interest tags you write or have proposed from material you drop into its inbox. A company profile may use only permissive licences, a personal one any | `profiles/<id>/profile.json` |
+| discover | For every tag: new and active GitHub repositories, the newest arXiv papers and recent works, since the last run. No agent calls; anything already seen is skipped | `scout/candidates/` |
+| triage | One agent call picks the few finds worth a card and passes the rest | `scout/seen.json` |
+| card | For each pick, the runner stores its README or paper page and sets its licence verdict. An agent writes the card: for leaders, what it is, what it could do for you, where it plugs in, and the verdict (worth testing, watch or not a fit) with why. For engineers: how it works, the component it touches, alternatives, pros, cons, risks and an evaluation plan. Every claim quotes the stored page | `scout/cards/` |
+| sceptic | Challenges every card against your profile and the evidence; a wrong verdict is replaced, visibly | in the card |
+| main screen | Every profile's cards, a page per card, and a shared trends feed (agent harnesses, models) naming the profiles each trend affects, as one private link | `rc home`, `rc trends` |
+
+"Not a fit" is a full answer: the card names the component and what would have to change. A run costs about 12 agent calls and can run weekly (`rc scout --due`).
+
+## Deep dive
+
+When a card or a question needs a real study, `rc scout dive <card>` drafts a research brief, or you grill one from scratch:
+
+```text
+grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
 ```
 
 | Stage | What happens | Output |
 | --- | --- | --- |
-| profile | Whom the research serves: a company or a person, with a description and interest tags. A company profile may use only permissive licences, a personal one any. Each profile keeps its own sources and research | `profiles/<id>/profile.json` |
-| ingest | Folders, repos, URLs, Notion and Drive become committed text (secrets redacted), one digest per source, and a cited profile of you or your company | `sources/`, `knowledge/` |
 | grill | An agent turns your topic into numbered questions, scope, needs and success criteria, asking only what your profile cannot answer | `research/<topic>/brief.md` |
 | plan | Hypotheses, a disconfirming search for each, adapter queries per question, exclusion criteria | `source-plan.md` |
 | search | The runner queries the adapters (scholarly works, books, news, feeds, watched pages); every query logged | `searches.json` |
@@ -23,6 +42,8 @@ profile (type, tags) → ingest (optional) → grill → plan → search → scr
 | share | The topic as one HTML page for people without the repository: bottom line, ideas by ring, certainty, the evidence charted, every claim linked to its source; a dashboard for the profile; published as a private claude.ai link | `rc report`, rc-share |
 
 A brief with a cadence makes the topic **living**: `./rc research refresh` re-runs its searches, screens only what is new, re-derives the conclusions when new verified evidence arrives, and writes a delta of what changed and what needs your review.
+
+Both loops read what you ingested: folders, repos, URLs, Notion and Drive become committed text (secrets redacted), one digest per source, and cited profile notes (`rc ingest`).
 
 Ideas worth acting on leave as a [Control Center](https://github.com/romank-foxcale/command_center_template) task plan (`handoff.md`). The RC itself never touches product code.
 
@@ -82,6 +103,8 @@ This template is public and holds no data. Your RC commits the text of everythin
 ./rc profile new acme --name "Acme" --type company   a profile: whom the RC works for
 ./rc -p acme tags add "Japanese OCR"          an interest tag; or drop files into profiles/acme/inbox/ and run tags suggest
 ./rc -p acme scout                            technology cards: what is new for the profile's tags, and whether it fits
+./rc scout --due                              weekly: every profile and the trends feed that is due
+./rc -p acme scout dive <card>                a draft research brief from a card
 ./rc trends                                   shared trends (agent harnesses, models) and which profiles they affect
 ./rc home                                     the main screen: every profile's cards, one page each, ready to share
 ./rc -p acme ingest add ...                   work inside a profile (or set defaultProfile)
@@ -108,6 +131,7 @@ This template is public and holds no data. Your RC commits the text of everythin
 - Sceptics review independently. The judge sees them only as Review A, B, C. A claim one sceptic refuted and the judge kept is shown to you as contested.
 - Questions with competing answers are weighed in a hypothesis matrix, every answer names its key assumptions, and the report says likelihood only on a fixed scale, marking what is evidence and what is assessment.
 - Every source carries a reliability grade capped by its evidence type, every claim a credibility grade, and every answer a certainty (high to very low) with the named weaknesses that lowered it.
+- Technology cards quote the stored README or paper word for word, licences are classified by the runner, not by an agent, and a sceptic reviews every card.
 - `./rc check` validates every manifest, citation and report, and fails on any unredacted secret.
 
 See [docs/index.md](docs/index.md) for the architecture and decisions.

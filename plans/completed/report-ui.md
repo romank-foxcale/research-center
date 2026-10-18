@@ -1,6 +1,6 @@
 # report-ui: Research results as shareable pages: a topic report, a use-case dashboard, sharing from Claude Code, explainer briefs
 
-Lifecycle: active
+Lifecycle: completed
 Planning status: accepted
 
 ## Outcome
@@ -84,4 +84,6 @@ Leadership (a CTO or CEO) can read a research topic without opening the reposito
 
 ## Lifecycle closure
 
-Not closed.
+- state: completed
+- date: 2026-10-18
+- evidence: WP1-WP3 and WP5 done: rc report topic pages and dashboards, rc-share with private artifacts, docs (ADR 0014); reports open with a plain-words summary. WP4 (explainer briefs) was not built: technology cards and the plain summary cover the leadership read, and the scouting plan's main screen (rc home) replaced it. rc check 20 of 20.

@@ -1,9 +1,10 @@
 # Research Center: setup and usage guide
 
-A **Research Center (RC)** is a git repo that does research with your own AI subscription. It is the knowledge counterpart of a [Control Center](https://github.com/romank-foxcale/command-center), and it runs natively on Windows (or macOS and Linux) with no WSL.
+A **Research Center (RC)** is a git repo that scouts new technology and does research with your own AI subscription. It is the knowledge counterpart of a [Control Center](https://github.com/romank-foxcale/command-center), and it runs natively on Windows (or macOS and Linux) with no WSL.
 
+- **It scouts for you.** You create profiles (your company, yourself) with interest tags. Every week it finds what is new on GitHub, arXiv and in papers for those tags, picks the few finds worth it, and writes a technology card for each: what it is, where it would plug in, and a plain verdict (worth testing, watch, not a fit) with why, plus the engineers' detail and an evaluation plan. A sceptic checks every card, and a shared trends feed covers what may affect every profile.
 - **It learns what you know.** Point it at your folders, repos, web pages, Notion and Google Drive. It commits their text (secrets redacted), digests each source, and builds a cited profile of you or your company.
-- **It grills you on a topic.** Before any search, an agent turns "research X" into numbered questions, scope, needs and success criteria. It only asks what your profile can't answer.
+- **It grills you on a topic** for a deep dive. Before any search, an agent turns "research X" into numbered questions, scope, needs and success criteria. It only asks what your profile can't answer.
 - **It researches with independent agents.** It searches scholarly databases, news, books, feeds and the web. Two researchers on different Claude models work independently, and every cited page is stored with its quote checked. Two sceptics then try to disprove each claim, and an anonymous judge settles them.
 - **It applies the results to your work.** Surviving ideas are ranked ADOPT, TRIAL, ASSESS or HOLD against your repos. The ones worth acting on become a Control Center task plan. The RC never touches code.
 
@@ -105,6 +106,18 @@ Not sure which skill fits? Ask "what can the RC do?" or type `/rc-help`.
 > Create a profile for our company. Use the grill-profile skill.
 
 The agent creates `profiles/<id>/`, asks whether it is a company or personal profile, reads what you point it at (your website, product repos), and writes a short description. A company with products can also get a longer `scope.md`. Then work in it with `./rc -p <id> ...`, or set `defaultProfile` in `research-center.json`.
+
+**Interest tags.** Tags are what the scout searches for. Write them, or let the RC propose them from what you ingested or dropped into `profiles/<id>/inbox/`:
+
+> Propose interest tags for our profile from what was ingested.
+
+The agent runs `./rc -p <id> tags suggest` and shows you each proposed tag with its reason. You accept, rename or reject them; a rejected tag is never proposed again.
+
+**Scout.** Ask for what is new:
+
+> Scout for our profile. Use the rc-scout skill.
+
+The agent runs `./rc -p <id> scout`, about 12 agent calls, and follows it live. It finds what is new for every tag, triages it, writes a technology card for each pick, and has a sceptic check them. It then walks you through the cards by verdict. `./rc home` builds the main screen with every card, which the rc-share skill publishes as a private link for your CTO. `./rc trends init` starts the shared trends feed, and `./rc trends` scouts it.
 
 **Teach it what you know** (optional, repeatable):
 

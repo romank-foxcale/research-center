@@ -1,6 +1,6 @@
 # scouting: Profiles with interest tags, a scouting loop that turns new releases into technology cards, and a shared trends feed
 
-Lifecycle: active
+Lifecycle: completed
 Planning status: accepted
 
 ## Outcome
@@ -128,4 +128,6 @@ Scouting runs weekly (`rc scout --due`, scheduled) and on demand (`rc scout`).
 
 ## Lifecycle closure
 
-Not closed.
+- state: completed
+- date: 2026-10-18
+- evidence: WP1-WP8 done on 2026-10-18. Profiles with type and licence rule (ADR 0015), interest tags with tagger proposals, discovery, triage, technology cards and sceptic, trends feed, main screen (rc home), weekly rc scout --due and rc scout dive (ADR 0016). foxcale_RC: 17 tags; first scout 224 candidates to 6 cards in 8 calls (jev-tar judged not a fit: hosted API, air-gapped DI); trends 264 candidates to 6 cards in 8 calls; main screen shared privately. rc check 20 of 20 in the template and in foxcale_RC.

@@ -7,19 +7,35 @@ description: Explain what the Research Center can do - its pipeline, its skills 
 
 Explain the RC in this order, briefly, then offer a pick list of where to start.
 
-## The pipeline
+## Two loops
 
 ```
-profile (type, tags) → ingest (optional, repeatable) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
+scout:      profile (type, tags) → discover → triage → technology cards → sceptic → main screen
+deep dive:  grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
 ```
 
-0. **Profile** (grill-profile, `./rc profile new|edit`): the RC works for a profile (a company, a product line, a person) with its own type, interest tags, sources and topics. A company profile may use only permissive licences, a personal one any. An optional scope.md says whom the research serves, their products and plug-in points, hard constraints and how value is measured.
+1. **Profile** (grill-profile, `./rc profile new|edit`, `./rc tags`): the RC works for a profile, such as a company, a product line or a person.
+   - Each profile has its own type, interest tags, sources and topics.
+   - A company profile may use only permissive licences; a personal one may use any.
+   - Tags are written by the user, or proposed from ingested material and the profile's `inbox/` (`./rc tags suggest`).
+   - An optional `scope.md` holds the longer context.
+2. **Ingest** (rc-ingest, `./rc ingest`): point at folders, repos, URLs, Notion and Drive. Their text is committed with secrets redacted, then digested into cited profile notes. Both loops read them.
+3. **Scout** (rc-scout, `./rc scout`, about 12 agent calls, weekly with `./rc scout --due`):
+   - discovery finds what is new for every tag on GitHub, arXiv and OpenAlex, with no agent calls;
+   - triage picks the few finds worth a card;
+   - each card says what the find is, where it plugs in, and a verdict (worth testing, watch, not a fit) with why, for leaders and for engineers, quoting the stored README or paper;
+   - a sceptic checks every card.
 
-1. **Ingest** (rc-ingest, `./rc ingest`): point at folders, repos, URLs, Notion, Drive. Their text is committed, with secrets redacted, then digested and reduced into a cited profile.
-2. **Grill** (grill-research-topic, `./rc research new|accept`): turn a topic into an accepted brief. The profile answers whatever it can, so the user is only asked the rest.
-3. **Research** (rc-research, `./rc research run`): a source plan with competing hypotheses; the adapters search and a screener includes or excludes each record; two researchers (Claude Opus and Sonnet) read them and search the web, and every cited page is stored with its quotes checked; an analysis; two sceptics (Claude Opus and Sonnet) try to disprove each claim; an anonymous judge settles them; the surviving ideas are fitted to the user's repos; a cited report comes out. A topic with a cadence stays living: `./rc research refresh` re-searches it.
-4. **Handoff**: ideas ranked ADOPT or TRIAL become a Control Center task plan (research/<topic>/handoff.md). Code changes happen in a CC, never in the RC.
-5. **Share** (rc-share, `./rc report`): a topic's page or the profile's dashboard, as self-contained HTML, published as a private claude.ai link for people without the repository.
+   `./rc trends` does the same for a shared feed and names the profiles each trend affects. `./rc home` is the main screen.
+4. **Deep dive** (`./rc scout dive <card>`, or grill-research-topic, then rc-research): a full cited study.
+   - A source plan with competing hypotheses; screened searches.
+   - Two researchers (Claude Opus and Sonnet) read the included records and search the web; quotes are checked against stored pages.
+   - An analysis, then two sceptics; an anonymous judge settles them.
+   - Fit to the user's repos, then a report that opens in plain words.
+
+   A topic with a cadence stays living (`./rc research refresh`).
+5. **Handoff**: ideas worth acting on become a Control Center task plan (`research/<topic>/handoff.md`), or a card's evaluation plan goes to the Control Center. Code changes happen in a CC, never in the RC.
+6. **Share** (rc-share): the main screen (`./rc home`), a topic's page or a profile's research dashboard, as a private claude.ai link.
 
 ## User-facing skills
 
@@ -34,7 +50,7 @@ profile (type, tags) → ingest (optional, repeatable) → grill → plan → se
 | rc-share | share a topic or the profile's dashboard as a link |
 | rc-help | this overview |
 
-The ingest-*, research-* skills are role instructions the runners load for agents. They are not for direct use.
+The ingest-*, research-*, scout-* and profile-tags skills are role instructions the runners load for agents. They are not for direct use.
 
 ## Commands
 
@@ -52,4 +68,4 @@ Inside an RC, `./rc help` lists every command. Most used: `./rc doctor`, `./rc p
 
 In an instance with profiles, these folders live under `profiles/<id>/`, and commands take `-p <id>`.
 
-Finish by asking which to start with: bootstrap, a profile, ingest, a research topic, or sharing results.
+Finish by asking which to start with: bootstrap, a profile and its tags, a scout, ingest, a research topic, or sharing results.
