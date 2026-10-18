@@ -172,8 +172,9 @@ def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
             errors.append(f"{name}: module {module!r} is neither in scripts/sources/adapters/ nor in catalog/adapters/code/")
         if not isinstance(spec.get("retractions", False), bool):
             errors.append(f"{name}: retractions must be true or false")
-        if spec.get("needsKeyEnv") is not None and not re.fullmatch(r"[A-Z][A-Z0-9_]*", str(spec["needsKeyEnv"])):
-            errors.append(f"{name}: needsKeyEnv must be null or an environment variable name; keys are never stored")
+        for field in ("needsKeyEnv", "optionalKeyEnv"):
+            if spec.get(field) is not None and not re.fullmatch(r"[A-Z][A-Z0-9_]*", str(spec[field])):
+                errors.append(f"{name}: {field} must be null or an environment variable name; keys are never stored")
 
 
 def check_sources(root: Path, errors: list[str]) -> None:

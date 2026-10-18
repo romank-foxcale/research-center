@@ -34,6 +34,7 @@ relations:
 - [0013 Use cases with their own scope, sources and research](decisions/0013-use-case-scopes.md) (superseded by 0015)
 - [0014 Research shared as computed HTML pages and private artifacts](decisions/0014-report-pages.md)
 - [0015 Profiles with a type, a licence rule and interest tags](decisions/0015-profiles.md)
+- [0016 Scouting: discovery per interest tag, then technology cards](decisions/0016-scouting.md)
 
 ## Rules
 

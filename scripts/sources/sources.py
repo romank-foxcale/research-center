@@ -192,6 +192,9 @@ def options(root: Path, spec: dict[str, Any]) -> dict[str, Any]:
     settings_path = instance(root) / "research-center.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
     found = {"interval": float(spec.get("rateLimit", 1.0)), "contactEmail": settings.get("research", {}).get("contactEmail") or None}
+    if spec.get("optionalKeyEnv") and os.environ.get(spec["optionalKeyEnv"]):
+        found["key"] = os.environ[spec["optionalKeyEnv"]]
+        found["interval"] = float(spec.get("rateLimitWithKey", found["interval"]))
     if spec.get("needsKeyEnv"):
         key = os.environ.get(spec["needsKeyEnv"])
         if not key:

@@ -181,7 +181,8 @@ def build_url(url: str, params: dict[str, Any] | None = None) -> str:
     return f"{url}?{urllib.parse.urlencode(query)}" if query else url
 
 
-def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0) -> tuple[bytes, str]:
+def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0,
+          headers: dict[str, str] | None = None) -> tuple[bytes, str]:
     """(body, content type) of a GET, retrying 429 and 5xx; AdapterError when it cannot be had."""
     full = build_url(url, params)
     if TRANSPORT is not None:
@@ -189,7 +190,7 @@ def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0)
     host = urllib.parse.urlsplit(full).hostname or ""
     for attempt in range(RETRIES + 1):
         _wait_turn(host, interval)
-        request = urllib.request.Request(full, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+        request = urllib.request.Request(full, headers={"User-Agent": USER_AGENT, "Accept": "*/*", **(headers or {})})
         try:
             with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
                 data = response.read(MAX_BYTES + 1)
@@ -212,8 +213,9 @@ def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0)
     raise AdapterError(f"{host}: no response")
 
 
-def fetch_json(url: str, params: dict[str, Any] | None = None, interval: float = 1.0) -> Any:
-    data, _ = fetch(url, params, interval)
+def fetch_json(url: str, params: dict[str, Any] | None = None, interval: float = 1.0,
+               headers: dict[str, str] | None = None) -> Any:
+    data, _ = fetch(url, params, interval, headers)
     try:
         return json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:

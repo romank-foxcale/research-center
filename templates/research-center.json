@@ -22,6 +22,12 @@
     "snowballPerSeed": 10,
     "contactEmail": ""
   },
+  "scout": {
+    "lookbackDays": 30,
+    "perQuery": 10,
+    "githubMinStars": 50,
+    "sources": ["github-new", "github-active", "arxiv", "openalex"]
+  },
   "pipeline": {
     "connectorReader": "connector-reader",
     "digester": "digester",

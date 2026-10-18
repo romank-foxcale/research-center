@@ -11,10 +11,13 @@
   "filters": {
     "language": "Programming language, e.g. python",
     "minStars": "Only repositories with at least this many stars",
-    "sort": "stars or updated; default best match"
+    "sort": "stars or updated; default best match",
+    "created": "Only repositories created on or after this date, YYYY-MM-DD"
   },
   "watchable": true,
   "related": false,
   "needsKeyEnv": null,
-  "rateLimit": 6.0
+  "rateLimit": 6.0,
+  "optionalKeyEnv": "GITHUB_TOKEN",
+  "rateLimitWithKey": 2.0
 }
