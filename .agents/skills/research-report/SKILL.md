@@ -34,6 +34,12 @@ Markdown, in this order:
 
 - Cite claims inline as `[C12]`. Every claim you cite must be in the ledger, and its verdict must be HOLDS or WEAK.
 - Never cite a REFUTED or UNSUPPORTED claim as `[C#]`. If it matters that something widely believed is false, say so in words without the bracket citation. The runner appends a list of refuted claims anyway.
+- **Before you reply, check every bullet and paragraph of the TL;DR and the answers.**
+  - One that states a finding, even a weak or second-hand one ("one survey says..."), must cite its claim `[C#]`.
+  - One that is your own judgement must start with `Assessment:`.
+  - A caveat is either a cited finding or an assessment. Start an assessed caveat with `Assessment:`, not with a label before it.
+
+  A retry is rejected again for any line it misses, not only for the lines listed.
 - Mark claims judged WEAK in the prose ("one vendor benchmark suggests ...").
 - **Evidence or assessment.** In the TL;DR and the answers, every paragraph and bullet either cites claims `[C#]` or starts with `Assessment:`, your judgement beyond the evidence. A line starting `Certainty:` states the grade.
 - **Say likelihood only with the scale** (ICD 203): almost no chance, very unlikely, unlikely, roughly even chance, likely, very likely, almost certain(ly). Never probably, possibly, perhaps, presumably, conceivably, definitely, certainly, undoubtedly, probable, improbable, doubtful. The question's certainty limits the words: likely, unlikely and roughly even chance need at least low certainty; very likely and very unlikely need moderate; almost certain and almost no chance need high. With very low certainty, say what the evidence shows and that it does not settle the question.

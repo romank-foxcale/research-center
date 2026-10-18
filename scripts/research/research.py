@@ -85,7 +85,7 @@ DOWNGRADES = ("reliability", "inconsistency", "indirectness", "imprecision", "on
 UPGRADES = ("large-effect", "convergence")
 # Analysis of Competing Hypotheses: each relied-on claim is consistent (C), inconsistent (I) or neutral (N) with each.
 RATINGS = ("C", "I", "N")
-BOLD_LABEL = re.compile(r"\*\*[^*\n]+\*\*:?")
+BOLD_LABEL = re.compile(r"(?:[-*]\s*)?\*\*[^*\n]+\*\*:?")  # also a bullet that is only a label: "- **Shares in use:**"
 PLAIN = "In plain words"  # the report's first section: the answer for a reader who reads nothing else
 PLAIN_MAX_WORDS = 350  # the reporter aims at about 250 words; writers miscount, so the hard limit leaves room
 ASSUMPTION_ID = re.compile(r"A\d+")

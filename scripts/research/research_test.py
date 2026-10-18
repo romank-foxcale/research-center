@@ -383,6 +383,8 @@ def main() -> int:
         "a bold label on its own line heads a paragraph; it is not one"
     assert research.language_problems("## Q1: x\n\n### Ranking\n\nIt is unlikely to matter [C1].", {"Q1": "low"}) == [], \
         "a sub-heading heads a paragraph; it is not one"
+    assert research.language_problems("## Q1: x\n\n- **Shares in use:**\n- It is unlikely to matter [C1].", {"Q1": "low"}) == [], \
+        "a bullet that is only a bold label heads the bullets after it"
     lead_ins = ("## Q1: x\n\nDense results are mixed:\n\n- one way [C1]\n- uncited bullet\n\n"
                 "Assessment: what we would do:\n\n- hash the features\n- score in chunks\n\nAn uncited paragraph.")
     problems = " ".join(research.language_problems(lead_ins, {"Q1": "low"}))
