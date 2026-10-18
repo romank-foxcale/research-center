@@ -31,8 +31,9 @@ relations:
 - [0010 Evidence grading and staleness](decisions/0010-evidence-grading.md)
 - [0011 Competing hypotheses, assumptions and calibrated language](decisions/0011-structured-analysis.md)
 - [0012 Windows-native through uv and Python, Claude-only roles](decisions/0012-windows-native-uv.md)
-- [0013 Use cases with their own scope, sources and research](decisions/0013-use-case-scopes.md)
+- [0013 Use cases with their own scope, sources and research](decisions/0013-use-case-scopes.md) (superseded by 0015)
 - [0014 Research shared as computed HTML pages and private artifacts](decisions/0014-report-pages.md)
+- [0015 Profiles with a type, a licence rule and interest tags](decisions/0015-profiles.md)
 
 ## Rules
 

@@ -1,6 +1,6 @@
 ---
 name: rc-share
-description: Share Research Center results with people who do not use the repository (a CTO, a CEO, a client) - build a topic's page or the use case's dashboard with ./rc report, confirm with the user, then publish it as a private claude.ai artifact and give the link, updating the same link on later shares. Use when the user wants to share, send, show or present research results, or asks for a link, a page or a dashboard of the research.
+description: Share Research Center results with people who do not use the repository (a CTO, a CEO, a client) - build a topic's page or the profile's dashboard with ./rc report, confirm with the user, then publish it as a private claude.ai artifact and give the link, updating the same link on later shares. Use when the user wants to share, send, show or present research results, or asks for a link, a page or a dashboard of the research.
 ---
 
 # Share research
@@ -9,10 +9,10 @@ The pages are computed by `./rc report` from the committed outputs, so sharing n
 
 ## Build
 
-- One topic: `./rc -u <use-case> report <topic> --manifest`.
-- The whole use case (a dashboard with every topic's page beside it): `./rc -u <use-case> report --manifest`.
+- One topic: `./rc -p <profile> report <topic> --manifest`.
+- The whole profile (a dashboard with every topic's page beside it): `./rc -p <profile> report --manifest`.
 
-Leave out `-u` in an RC without use cases or when `defaultUseCase` covers it. The manifest gives:
+Leave out `-p` in an RC without profiles or when `defaultProfile` covers it. The manifest gives:
 - `page`, the file to publish;
 - `files`, the pages beside it (dashboard only);
 - `title`;
@@ -45,13 +45,13 @@ Pages describe the user's company and products. A published artifact is private 
   - `file_path` is the manifest's `page`;
   - `files` maps each name in the manifest's `files` to its path;
   - `icon` is `chart` on the first publish;
-  - `description` is one sentence: the topic's bottom line, or the use case's topic count.
+  - `description` is one sentence: the topic's bottom line, or the profile's topic count.
 - If `sharedAt` has a link, pass it as `url` so the link stays the same. Read the artifact first when this conversation has not published it.
-- Record the link: `./rc -u <use-case> report [<topic>] --shared-at <url>`. Records live in `.rc-local/reports/shares.json`, on this machine only. Another person shares from their own account under their own link.
+- Record the link: `./rc -p <profile> report [<topic>] --shared-at <url>`. Records live in `.rc-local/reports/shares.json`, on this machine only. Another person shares from their own account under their own link.
 - Give the user the link. Mention that a refresh or re-run changes the page only when they share again.
 
 ## Never
 
 - Never edit the HTML to change wording or a conclusion. Change the brief or a source and re-run, as everywhere in the RC.
-- Never publish a page the script did not write, or one from another use case than the user asked for.
+- Never publish a page the script did not write, or one from another profile than the user asked for.
 - Never publish to an artifact someone else owns unless the user has edit access.

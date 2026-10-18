@@ -18,10 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 SCRIPTS = ROOT / "scripts"
 
-USAGE = """Usage: rc [-u <use case>] <command> [arguments]
+USAGE = """Usage: rc [-p <profile>] <command> [arguments]
 
-Use cases: ingest, research, report and watch work on one use case (usecases/<id>/), chosen with -u <id>, else RC_USE_CASE,
-else defaultUseCase in research-center.json, else the only one there is. Everything else is the whole instance.
+Profiles: ingest, research, report and watch work on one profile (profiles/<id>/), chosen with -p <id>, else RC_PROFILE,
+else defaultProfile in research-center.json, else the only one there is. Everything else is the whole instance.
 
 Commands:
   doctor         Check Python, git, gh and the provider logins
@@ -47,7 +47,8 @@ Commands:
   settings [show]  Settings as text: status, budgets, limits, agents and their models
   roles [list] | roles set <role> [--provider claude|codex] [--model M]
   plan <create|list|show|accept|archive|complete> ...  Plans for changing this RC itself
-  usecase new <id> --title "..." | list | show <id> | accept <id>  The use cases and their scopes"""
+  profile new <id> --name "..." --type company|personal [--description "..."]  A profile: whom the RC scouts for
+  profile list | show <id> | edit <id> [--name] [--type] [--description] | scope <id> | accept <id>"""
 
 # The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
 CHECKS = [
@@ -64,39 +65,45 @@ CHECKS = [
     ("report test", ["report/report_test.py"]),
     ("sources test", ["sources/sources_test.py"]),
     ("upgrade test", ["upgrade_instance_test.py"]),
-    ("use cases test", ["usecases_test.py"]),
+    ("profiles test", ["profiles_test.py"]),
 ]
 # Commands that hand over to one script with the root and the remaining arguments.
 SCRIPT_COMMANDS = {
     "ingest": "ingest/ingest.py", "research": "research/research.py", "sources": "sources/sources.py",
     "watch": "runner/events.py", "roles": "roles.py", "plan": "plans.py", "agents": "agent-configs.py",
-    "usecase": "usecases.py", "report": "report/report.py",
+    "profile": "profiles.py", "report": "report/report.py",
 }
-# Commands whose data lives in a use case: they get its folder as their root (docs/decisions/0013-use-case-scopes.md).
+# Commands whose data lives in a profile: they get its folder as their root (docs/decisions/0015-profiles.md).
 DATA_COMMANDS = {"ingest", "research", "watch", "report"}
+# The flag that picks a profile; -u and --use-case are the names from before profiles, kept for one release.
+PROFILE_FLAGS = ("-p", "--profile", "-u", "--use-case")
 
 
-def use_cases() -> list[str]:
-    return sorted(path.parent.name for path in (ROOT / "usecases").glob("*/usecase.json"))
+def profiles() -> list[str]:
+    return sorted(path.parent.name for path in (ROOT / "profiles").glob("*/profile.json"))
 
 
 def data_root(selected: str | None) -> Path:
-    """The folder a data command works on: the chosen use case, or the instance itself when it has none."""
-    names = use_cases()
+    """The folder a data command works on: the chosen profile, or the instance itself when it has none."""
+    names = profiles()
+    if (ROOT / "usecases").is_dir():
+        raise SystemExit("error: this RC still has usecases/; run rc upgrade from the template to move them to profiles/")
     if not names:
         if selected:
-            raise SystemExit(f"error: no use case {selected}; create one with rc usecase new {selected} --title \"...\"")
+            raise SystemExit(f"error: no profile {selected}; create one with rc profile new {selected} --name \"...\" --type company")
         return ROOT
     default = None
     settings = ROOT / "research-center.json"
     if settings.is_file():
-        default = json.loads(settings.read_text(encoding="utf-8")).get("defaultUseCase")
-    name = selected or os.environ.get("RC_USE_CASE") or default or (names[0] if len(names) == 1 else None)
+        config = json.loads(settings.read_text(encoding="utf-8"))
+        default = config.get("defaultProfile") or config.get("defaultUseCase")
+    chosen = os.environ.get("RC_PROFILE") or os.environ.get("RC_USE_CASE")
+    name = selected or chosen or default or (names[0] if len(names) == 1 else None)
     if not name:
-        raise SystemExit(f"error: this RC has several use cases ({', '.join(names)}); choose one with rc -u <id> ...")
+        raise SystemExit(f"error: this RC has several profiles ({', '.join(names)}); choose one with rc -p <id> ...")
     if name not in names:
-        raise SystemExit(f"error: no use case {name}; rc usecase list shows them")
-    return ROOT / "usecases" / name
+        raise SystemExit(f"error: no profile {name}; rc profile list shows them")
+    return ROOT / "profiles" / name
 
 
 def script(name: str, *args: str, quiet: bool = False) -> int:
@@ -137,9 +144,9 @@ def doctor() -> int:
 
 def main(argv: list[str]) -> int:
     selected = None
-    if argv[:1] in (["-u"], ["--use-case"]):
+    if argv[:1] and argv[0] in PROFILE_FLAGS:
         if len(argv) < 2:
-            print("error: -u needs a use case id", file=sys.stderr)
+            print("error: -p needs a profile id", file=sys.stderr)
             return 2
         selected, argv = argv[1], argv[2:]
     command, args = (argv[0], argv[1:]) if argv else ("help", [])
@@ -164,9 +171,9 @@ def main(argv: list[str]) -> int:
         return 2
     if command == "upgrade":
         return script("upgrade-instance.py", str(ROOT), *args)
-    if command == "research" and args[:2] == ["refresh", "--due"] and not selected and len(use_cases()) > 1:
-        # Every use case's due topics; one failing does not stop the others.
-        codes = [script(SCRIPT_COMMANDS["research"], str(ROOT / "usecases" / name), *args) for name in use_cases()]
+    if command == "research" and args[:2] == ["refresh", "--due"] and not selected and len(profiles()) > 1:
+        # Every profile's due topics; one failing does not stop the others.
+        codes = [script(SCRIPT_COMMANDS["research"], str(ROOT / "profiles" / name), *args) for name in profiles()]
         return max(codes)
     if command in SCRIPT_COMMANDS:
         if command == "agents" and not args:

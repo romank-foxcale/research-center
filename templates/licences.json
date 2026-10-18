@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "note": "SPDX ids by class. A company profile may use only the permissive class; a personal profile may use any. Ids are matched case-insensitively, with -only and -or-later suffixes removed. An id in no class is unknown, and unknown is flagged like any unusable licence.",
+  "classes": {
+    "permissive": ["MIT", "MIT-0", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear", "0BSD", "ISC", "Zlib", "PSF-2.0", "Python-2.0", "Unlicense", "CC0-1.0", "CC-BY-4.0", "MPL-2.0", "BSL-1.0", "PostgreSQL", "NCSA", "X11", "UPL-1.0"],
+    "weak-copyleft": ["LGPL-2.0", "LGPL-2.1", "LGPL-3.0", "EPL-1.0", "EPL-2.0", "CDDL-1.0", "CDDL-1.1", "EUPL-1.1", "EUPL-1.2", "MS-RL", "OSL-3.0", "CC-BY-SA-4.0"],
+    "copyleft": ["GPL-2.0", "GPL-3.0", "AGPL-3.0", "SSPL-1.0"],
+    "non-commercial": ["CC-BY-NC-4.0", "CC-BY-NC-SA-4.0", "CC-BY-NC-ND-4.0", "CC-BY-NC-3.0", "CC-BY-NC-SA-3.0", "PolyForm-Noncommercial-1.0.0"],
+    "source-available": ["BUSL-1.1", "Elastic-2.0", "Commons-Clause", "PolyForm-Shield-1.0.0", "PolyForm-Small-Business-1.0.0", "RSAL"]
+  },
+  "reasons": {
+    "weak-copyleft": "changes to the licensed files must be published under the same licence; linking from closed code is usually allowed but needs a legal check",
+    "copyleft": "software built on it and distributed (or, for AGPL and SSPL, offered as a service) must be released under the same licence",
+    "non-commercial": "commercial use is not allowed",
+    "source-available": "the source is visible but commercial or competing use is restricted",
+    "unknown": "no licence could be read, so no right to use it can be assumed"
+  }
+}

@@ -32,7 +32,7 @@ import kit  # noqa: E402
 
 
 def instance(root: Path) -> Path:
-    """The instance a data root (an instance, or a use case inside one) belongs to; adapters are shared by the
+    """The instance a data root (an instance, or a profile inside one) belongs to; adapters are shared by the
     whole instance. Without research-center.json above, the path itself (the template)."""
     for candidate in (root, *root.parents):
         if (candidate / "research-center.json").is_file():

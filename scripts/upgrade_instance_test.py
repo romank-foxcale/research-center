@@ -45,10 +45,14 @@ def old_instance(base: Path) -> Path:
     pipeline = settings["pipeline"]
     del pipeline["screener"]
     pipeline.update({"sceptics": ["sceptic-claude", "sceptic-grok"], "researchers": ["researcher-claude"]})
+    settings["defaultUseCase"] = "acme"
     (root / "research-center.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
     for name, text in (("flake.nix", "{}"), ("nix/tools.nix", "{}"), ("rc", "#!/usr/bin/env bash\nold\n"),
                        ("README.md", "# Our own RC\n"), ("scripts/stale.py", "old\n"),
-                       ("research/topic/brief.md", "# A topic\n"), ("docs/our-note.md", "kept\n")):
+                       ("research/topic/brief.md", "# A topic\n"), ("docs/our-note.md", "kept\n"),
+                       ("usecases/acme/usecase.json", json.dumps({"id": "acme", "title": "Acme scouting", "createdAt": "2026-10-16"})),
+                       ("usecases/acme/scope.md", "# Acme\n\nUse case: acme\nStatus: draft\n\n## Who\n\nAcme sells parts [acme.example].\n\nMore.\n"),
+                       ("usecases/acme/research/ocr/brief.md", "# OCR\n")):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text, encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -72,11 +76,21 @@ def main() -> int:
         assert (root / "rc.py").read_text(encoding="utf-8") == (REPO / "rc.py").read_text(encoding="utf-8")
         assert "uv run" in (root / "rc").read_text(encoding="utf-8"), "the bash rc is replaced by the uv launcher"
         assert not (root / "scripts" / "stale.py").exists(), "template-owned folders are mirrored"
+        # Use cases become profiles, with their history, data and default.
+        acme = root / "profiles" / "acme"
+        assert not (root / "usecases").exists() and (acme / "research" / "ocr" / "brief.md").is_file() and (acme / "inbox").is_dir()
+        profile = json.loads((acme / "profile.json").read_text(encoding="utf-8"))
+        assert profile["name"] == "Acme scouting" and profile["type"] == "company" and profile["tags"] == [], profile
+        assert profile["description"] == "Acme sells parts.", profile
+        assert not (acme / "usecase.json").exists() and "Profile: acme" in (acme / "scope.md").read_text(encoding="utf-8")
+        assert "profiles/acme/research/ocr/brief.md" in git(root, "status", "--porcelain"), "moved with git, so history follows"
+        assert "use case acme is now profile acme" in output, output
         assert (root / "README.md").read_text(encoding="utf-8") == "# Our own RC\n", "the instance's README stays"
         assert (root / "research" / "topic" / "brief.md").is_file() and (root / "docs" / "our-note.md").is_file(), "data stays"
         assert (root / "catalog" / "evidence-types.json").is_file() and (root / "catalog" / "adapters" / "openalex.json").is_file()
 
         settings = json.loads((root / "research-center.json").read_text(encoding="utf-8"))
+        assert settings.get("defaultProfile") == "acme" and "defaultUseCase" not in settings
         assert settings["budget"]["ingestCalls"] == 99 and settings["budget"]["refreshCalls"] == 16, "added, never overwritten"
         assert settings["research"]["maxSourcesPerResearcher"] == 7 and settings["research"]["snowballDepth"] == 1
         assert settings["pipeline"]["screener"] == "screener" and (root / "catalog" / "agents" / "screener.json").is_file()

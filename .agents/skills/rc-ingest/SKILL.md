@@ -18,8 +18,8 @@ Ingest is optional and repeatable. It turns sources into committed text (sources
 
    Ask what each source is and why it matters. That goes into `--note` and steers the digest.
 2. **Register each source:**
-   `./rc -u <use-case> ingest add <kind> <locator...> [--id <id>] [--include '<glob>'] [--exclude '<glob>'] [--note "..."]`
-   Sources belong to one use case (`./rc usecase list`): its sources, digests and profile live in `usecases/<use-case>/`, and only its research sees them. Leave out `-u` in an RC without use cases.
+   `./rc -p <profile> ingest add <kind> <locator...> [--id <id>] [--include '<glob>'] [--exclude '<glob>'] [--note "..."]`
+   Sources belong to one profile (`./rc profile list`): its sources, digests and profile notes live in `profiles/<profile>/`, and only its research sees them. Leave out `-p` in an RC without profiles.
    For big repos, narrow with `--include` (for example `docs/*`, `src/*`, `*.md`) before running. The run refuses a source over `ingest.maxSourceBytes`.
 3. **Run it in the background, and follow it with `./rc watch`:**
    `./rc ingest run [ids...]`. Relay fetches, redactions, digests, stalls and the result as they happen.

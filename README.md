@@ -3,12 +3,12 @@
 An AI research assistant you run with your own Claude subscription, natively on Windows (or macOS and Linux), on any subject: medicine, law, markets, history, engineering, software. Point it at what you already know (your company's repos, Notion, Google Drive, documents, the books and papers you read), grill a research topic with it, and get back a report in which every claim is cited, graded, critiqued by sceptics and fitted to your own projects. A topic can stay living: the RC keeps searching, and tells you when the evidence changes.
 
 ```text
-use case (scope) → ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
+profile (type, tags) → ingest (optional) → grill → plan → search → screen → collect → analyze → critique → judge → apply → report → share
 ```
 
 | Stage | What happens | Output |
 | --- | --- | --- |
-| use case | A scope for whom the research serves: their products and where new technology could plug in, hard constraints, how value is measured. Each use case keeps its own sources and research | `usecases/<id>/scope.md` |
+| profile | Whom the research serves: a company or a person, with a description and interest tags. A company profile may use only permissive licences, a personal one any. Each profile keeps its own sources and research | `profiles/<id>/profile.json` |
 | ingest | Folders, repos, URLs, Notion and Drive become committed text (secrets redacted), one digest per source, and a cited profile of you or your company | `sources/`, `knowledge/` |
 | grill | An agent turns your topic into numbered questions, scope, needs and success criteria, asking only what your profile cannot answer | `research/<topic>/brief.md` |
 | plan | Hypotheses, a disconfirming search for each, adapter queries per question, exclusion criteria | `source-plan.md` |
@@ -20,7 +20,7 @@ use case (scope) → ingest (optional) → grill → plan → search → screen 
 | judge | Claude settles the anonymous reviews, grades each claim's credibility and each answer's certainty; contested claims are flagged for you | `judgement.md` |
 | apply | Surviving ideas ranked ADOPT, TRIAL, ASSESS or HOLD against your repos and needs | `fit.md`, `handoff.md` |
 | report | The answer, citing only claims that survived, with calibrated likelihood words, the certainty of each answer and how the sources were found | `report.md` |
-| share | The topic as one HTML page for people without the repository: bottom line, ideas by ring, certainty, the evidence charted, every claim linked to its source; a dashboard for the use case; published as a private claude.ai link | `rc report`, rc-share |
+| share | The topic as one HTML page for people without the repository: bottom line, ideas by ring, certainty, the evidence charted, every claim linked to its source; a dashboard for the profile; published as a private claude.ai link | `rc report`, rc-share |
 
 A brief with a cadence makes the topic **living**: `./rc research refresh` re-runs its searches, screens only what is new, re-derives the conclusions when new verified evidence arrives, and writes a delta of what changed and what needs your review.
 
@@ -79,8 +79,8 @@ This template is public and holds no data. Your RC commits the text of everythin
 
 ```text
 ./rc doctor                                   logins and tools
-./rc usecase new acme --title "Acme's products"   then the grill-use-case skill writes its scope
-./rc -u acme ingest add ...                   work inside a use case (or set defaultUseCase)
+./rc profile new acme --name "Acme" --type company   a profile: whom the RC works for
+./rc -p acme ingest add ...                   work inside a profile (or set defaultProfile)
 ./rc ingest add git https://github.com/org/api --note "our main API"
 ./rc ingest add folder /mnt/c/Users/me/Papers --include '*.pdf'
 ./rc ingest add notion https://www.notion.so/... --depth 2

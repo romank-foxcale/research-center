@@ -100,11 +100,11 @@ You can also call the skill directly: `/grill-rc-bootstrap` in Claude Code and C
 
 Not sure which skill fits? Ask "what can the RC do?" or type `/rc-help`.
 
-**Use cases.** Research happens inside a use case: a company, a product line, a personal area. Each has its own scope, sources and topics, and research in one never sees another's material.
+**Profiles.** The RC works for profiles: a company, a product line, or you personally. Each has a type, a description, interest tags, and its own sources and topics, and research in one never sees another's material. A company profile may use only permissive licences (MIT, Apache-2.0, BSD and similar); a personal one may use any.
 
-> Create a use case for our company. Use the grill-use-case skill.
+> Create a profile for our company. Use the grill-profile skill.
 
-The agent creates `usecases/<id>/`, reads what you point it at (your website, product repos), grills you on the products, the places new technology could plug in, the hard constraints and how value is measured, and accepts the scope with you. Then work in it with `./rc -u <id> ...`, or set `defaultUseCase` in `research-center.json`.
+The agent creates `profiles/<id>/`, asks whether it is a company or personal profile, reads what you point it at (your website, product repos), and writes a short description. A company with products can also get a longer `scope.md`. Then work in it with `./rc -p <id> ...`, or set `defaultProfile` in `research-center.json`.
 
 **Teach it what you know** (optional, repeatable):
 
@@ -144,8 +144,8 @@ Ideas ranked ADOPT or TRIAL come with `research/<topic>/handoff.md`: copy it int
 | `./rc check` | Run every check: tests, notes, manifests, report citations, secret scan |
 | `./rc validate` | The validators only, without the test suites |
 | `./rc doctor` | Check Python, git, uv, gh and the claude and codex logins |
-| `./rc usecase list` / `show <id>` / `new <id> --title "..."` / `accept <id>` | The use cases and their scopes |
-| `./rc -u <id> <command>` | Run ingest, research or watch in one use case |
+| `./rc profile list` / `show <id>` / `new <id> --name "..." --type company` / `edit <id>` | The profiles: name, type, description, tags |
+| `./rc -p <id> <command>` | Run ingest, research, report or watch in one profile |
 | `./rc settings` | Status, budgets, limits, and which provider and model each role uses |
 | `./rc roles set <role> --provider claude --model opus` | Move a role to another provider or model |
 | `./rc ingest list` | Sources, file counts, last fetch, whether each digest is fresh |

@@ -31,8 +31,8 @@ First read `BOOTSTRAP.md`. Keep grilling until every step below is verified, not
 9. **Living topics**: explain that a topic with a cadence is refreshed with `./rc research refresh --due`. Offer to schedule it (cron or Task Scheduler, GUIDE.md) once the first living topic exists.
 10. Replace the template README with this RC's purpose. Keep `GUIDE.md`, `install/`, `CLAUDE.md` and `.claude/skills`: they are the entry point for people and AI tools.
 11. `./rc agents sync`, `./rc check`, set the status to `ready`, and commit with the user's go-ahead.
-12. **First use case**: research happens inside use cases, each with its own scope, sources and topics (for example the company, or a personal area). Create the first with the grill-use-case skill and set it as `defaultUseCase` in research-center.json if the user will mostly work in it.
-13. Hand over: point the use case at the user's material (rc-ingest), or grill a first topic (grill-research-topic)?
+12. **First profile**: the RC works for profiles, each with its own type, tags, sources and topics (for example the company, or the user personally). Create the first with the grill-profile skill and set it as `defaultProfile` in research-center.json if the user will mostly work in it.
+13. Hand over: point the profile at the user's material (rc-ingest), or grill a first topic (grill-research-topic)?
 
 ## Migration
 

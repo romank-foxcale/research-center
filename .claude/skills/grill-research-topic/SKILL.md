@@ -9,14 +9,14 @@ Research is only as good as its brief. Your job is to turn "research X" into que
 
 ## 0. Know the user before asking
 
-- A topic belongs to a use case (`./rc usecase list`). Work in it with `./rc -u <id> ...`; its folder is `usecases/<id>/`. Read its accepted `scope.md` first: it already says whom the research serves, their products and plug-in points, the hard constraints and how value is measured. If the use case has no accepted scope, write it with the grill-use-case skill before grilling a topic.
-- If knowledge/profile/index.md exists (in the use case's folder), read it and the notes relevant to the topic. Skim knowledge/digests/ for the sources that matter.
+- A topic belongs to a profile (`./rc profile list`). Work in it with `./rc -p <id> ...`; its folder is `profiles/<id>/`. Read its `profile.json` (description, type, tags) and its `scope.md` if there is one first: it already says whom the research serves, their products and plug-in points, the hard constraints and how value is measured. If the profile has no description or tags, describe it with the grill-profile skill before grilling a topic.
+- If knowledge/profile/index.md exists (in the profile's folder), read it and the notes relevant to the topic. Skim knowledge/digests/ for the sources that matter.
 - If there is no profile, ask once whether the user wants to point the RC at their material first (the rc-ingest skill). If they decline, grill from scratch.
 - Never ask what the profile already answers. State it instead ("your API is Python on AWS, so I'll scope to tools that fit that. Right?") and let the user correct it.
 
 ## 1. Create the topic
 
-`./rc -u <use-case> research new <topic-id> --title "<short title>"` creates `usecases/<use-case>/research/<topic-id>/brief.md` from templates/brief.md. In an RC without use cases, leave out `-u`.
+`./rc -p <profile> research new <topic-id> --title "<short title>"` creates `profiles/<profile>/research/<topic-id>/brief.md` from templates/brief.md. In an RC without profiles, leave out `-p`.
 
 ## 2. Grill, one decision at a time
 
@@ -25,7 +25,7 @@ Use a pick list when the choices are discrete. Recommend an option and say why. 
 1. **Why now**: the decision this research feeds, and who will act on it.
 2. **Questions**: three to seven, each answerable from evidence. Split vague ones ("is X good?") into measurable ones ("how does X compare to Y on latency and cost at our scale?"). Number them Q1, Q2, ...
 3. **Scope and out of scope**: technologies, vendors, the time window (match it to how fast the subject moves: months for news or fast-moving technology, years or decades for settled science, law or history), depth.
-4. **Our needs**: the stack, constraints and problems the answer must fit. Take them from the scope (cite `scope.md`) and the profile (`knowledge/profile/<note>.md`), and narrow them to this topic: which product and component, which constraint matters most here. For an individual: what they want to learn or build.
+4. **Our needs**: the stack, constraints and problems the answer must fit. Take them from the profile (`profile.json`, `scope.md`) and its notes (`knowledge/profile/<note>.md`), and narrow them to this topic: which product and component, which constraint matters most here. For an individual: what they want to learn or build.
 5. **Success criteria**: what the report must enable, such as a choice between options, a go/no-go, or a reading list.
 6. **Source preferences**: trusted and distrusted sources, languages, paywalls.
 7. **Sources**: `./rc sources list` shows the adapters this RC searches, and `./rc sources packs` the domain packs it could. Recommend enabling a pack that fits the topic (medicine for health questions, software for tools and libraries) with `./rc sources enable <pack>`. When a key source has a feed or a page worth watching, put it in Source preferences so the planner uses the feed or page-watch adapter. When a key source needs an API no adapter covers, `./rc sources new` scaffolds one for the user to finish.

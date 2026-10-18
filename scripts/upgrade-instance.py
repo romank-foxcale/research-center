@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -78,6 +79,45 @@ def upgrade_roles(instance: Path, settings: dict[str, Any], reset: bool) -> list
     return notes
 
 
+def migrate_profiles(instance: Path, settings: dict[str, Any]) -> list[str]:
+    """Use cases became profiles (docs/decisions/0015-profiles.md): usecases/<id>/ moves to profiles/<id>/ with git
+    history, usecase.json becomes profile.json (the title is the name, the scope's first Who paragraph the
+    description), and defaultUseCase becomes defaultProfile. A migrated profile is a company profile, the stricter
+    licence rule, until the user changes its type."""
+    notes = []
+    old_root = instance / "usecases"
+    for old in sorted(path.parent for path in old_root.glob("*/usecase.json")):
+        new = instance / "profiles" / old.name
+        if new.exists():
+            notes.append(f"usecases/{old.name} not moved: profiles/{old.name} already exists")
+            continue
+        new.parent.mkdir(parents=True, exist_ok=True)
+        moved = subprocess.run(["git", "-C", str(instance), "mv", f"usecases/{old.name}", f"profiles/{old.name}"], capture_output=True)
+        if moved.returncode != 0:
+            shutil.move(str(old), str(new))
+        meta = json.loads((new / "usecase.json").read_text(encoding="utf-8"))
+        description = ""
+        if (new / "scope.md").is_file():
+            text = (new / "scope.md").read_text(encoding="utf-8")
+            who = re.split(r"^## ", text.split("## Who", 1)[1], flags=re.MULTILINE)[0] if "## Who" in text else ""
+            description = " ".join(re.sub(r"\s*\[[^\]]*\]", "", who.strip().split("\n\n")[0]).split())[:600]
+            (new / "scope.md").write_text(re.sub(r"^Use case: ", "Profile: ", text, count=1, flags=re.MULTILINE),
+                                          encoding="utf-8", newline="\n")
+        profile = {"schemaVersion": 1, "id": old.name, "name": meta.get("title") or old.name, "description": description,
+                   "type": "company", "tags": [], "createdAt": meta.get("createdAt", "")}
+        (new / "profile.json").write_text(json.dumps(profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+        (new / "usecase.json").unlink()
+        (new / "inbox").mkdir(exist_ok=True)
+        (new / "inbox" / ".gitkeep").touch()
+        notes.append(f"use case {old.name} is now profile {old.name} (type company; change it with rc profile edit {old.name} --type personal)")
+    if old_root.is_dir() and not any(old_root.iterdir()):
+        old_root.rmdir()
+    if "defaultUseCase" in settings:
+        settings.setdefault("defaultProfile", settings.pop("defaultUseCase"))
+        notes.append("setting defaultUseCase is now defaultProfile")
+    return notes
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="rc upgrade")
     parser.add_argument("template", type=Path, help="the template root (passed by rc)")
@@ -123,6 +163,7 @@ def main() -> int:
     seed.pop("name", None)
     notes = [f"setting {key} added" for key in merge_missing(settings, {key: value for key, value in seed.items() if key != "pipeline"})]
     notes += upgrade_roles(instance, settings, args.reset_roles)
+    notes += migrate_profiles(instance, settings)
     settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     for name, source in (("catalog/evidence-types.json", "templates/evidence-types.json"),):
         if not (instance / name).is_file():

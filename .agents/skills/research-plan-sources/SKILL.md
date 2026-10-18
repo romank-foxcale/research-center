@@ -9,7 +9,7 @@ You decide where the evidence for a research brief is most likely to be, before 
 
 ## Read
 
-Read the use case's `scope.md` when there is one (its scouting lens and source preferences apply to every topic in it), then the brief: questions, scope, out of scope, source preferences. Read the profile when there is one. It tells you what the user already knows (don't plan searches for that) and what situation the answer must fit. The task lists the adapters you can use, what each covers, its query syntax and its filters.
+Read the profile's `profile.json` (its tags) and `scope.md` when there is one (its scouting lens and source preferences apply to every topic in it), then the brief: questions, scope, out of scope, source preferences. Read the profile when there is one. It tells you what the user already knows (don't plan searches for that) and what situation the answer must fit. The task lists the adapters you can use, what each covers, its query syntax and its filters.
 
 ## Plan
 

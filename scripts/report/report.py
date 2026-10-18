@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """./rc report [<topic>]: research as self-contained HTML pages for people without the repository. With a topic, its
-page; without, a dashboard of the use case's topics (index.html) with every topic's page beside it.
+page; without, a dashboard of the profile's topics (index.html) with every topic's page beside it.
 
 The page is computed from the topic's committed outputs, never written by an agent, so it costs no budget and the
 same outputs always give the same bytes. The first screen is for decisions: the bottom line, the ideas by ring with
@@ -77,7 +77,7 @@ class Topic:
         self.fit = load(self.dir, "fit.json")
         self.watch = load(self.dir, "watch.json")
         self.report = read(self.dir, "report.md")
-        self.usecase = load(root, "usecase.json")
+        self.profile = load(root, "profile.json")
         self.claims = {claim["id"]: claim for claim in (self.ledger or {}).get("claims", [])}
         self.sources = {source["id"]: source for source in (self.ledger or {}).get("sources", [])}
         self.verdicts = {item["claim"]: item for item in (self.judgement or {}).get("claims", [])}
@@ -164,8 +164,8 @@ def stacked(parts: list[tuple[str, int, str]]) -> str:
 
 def section_header(topic: Topic) -> str:
     meta, _ = topic.report_parts()
-    usecase = topic.usecase or {}
-    crumbs = esc(usecase.get("title") or usecase.get("id") or "")
+    profile = topic.profile or {}
+    crumbs = esc(profile.get("name") or profile.get("id") or "")
     counts = []
     if topic.ledger:
         counts.append(f"{len(topic.claims)} claims from {len(topic.sources)} sources")
@@ -445,6 +445,7 @@ nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem;margin-bottom:8
 .certainty-high{color:var(--ok)}.certainty-moderate{color:var(--trial)}.certainty-low{color:var(--weak)}.certainty-very-low{color:var(--bad)}
 .effort-effort-s,.effort-effort-m,.effort-effort-l,.status-living,.status-accepted,.status-draft,.status-paused,.status-retired,.change-no-material-change{color:var(--muted)}
 .change-material{color:var(--weak)}
+.status-company,.status-personal{color:var(--accent)}.badge.tag{color:var(--ink);border-color:var(--line);font-weight:500}
 .cards{display:grid;gap:14px}
 .card{border:1px solid var(--line);border-left:4px solid var(--hold);border-radius:10px;padding:14px 16px}
 .card.ring-adopt{border-left-color:var(--adopt)}.card.ring-trial{border-left-color:var(--trial)}.card.ring-assess{border-left-color:var(--assess)}
@@ -514,7 +515,7 @@ def page(title: str, body: str, script: bool = True, fragment: bool = False) -> 
 
 
 def render_topic(root: Path, topic_id: str, dashboard: bool = False, fragment: bool = False) -> str:
-    """A topic's page; with dashboard, it links back to the use case's dashboard (index.html) beside it."""
+    """A topic's page; with dashboard, it links back to the profile's dashboard (index.html) beside it."""
     topic = Topic(root, topic_id)
     toc = [("plain", "In plain words"), ("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
            ("hypotheses", "Hypotheses"), ("report", "Full report"), ("claims", "Claims"), ("sources", "Sources"), ("history", "History")]
@@ -574,28 +575,33 @@ def topic_card(topic: Topic) -> str:
             + (f'<div class="legend">Certainty {certainty}</div>' if certainty else "") + "</article>")
 
 
-def scope_line(root: Path) -> str:
-    """The use case's scope status and the first paragraph of whom it serves, without its evidence paths."""
+def tag_names(meta: dict[str, Any]) -> list[str]:
+    return [str(tag.get("tag", "")) if isinstance(tag, dict) else str(tag) for tag in meta.get("tags", [])]
+
+
+def profile_line(root: Path) -> str:
+    """The profile's type, description and interest tags; without a description, the first paragraph of its
+    scope's Who, without the scope's evidence paths, which mean nothing outside the repository."""
+    meta = load(root, "profile.json") or {}
+    about = meta.get("description", "")
     scope = read(root, "scope.md")
-    if not scope:
-        return ""
-    status = re.search(r"^Status:\s*(\S+)", scope, re.MULTILINE)
-    who = research.sections(scope).get("Who", "").strip().split("\n\n")[0]
-    who = re.sub(r"\s*\[[^\]]*\]", "", who)  # evidence paths mean nothing outside the repository
-    return (f'<p class="meta">Scope {badge("status", status.group(1) if status else "unknown")}</p>'
-            + (f'<div class="md">{MARKDOWN.render(who)}</div>' if who else ""))
+    if not about and scope:
+        about = re.sub(r"\s*\[[^\]]*\]", "", research.sections(scope).get("Who", "").strip().split("\n\n")[0])
+    tags = "".join(f'<span class="badge tag">{esc(name)}</span>' for name in tag_names(meta) if name)
+    return ((f'<p class="meta">{badge("status", meta["type"])}</p>' if meta.get("type") else "")
+            + (f'<div class="md">{MARKDOWN.render(about)}</div>' if about else "")
+            + (f'<div class="legend tags">{tags}</div>' if tags else ""))
 
 
 def render_dashboard(root: Path, fragment: bool = False) -> str:
     topics = [Topic(root, topic_id) for topic_id in topic_ids(root)]
     topics.sort(key=lambda topic: (STATUS_ORDER.get(topic.status, len(STATUS_ORDER)), topic.id))
-    usecase = load(root, "usecase.json") or {}
-    title = usecase.get("title") or rc.settings(root).get("name") or "Research"
+    title = (load(root, "profile.json") or {}).get("name") or rc.settings(root).get("name") or "Research"
     cards = "".join(topic_card(topic) for topic in topics) or '<p class="missing">No research topics yet.</p>'
     living = sum(topic.status == "living" for topic in topics)
     summary = f"{len(topics)} topic{'s' if len(topics) != 1 else ''}, {living} living"
     return page(title, f'<header class="top"><p class="crumbs">Research Center</p><h1>{esc(title)}</h1>'
-                f'<p class="meta">{esc(summary)}</p>{scope_line(root)}</header>'
+                f'<p class="meta">{esc(summary)}</p>{profile_line(root)}</header>'
                 f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
                 "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False, fragment=fragment)
 
@@ -636,7 +642,7 @@ def manifest(root: Path, topic: str | None, page_path: Path) -> dict[str, Any]:
     content = render_topic(root, topic, fragment=True) if topic else render_dashboard(root, fragment=True)
     shared = write_page(folder / "share" / f"{name}.html", content)
     beside = {} if topic else {f"{other}.html": str(folder / f"{other}.html") for other in topic_ids(root)}
-    title = Topic(root, topic).title if topic else (load(root, "usecase.json") or {}).get("title") or rc.settings(root).get("name")
+    title = Topic(root, topic).title if topic else (load(root, "profile.json") or {}).get("name") or rc.settings(root).get("name")
     return {"page": str(shared), "files": beside, "title": title, "sharedAt": shares(folder).get(name)}
 
 

@@ -59,7 +59,8 @@ def write(path: Path, data) -> None:
 
 def fixture(root: Path) -> Path:
     topic = root / "research" / "retrieval"
-    write(root / "usecase.json", {"id": "acme", "title": "Acme product scouting"})
+    write(root / "profile.json", {"id": "acme", "name": "Acme product scouting", "type": "company",
+                                  "description": "", "tags": [{"tag": "search ranking"}, "e-commerce"]})
     write(topic / "brief.md", BRIEF)
     write(topic / "source-plan.json", {
         "hypotheses": [{"id": "H1", "statement": "Hybrid gives the best recall", "questions": ["Q1"]},
@@ -168,7 +169,7 @@ def main() -> int:
         assert 'id="claims"' not in early and "Not judged yet." in early
 
         # The dashboard: every topic, living first, each linked to its page beside it, which links back.
-        (root / "scope.md").write_text("# Acme\n\nUse case: acme\nStatus: accepted\n\n## Who\n\nAcme sells parts online "
+        (root / "scope.md").write_text("# Acme\n\nProfile: acme\nStatus: accepted\n\n## Who\n\nAcme sells parts online "
                                        "[acme.example/about].\n\nSecond paragraph.\n", encoding="utf-8")
         index = report.command_dashboard(root, None)
         assert index == root / ".rc-local" / "reports" / "index.html"
@@ -177,6 +178,7 @@ def main() -> int:
         assert board.find('href="retrieval.html"') < board.find('href="early.html"'), "living topics first"
         assert "1 TRIAL" in board and "Hybrid retrieval" in board and "Dense only" not in board, "leading ideas are ADOPT or TRIAL"
         assert "certainty-low" in board and "not run" in board and "3 claims, 2 sources" in board
+        assert "search ranking</span>" in board and "e-commerce</span>" in board and "status-company" in board
         assert "Acme sells parts online." in board and "acme.example" not in board and "Second paragraph" not in board
         assert "<script>" not in board
         beside = (index.parent / "retrieval.html").read_text(encoding="utf-8")

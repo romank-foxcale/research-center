@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "ingest"), str(HERE / "runner"), str(HERE / "sources")]
 import kit  # noqa: E402
 import secrets_scan  # noqa: E402
-import usecases  # noqa: E402
+import profiles  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("validate_knowledge", HERE / "validate-knowledge.py")
 _knowledge = importlib.util.module_from_spec(_spec)
@@ -54,7 +54,7 @@ NUMBERS = {
 COUNTS = ("snowballDepth", "snowballSeeds", "snowballPerSeed")  # optional; 0 is allowed
 GRADES = ("A", "B", "C", "D", "E", "F")
 CERTAINTIES = ("very low", "low", "moderate", "high")
-DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "usecases")
+DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "profiles", "usecases")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 ADAPTER_FIELDS = {"schemaVersion": int, "id": str, "module": str, "family": str, "covers": str, "evidenceTypes": list,
@@ -241,19 +241,37 @@ def check_reports(root: Path, errors: list[str]) -> None:
                 errors.append(f"{name}/report.md: relies on {claim}, judged {verdicts[claim]}")
 
 
-def check_use_case(root: Path, space: Path, errors: list[str]) -> None:
-    """A use case names itself after its folder and has a scope; an accepted scope has every section filled."""
+def check_profile(root: Path, space: Path, errors: list[str]) -> None:
+    """A profile names itself after its folder, with a name, a type and tags; an optional scope.md, once accepted,
+    has every section filled."""
     name = space.relative_to(root).as_posix()
-    meta = load(space / "usecase.json", errors, root)
-    if not isinstance(meta, dict) or meta.get("id") != space.name or not meta.get("title"):
-        errors.append(f"{name}/usecase.json: id must equal the folder name, with a title")
+    meta = load(space / profiles.META, errors, root)
+    if meta is not None:
+        errors += [problem.replace(f"{space.name}/", f"{name}/", 1) for problem in profiles.meta_problems(meta, space.name)]
     scope = space / "scope.md"
-    if not scope.is_file():
-        errors.append(f"{name}/scope.md is missing")
+    if scope.is_file():
+        text = scope.read_text(encoding="utf-8")
+        if re.search(r"^Status:\s*accepted", text, flags=re.MULTILINE):
+            errors += [f"{name}/scope.md: {problem}" for problem in profiles.scope_problems(text)]
+
+
+def check_licences(root: Path, path: Path, errors: list[str]) -> None:
+    """The licence table: every class a list of SPDX ids, no id in two classes, a reason for every unusable class."""
+    data = load(path, errors, root)
+    if not isinstance(data, dict) or not isinstance(data.get("classes"), dict):
+        errors.append(f"{path.relative_to(root).as_posix()}: needs a classes object")
         return
-    text = scope.read_text(encoding="utf-8")
-    if re.search(r"^Status:\s*accepted", text, flags=re.MULTILINE):
-        errors += [f"{name}/scope.md: {problem}" for problem in usecases.scope_problems(text)]
+    seen: dict[str, str] = {}
+    for kind, members in data["classes"].items():
+        for member in members if isinstance(members, list) else []:
+            key = str(member).lower()
+            if key in seen:
+                errors.append(f"{path.relative_to(root).as_posix()}: {member} is in both {seen[key]} and {kind}")
+            seen[key] = kind
+        if kind != "permissive" and kind not in data.get("reasons", {}):
+            errors.append(f"{path.relative_to(root).as_posix()}: class {kind} needs a reason")
+    if "unknown" not in data.get("reasons", {}):
+        errors.append(f"{path.relative_to(root).as_posix()}: needs a reason for unknown licences")
 
 
 def validate(root: Path) -> list[str]:
@@ -267,10 +285,12 @@ def validate(root: Path) -> list[str]:
         if (root / "catalog" / "evidence-types.json").is_file():
             check_evidence_types(root, root / "catalog" / "evidence-types.json", errors)
         errors += secrets_scan.scan(root, ["catalog"])
-        # The instance root holds data when it has no use cases; every use case holds its own (ADR 0013).
-        for space in [root, *sorted(path.parent for path in (root / "usecases").glob("*/usecase.json"))]:
+        if (root / "usecases").is_dir():
+            errors.append("usecases/ is the layout from before profiles; run rc upgrade from the template to move it to profiles/")
+        # The instance root holds data when it has no profiles; every profile holds its own (ADR 0015).
+        for space in [root, *sorted(path.parent for path in (root / profiles.FOLDER).glob(f"*/{profiles.META}"))]:
             if space != root:
-                check_use_case(root, space, errors)
+                check_profile(root, space, errors)
             check_sources(space, errors)
             check_notes(space, errors)
             check_reports(space, errors)
@@ -282,6 +302,7 @@ def validate(root: Path) -> list[str]:
             check_settings(root, template, root / "templates" / "agents", errors, "templates/research-center.json")
         check_adapters(root, root / "templates" / "adapters", errors)
         check_evidence_types(root, root / "templates" / "evidence-types.json", errors)
+        check_licences(root, root / "templates" / "licences.json", errors)
         for pack in sorted((root / "templates" / "packs").glob("*/pack.json")):
             data = load(pack, errors, root)
             if not isinstance(data, dict) or data.get("id") != pack.parent.name or not data.get("description"):

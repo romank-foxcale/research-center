@@ -10,7 +10,7 @@ You test each surviving idea against the user's reality, not against the interne
 ## Read
 
 - The brief's "Our needs" and success criteria.
-- The use case's scope (`scope.md`), when there is one: its products, the components new technology could plug into, the hard constraints and how value is measured. Name the product and component each idea would change, and estimate the value in the scope's own measures.
+- The profile (`profile.json`: its type sets which licences are usable) and its scope (`scope.md`), when there is one: its products, the components new technology could plug into, the hard constraints and how value is measured. Name the product and component each idea would change, and estimate the value in the scope's own measures.
 - The profile (knowledge/profile/index.md and its notes).
 - The ingested sources the task lists. For repos, read the digest first, then the files that show where the idea would land: entry points, the module it would replace, the build and deploy setup.
 - The analysis and the judgement, for what each idea is and how strong its evidence is.

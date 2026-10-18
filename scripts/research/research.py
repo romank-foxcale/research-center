@@ -408,24 +408,35 @@ def command_show(root: Path, args: argparse.Namespace) -> None:
 # Shared context -------------------------------------------------------------------------------------------
 
 
-def require_scope(root: Path) -> None:
-    """Research in a use case runs only against its accepted scope: the scope is what the results are judged by."""
-    scope = root / "scope.md"
-    if (root / "usecase.json").is_file() and (not scope.is_file() or brief_status(scope.read_text(encoding="utf-8")) != "accepted"):
-        raise rc.RcError(f"the scope of use case {root.name} is not accepted; finish usecases/{root.name}/scope.md "
-                         f"(grill-use-case skill), then rc usecase accept {root.name}")
+def profile_meta(root: Path) -> dict[str, Any] | None:
+    path = root / "profile.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
+def require_profile(root: Path) -> None:
+    """Research in a profile is judged against whom it serves, so the profile must say that first: a description
+    or at least one interest tag."""
+    meta = profile_meta(root)
+    if meta is not None and not meta.get("description") and not meta.get("tags"):
+        raise rc.RcError(f"profile {root.name} has no description and no interest tags yet; describe it with "
+                         f"rc profile edit {root.name} --description \"...\" or add tags first")
 
 
 def context(root: Path, topic: str) -> str:
-    """What every research role reads first: the use case's scope, the brief, the profile, and the ingested sources."""
+    """What every research role reads first: the profile, the brief, the profile notes, and the ingested sources."""
     lines = []
+    meta = profile_meta(root)
+    if meta is not None:
+        rule = ("a company profile: only permissive licences (templates/licences.json) are usable in what it ships; "
+                "flag every other licence" if meta.get("type") == "company" else "a personal profile: any licence is usable")
+        lines.append(f"Profile: profile.json (read it first): {meta.get('name', root.name)}, {rule}. Its description and "
+                     "interest tags say whom this research serves.")
     if (root / "scope.md").is_file():
-        lines.append("Use case scope: scope.md (read it first). It says whom this research serves, their products and the "
-                     "components a new technology could plug into, the hard constraints every recommendation must meet, "
-                     "and how value is measured.")
+        lines.append("Scope: scope.md, the profile's longer context: its products and the components a new technology "
+                     "could plug into, the hard constraints every recommendation must meet, and how value is measured.")
     lines.append(f"Topic: {topic}. Brief: research/{topic}/brief.md (read it first).")
     if (root / "knowledge" / "profile" / "index.md").is_file():
-        lines.append("Profile of the user or company: knowledge/profile/index.md and the notes it links.")
+        lines.append("Profile notes, built from the ingested sources: knowledge/profile/index.md and the notes it links.")
     else:
         lines.append("No profile: nothing was ingested, so judge needs from the brief alone.")
     owned = [descriptor for descriptor in ingest.sources(root) if descriptor.get("origin", "user") == "user"]
@@ -1482,7 +1493,7 @@ def clear_from(root: Path, topic: str, stage: str, keep_replies: bool = False) -
 
 def run_research(root: Path, topic: str, start: str | None, budget: int | None) -> int:
     config = rc.settings(root)
-    require_scope(root)
+    require_profile(root)
     directory = topic_dir(root, topic)
     text = (directory / "brief.md").read_text(encoding="utf-8")
     if brief_status(text) == "retired":

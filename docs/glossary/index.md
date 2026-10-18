@@ -2,7 +2,7 @@
 id: glossary.index
 title: Glossary
 status: active
-summary: Terms of the Research Center - use case, scope, instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, pack, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, competing hypotheses matrix, diagnostic claim, key assumption, assessment, handoff.
+summary: Terms of the Research Center - profile, licence rule, scope, instance, source, digest, profile, brief, claim, ledger, verdict, contested, fit ring, adapter, pack, record, evidence type, hypothesis, exclusion criterion, candidate, snowballing, screening flow, living topic, refresh, delta, reliability, credibility, certainty, drifted, competing hypotheses matrix, diagnostic claim, key assumption, assessment, handoff.
 verified_at: 2026-10-11
 evidence:
   - scripts/research/research.py
@@ -13,9 +13,10 @@ relations:
 
 # Glossary
 
-- **Use case**: a scoped part of an instance (usecases/&lt;id&gt;/) with its own scope, sources, profile and research; config is shared by the instance.
-- **Scope**: a use case's scope.md: whom it serves, products and plug-in points, hard constraints, how value is measured, out of scope, scouting lens, source preferences. Research runs only against an accepted scope.
-- **Report page**: a topic's results as one self-contained HTML page (`rc report <topic>`), computed from its committed outputs; the **dashboard** (`rc report`) lists a use case's topics with their pages beside it. Shared as private artifacts with the rc-share skill.
+- **Profile**: whom the RC works for, a company or a person (profiles/&lt;id&gt;/): name, description, type and interest tags in profile.json, with its own sources, profile notes and research; config is shared by the instance. Formerly a use case.
+- **Licence rule**: a company profile may use only permissive licences (templates/licences.json), a personal one any; the runner classifies every licence and flags the unusable ones.
+- **Scope**: a profile's optional scope.md: whom it serves, products and plug-in points, hard constraints, how value is measured, out of scope, scouting lens, source preferences.
+- **Report page**: a topic's results as one self-contained HTML page (`rc report <topic>`), computed from its committed outputs; the **dashboard** (`rc report`) lists a profile's topics with their pages beside it. Shared as private artifacts with the rc-share skill.
 - **Instance**: a private repo made from the template with `./rc bootstrap install`. Only an instance holds data.
 - **Source**: something ingested (folder, git, url, notion, gdrive), described in catalog/sources/&lt;id&gt;.json and stored as text in sources/&lt;id&gt;/.
 - **Digest**: one source's key facts, open problems and terms, every bullet cited.

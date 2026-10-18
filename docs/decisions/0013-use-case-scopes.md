@@ -1,23 +1,26 @@
 ---
 id: decision.0013-use-case-scopes
 title: An RC holds use cases - scoped folders with their own scope, sources, profile and research, sharing the instance's config
-status: accepted
+status: superseded
 summary: usecases/<id>/ holds a scope.md and the data of one use case laid out like an instance's (catalog/sources, sources, knowledge, research); the runners take it as their data root while settings, roles, adapters, templates and skills resolve from the instance; rc -u <id> (or RC_USE_CASE, defaultUseCase, the only one) picks it; research needs an accepted scope and every role reads it first.
 verified_at: 2026-10-16
 evidence:
-  - scripts/usecases.py
-  - scripts/usecases_test.py
+  - scripts/profiles.py
+  - scripts/profiles_test.py
   - scripts/runner/rc.py
   - rc.py
   - templates/scope.md
-  - .agents/skills/grill-use-case/SKILL.md
+  - docs/decisions/0015-profiles.md
 relations:
+  - docs/decisions/0015-profiles.md
   - docs/decisions/0001-template-and-instances.md
   - docs/decisions/0012-windows-native-uv.md
   - docs/architecture/research-center.md
 ---
 
 # An RC holds use cases - scoped folders with their own scope, sources, profile and research, sharing the instance's config
+
+Superseded on 2026-10-18 by [0015 Profiles](0015-profiles.md): use cases became profiles with a type, tags and an optional scope.
 
 ## Context
 

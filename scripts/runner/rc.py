@@ -67,9 +67,9 @@ def write_text(path: Path, text: str) -> list[dict[str, Any]]:
 
 
 def instance(path: Path) -> Path:
-    """The instance a data root belongs to: the nearest folder upward with research-center.json. A use case
-    (usecases/<id>/) is a data root inside its instance; settings, roles, adapters, templates and skills are the
-    instance's (docs/decisions/0013-use-case-scopes.md). Without one, the path itself (the template)."""
+    """The instance a data root belongs to: the nearest folder upward with research-center.json. A profile
+    (profiles/<id>/) is a data root inside its instance; settings, roles, adapters, templates and skills are the
+    instance's (docs/decisions/0015-profiles.md). Without one, the path itself (the template)."""
     for candidate in (path, *path.parents):
         if (candidate / SETTINGS).is_file():
             return candidate
@@ -182,7 +182,7 @@ class Session:
         self.reserve(label)
         spec = role(self.root, role_id)
         skills = "\n\n".join(skill_text(self.root, name) for name in spec.get("skills", []))
-        # Named outright: in a use case the current directory is usecases/<id>/, not the repository root, and an
+        # Named outright: in a profile the current directory is profiles/<id>/, not the repository root, and an
         # agent that guesses the root reads the wrong paths first.
         prompt = (f"{skills}\n\n# Context\n\nThe current directory is {self.root}. Every relative path in this task is "
                   f"relative to it. You can read files; you cannot write any.\n\n{body}")
