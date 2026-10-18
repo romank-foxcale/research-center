@@ -172,6 +172,15 @@ def main() -> int:
     if not (instance / "catalog" / "adapters").is_dir():
         shutil.copytree(TEMPLATE / "templates" / "adapters", instance / "catalog" / "adapters")
         notes.append("added catalog/adapters with the default adapters")
+    # Enabled adapters whose code is the template's (core and pack adapters) take the template's descriptor, so new
+    # filters reach the instance; an instance's own adapters (catalog/adapters/code/) are left alone.
+    shipped = {path.name: path for path in [*(TEMPLATE / "templates" / "adapters").glob("*.json"),
+                                            *(TEMPLATE / "templates" / "packs").glob("*/adapters/*.json")]}
+    for path in sorted((instance / "catalog" / "adapters").glob("*.json")):
+        source = shipped.get(path.name)
+        if source and path.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
+            shutil.copy2(source, path)
+            notes.append(f"adapter {path.stem} updated to the template's descriptor")
 
     print(f"upgraded {instance} to the template at {TEMPLATE}")
     for line in notes + [f"removed {name}" for name in removed]:

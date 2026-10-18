@@ -55,6 +55,11 @@ def old_instance(base: Path) -> Path:
                        ("usecases/acme/research/ocr/brief.md", "# OCR\n")):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text, encoding="utf-8")
+    # An enabled pack adapter copied before the template added a filter.
+    github = json.loads((REPO / "templates" / "packs" / "software" / "adapters" / "github.json").read_text(encoding="utf-8"))
+    github["filters"].pop("created")
+    (root / "catalog" / "adapters").mkdir(parents=True)
+    (root / "catalog" / "adapters" / "github.json").write_text(json.dumps(github), encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     git(root, "add", "-A")
     git(root, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-qm", "old instance")
@@ -87,7 +92,9 @@ def main() -> int:
         assert "use case acme is now profile acme" in output, output
         assert (root / "README.md").read_text(encoding="utf-8") == "# Our own RC\n", "the instance's README stays"
         assert (root / "research" / "topic" / "brief.md").is_file() and (root / "docs" / "our-note.md").is_file(), "data stays"
-        assert (root / "catalog" / "evidence-types.json").is_file() and (root / "catalog" / "adapters" / "openalex.json").is_file()
+        assert (root / "catalog" / "evidence-types.json").is_file()
+        refreshed = json.loads((root / "catalog" / "adapters" / "github.json").read_text(encoding="utf-8"))
+        assert "created" in refreshed["filters"] and "adapter github updated to the template's descriptor" in output, output
 
         settings = json.loads((root / "research-center.json").read_text(encoding="utf-8"))
         assert settings.get("defaultProfile") == "acme" and "defaultUseCase" not in settings

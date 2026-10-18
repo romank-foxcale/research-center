@@ -146,7 +146,7 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
         for source, adapter, query, filters, query_since in queries(tag, since, config, enabled):
             try:
                 results = search(root, adapter, query, filters, query_since, config["perQuery"], log)
-            except kit.AdapterError as error:
+            except (kit.AdapterError, ValueError) as error:  # ValueError: a filter the adapter does not know
                 failures.append(f"{source} for '{tag}': {error}")
                 continue
             total += len(results)
