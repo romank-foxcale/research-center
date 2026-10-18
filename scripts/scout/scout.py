@@ -187,6 +187,26 @@ def report_discovery(summary: dict[str, Any]) -> None:
         print(f"note: not searched, adapter not enabled: {', '.join(summary['sourcesSkipped'])} (rc sources packs)")
 
 
+TREND_TAGS = ("AI coding agent", "agent harness", "open-weight LLM", "local LLM inference", "LLM evaluation",
+              "RAG framework", "developer tooling")
+
+
+def command_init_trends(root: Path) -> None:
+    """Start the instance's shared trend feed: trends/ scouted like a profile, every card judged against all
+    profiles. Starts with general tags the user edits with rc trends tags."""
+    if root.name != carding.TRENDS or not (root.parent / "research-center.json").is_file():
+        raise rc.RcError("the trend feed lives in an instance's trends/ folder; run rc trends init")
+    if (root / "profile.json").is_file():
+        raise rc.RcError("the trend feed already exists; edit its tags with rc trends tags")
+    today = datetime.date.today().isoformat()
+    rc.write_json(root / "profile.json", {
+        "schemaVersion": 1, "id": carding.TRENDS, "name": "Trends across profiles", "type": "company", "createdAt": today,
+        "description": "Releases and research that may change how any profile works or builds its software, judged against "
+                       "every profile, under the strictest licence rule.",
+        "tags": [{"tag": tag, "why": "a default trend tag", "source": "user", "evidence": [], "added": today} for tag in TREND_TAGS]})
+    print(f"started trends/ with the tags {', '.join(TREND_TAGS)}; edit them with rc trends tags, then rc trends")
+
+
 def all_cards(root: Path) -> list[dict[str, Any]]:
     return sorted((json.loads(path.read_text(encoding="utf-8")) for path in (folder(root) / "cards").glob("*.json")),
                   key=lambda card: (card["date"], card["id"]), reverse=True)
@@ -248,6 +268,7 @@ def main() -> int:
     find.add_argument("--since", help="YYYY-MM-DD; default: the last discovery, else scout.lookbackDays ago")
     find.add_argument("--tag", action="append", help="only this tag; repeatable")
     commands.add_parser("cards", help="the profile's technology cards, newest first")
+    commands.add_parser("init", help="start the instance's shared trend feed (rc trends init)")
     commands.add_parser("dismiss", help="close a card; its find is never raised again").add_argument("card")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -256,6 +277,8 @@ def main() -> int:
             report_discovery(discover(root, args.since, args.tag))
         elif args.command == "cards":
             command_cards(root)
+        elif args.command == "init":
+            command_init_trends(root)
         elif args.command == "dismiss":
             command_dismiss(root, args.card)
         else:

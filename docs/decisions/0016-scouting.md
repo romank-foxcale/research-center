@@ -12,6 +12,7 @@ evidence:
   - templates/research-center.json
   - scripts/scout/cards.py
   - scripts/scout/cards_test.py
+  - scripts/scout/trends_test.py
   - .agents/skills/scout-card/SKILL.md
 relations:
   - docs/decisions/0015-profiles.md
@@ -55,6 +56,8 @@ The user wants the job foxcale pays consultants for: hear about new technology t
     At least two claims quote the evidence word for word, checked like research quotes, and the fit names the profile files it rests on. "Not a fit" is a full result.
   - **Challenge.** The scout-sceptic reviews every card in one call: holds, overstated (with issues) or wrong (with the verdict that does follow). A wrong card takes the sceptic's verdict, and the card says the sceptic changed it.
   - **Storage.** Cards are `scout/cards/<id>.json`, rendered to `.md` by the runner. `rc scout dismiss` closes one, and its find is never raised again.
+
+- **The shared trends feed** (`rc trends`). `trends/` at the instance root is scouted like a profile, with its own general tags (`rc trends init` seeds agent harnesses, open-weight models, local inference and similar; `rc trends tags` edits them) and the company licence rule, the strictest. Triage and the evaluator read every profile. A trend card must list in `affects` the profiles it may affect, with the component and how, naming only profiles that exist; a trend that affects none is not a fit. The main screen shows trends above the profiles.
 
 ## Consequences
 

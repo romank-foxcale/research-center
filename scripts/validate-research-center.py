@@ -58,7 +58,7 @@ NUMBERS = {
 COUNTS = ("snowballDepth", "snowballSeeds", "snowballPerSeed")  # optional; 0 is allowed
 GRADES = ("A", "B", "C", "D", "E", "F")
 CERTAINTIES = ("very low", "low", "moderate", "high")
-DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "profiles", "usecases")
+DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "profiles", "usecases", "trends")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
 ADAPTER_FIELDS = {"schemaVersion": int, "id": str, "module": str, "family": str, "covers": str, "evidenceTypes": list,
@@ -293,7 +293,8 @@ def validate(root: Path) -> list[str]:
         if (root / "usecases").is_dir():
             errors.append("usecases/ is the layout from before profiles; run rc upgrade from the template to move it to profiles/")
         # The instance root holds data when it has no profiles; every profile holds its own (ADR 0015).
-        for space in [root, *sorted(path.parent for path in (root / profiles.FOLDER).glob(f"*/{profiles.META}"))]:
+        trends = [root / "trends"] if (root / "trends" / profiles.META).is_file() else []
+        for space in [root, *sorted(path.parent for path in (root / profiles.FOLDER).glob(f"*/{profiles.META}")), *trends]:
             if space != root:
                 check_profile(root, space, errors)
             check_sources(space, errors)

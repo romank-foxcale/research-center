@@ -18,6 +18,10 @@ description: Run and present scouting for a profile with ./rc scout - discovery 
 3. `./rc -p <id> scout discover` alone costs no agent calls. `./rc -p <id> scout run --no-discover` triages what is already open.
 4. A provider that is logged out stops the run. Tell the user which login to fix (`./rc doctor`). Never switch to another model.
 
+## The shared trends feed
+
+`./rc trends init` starts `trends/`, a feed of releases and research that may affect any profile, with general tags such as agent harnesses and open-weight models. Edit its tags with `./rc trends tags add|remove`. `./rc trends` runs it like a profile scout, and every trend card says which profiles it may affect and how. Trends appear first on the main screen (`./rc home`).
+
 ## Present
 
 Read the new cards (`profiles/<id>/scout/cards/<card>.md`), then give the user:

@@ -57,3 +57,4 @@ End with one fenced JSON block:
 - **Claims.** At least two claims about the find, each with a verbatim quote of six or more words from the evidence page. The runner checks every quote word for word and rejects the card otherwise.
 - **profileBasis.** The profile files your fit judgement rests on. The runner checks they exist.
 - No facts that are in neither the evidence nor the profile files.
+- **Trend cards.** When the task says this is the shared trends feed, read every profile it lists and add `affects`: one entry per profile the find may affect, `{"profile": "<id>", "component": "...", "how": "..."}`. A trend need not touch a profile's products; a better way to build or run its software counts. A find that affects no profile is `not a fit`, with `affects: []`. `profileBasis` paths start with `../profiles/<id>/`.

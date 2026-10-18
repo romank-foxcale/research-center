@@ -64,12 +64,18 @@ def flags(card: dict[str, Any]) -> str:
     return " ".join(out)
 
 
+def affects_text(card: dict[str, Any]) -> str:
+    """For a trend card: the profiles it may affect, with the component and how."""
+    return "; ".join(f"{entry['profile']} ({entry['component']}): {entry['how']}" for entry in card.get("affects", [])) or "no profile"
+
+
 def card_tile(card: dict[str, Any], href: str) -> str:
     kind = card.get("kind", "")
     return (f'<article class="card v-{esc(card["verdict"].replace(" ", "-"))}"><div class="card-head">'
             f'<h3><a href="{esc(href)}">{esc(card["title"])}</a></h3>{badge("verdict", card["verdict"])}</div>'
             f'<p>{esc(card["headline"])}</p>'
             f'<p class="hint">{esc(kind)} · {esc(card["date"])} · {esc(", ".join(card.get("tags", [])))}</p>'
+            + (f'<p class="hint">May affect: {esc(affects_text(card))}</p>' if "affects" in card else "")
             + (f"<p>{flags(card)}</p>" if flags(card) else "") + "</article>")
 
 
@@ -100,11 +106,13 @@ def profile_section(profile_root: Path, meta: dict[str, Any]) -> str:
 
 def trends_section(root: Path) -> str:
     """The shared trend feed (scouting plan WP5); until it exists, the main screen says so in one line."""
-    found = sorted((root / "trends" / "cards").glob("*.json")) if (root / "trends").is_dir() else []
+    found = [card for card in cards(root / "trends") if card.get("status", "open") != "dismissed"] if (root / "trends").is_dir() else []
     if not found:
         return ""
-    tiles = "".join(card_tile(json.loads(path.read_text(encoding="utf-8")), f"trends/{path.stem}.html") for path in found)
-    return f'<section id="trends"><h2>Trends across profiles</h2><div class="cards">{tiles}</div></section>'
+    found.sort(key=lambda card: (VERDICT_ORDER.index(card["verdict"]), card["title"]))
+    tiles = "".join(card_tile(card, f"trends/{card['id']}.html") for card in found)
+    return (f'<section id="trends"><h2>Trends across profiles</h2><p class="hint">Releases and research that may change how '
+            f'any profile works; each card names the profiles it may affect.</p><div class="cards">{tiles}</div></section>')
 
 
 def render_home(root: Path, fragment: bool = False) -> str:
@@ -167,6 +175,13 @@ def command_home(root: Path) -> tuple[Path, dict[str, str]]:
     """Write the main screen and every page beside it; return the main page and the pages beside it by path."""
     out = folder(root)
     beside: dict[str, str] = {}
+    trends = root / "trends"
+    if (trends / "profile.json").is_file():
+        meta = json.loads((trends / "profile.json").read_text(encoding="utf-8"))
+        for card in cards(trends):
+            if card.get("status", "open") != "dismissed":
+                path = write_page(out / "trends" / f"{card['id']}.html", render_card(card, meta))
+                beside[f"trends/{card['id']}.html"] = str(path)
     for profile_root, meta in profiles(root):
         pid = meta["id"]
         for card in cards(profile_root):

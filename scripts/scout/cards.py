@@ -76,10 +76,25 @@ def line(index: int, item: dict[str, Any]) -> str:
     return f"K{index} | {item['title']} | {' | '.join(fact for fact in facts if fact)} | {text}"
 
 
+TRENDS = "trends"  # the instance's shared trend feed: scouted like a profile, judged against every profile
+
+
+def is_trends(root: Path) -> bool:
+    return root.name == TRENDS and (root.parent / "profiles").is_dir()
+
+
+def trend_profiles(root: Path) -> list[str]:
+    """The profiles a trend card is judged against, by id."""
+    return sorted(path.parent.name for path in (root.parent / "profiles").glob("*/profile.json"))
+
+
 def profile_reading(root: Path) -> str:
     files = ["profile.json"] + (["scope.md"] if (root / "scope.md").is_file() else [])
     if (root / "knowledge" / "profile" / "index.md").is_file():
         files.append("knowledge/profile/index.md and the notes it links")
+    if is_trends(root):
+        for pid in trend_profiles(root):
+            files.append(f"../profiles/{pid}/profile.json" + (f" and ../profiles/{pid}/scope.md" if (root.parent / "profiles" / pid / "scope.md").is_file() else ""))
     return ", ".join(files)
 
 
@@ -90,7 +105,8 @@ def triage(session: rc.Session, root: Path, candidates: list[dict[str, Any]], pi
     numbered = {f"K{index}": item for index, item in enumerate(candidates, 1)}
     meta = json.loads((root / "profile.json").read_text(encoding="utf-8"))
     body = (f"# Task\n\nTriage {len(candidates)} new finds for the profile {meta.get('name')} ({meta.get('type')}). "
-            f"Read {profile_reading(root)} first. Pick at most {picks} that most deserve a technology card.\n\n"
+            + ("This is the shared trends feed: judge every find against all the profiles listed. " if is_trends(root) else "")
+            + f"Read {profile_reading(root)} first. Pick at most {picks} that most deserve a technology card.\n\n"
             "# Candidates, one per line: id | title | kind, tags, date, stars, licence, language | summary\n\n"
             + "\n".join(line(index, item) for index, item in enumerate(candidates, 1)) + "\n")
 
@@ -196,6 +212,19 @@ def card_problems(data: Any, evidence: str, root: Path) -> list[str]:
     else:
         problems += [f"profileBasis {path} is not a file of the profile" for path in basis
                      if not (root / re.sub(r"#.*$", "", str(path))).is_file()]
+    if is_trends(root):
+        known = trend_profiles(root)
+        affects = data.get("affects")
+        if not isinstance(affects, list):
+            problems.append("a trend card needs affects: the profiles it may affect, each with component and how (an empty list when none)")
+        else:
+            for entry in affects:
+                if not isinstance(entry, dict) or entry.get("profile") not in known:
+                    problems.append(f"affects names {entry!r}; use one of the profiles {', '.join(known)}")
+                elif not str(entry.get("component", "")).strip() or not str(entry.get("how", "")).strip():
+                    problems.append(f"affects {entry['profile']}: needs component and how")
+            if not affects and data.get("verdict") != "not a fit":
+                problems.append("a trend that affects no profile is 'not a fit'")
     return problems
 
 
@@ -205,7 +234,11 @@ def evaluate(session: rc.Session, root: Path, item: dict[str, Any], evidence_pat
     licence_line = (f"Licence (set by the runner, not by you): {licence['spdx'] or 'none found'}, class {licence['class']}, "
                     + ("usable by this profile." if licence["usable"] else f"NOT usable by this {meta.get('type')} profile: {licence['reason']}.")
                     if licence else "Licence: not applicable (a paper or article).")
-    body = (f"# Task\n\nWrite the technology card for one find, for the profile {meta.get('name')} ({meta.get('type')}). "
+    scope_line = (f"This is the shared trends feed: judge the find against every profile ({', '.join(trend_profiles(root))}), and "
+                  "fill affects with each profile it may affect, the component and how. It need not touch their products: a "
+                  "better way to build their software counts. "
+                  if is_trends(root) else f"for the profile {meta.get('name')} ({meta.get('type')}). ")
+    body = (f"# Task\n\nWrite the technology card for one find, {scope_line}"
             f"Read {profile_reading(root)}, then the evidence page {evidence_path}.\n\n"
             f"Find: {item['title']} ({item['kind']}), {item['url']}\nFound by the tags: {', '.join(item['tags'])}\n"
             f"Triage said: {item['triage']['why']} (component: {item['triage']['component']})\n{licence_line}\n")
@@ -223,10 +256,12 @@ def evaluate(session: rc.Session, root: Path, item: dict[str, Any], evidence_pat
 
 def challenge(session: rc.Session, root: Path, cards: list[dict[str, Any]], role: str) -> dict[str, dict[str, Any]]:
     ids = {card["id"] for card in cards}
-    body = (f"# Task\n\nChallenge {len(cards)} technology cards for the profile. Read {profile_reading(root)}. "
+    body = (f"# Task\n\nChallenge {len(cards)} technology cards for the profile"
+            + (" feed of shared trends, including each card's affects" if is_trends(root) else "")
+            + f". Read {profile_reading(root)}. "
             "For each card, read its evidence page and test its verdict and fit claims.\n\n"
             + "\n\n".join(f"## Card {card['id']}\n\nEvidence page: {card['evidence']}\n\n```json\n"
-                          + json.dumps({key: card[key] for key in ("title", "verdict", "headline", "leaders", "engineers")},
+                          + json.dumps({key: card[key] for key in ("title", "verdict", "headline", "leaders", "engineers", "affects") if key in card},
                                        ensure_ascii=False, indent=1) + "\n```" for card in cards) + "\n")
 
     def check(reply: str) -> dict[str, dict[str, Any]]:
@@ -269,6 +304,9 @@ def render(card: dict[str, Any]) -> str:
     if licence:
         lines += ["", f"**Licence:** {licence['spdx'] or 'none found'} ({licence['class']}) - "
                   + ("usable." if licence["usable"] else f"**not usable for this profile:** {licence['reason']}.")]
+    if "affects" in card:
+        lines += ["", "**May affect:** " + ("; ".join(f"{entry['profile']} ({entry['component']}): {entry['how']}" for entry in card["affects"])
+                                           or "no profile")]
     lines += ["", "## In plain words", "", f"- **What it is:** {leaders['whatItIs']}", f"- **What it could do for us:** {leaders['whatItCouldDo']}",
               f"- **Where it would plug in:** {leaders['wherePlugsIn']}", f"- **Why this verdict:** {leaders['why']}",
               "", "## For engineers", "", f"**How it works.** {engineers['howItWorks']}", "",
@@ -327,7 +365,8 @@ def run(root: Path, config: dict[str, Any], roles: dict[str, str], stamp: str) -
                           "triage": item["triage"], "licence": item.get("licence"), "evidence": item["evidence"],
                           "verdict": data["verdict"], "verdictBy": "evaluator", "evaluatorVerdict": data["verdict"],
                           "headline": data["headline"], "leaders": data["leaders"], "engineers": data["engineers"],
-                          "claims": data["claims"], "profileBasis": data["profileBasis"], "status": "open"})
+                          "claims": data["claims"], "profileBasis": data["profileBasis"], "status": "open",
+                          **({"affects": data.get("affects", [])} if is_trends(root) else {})})
         if cards:
             reviews = challenge(session, root, cards, roles["scoutSceptic"])
             for card in cards:

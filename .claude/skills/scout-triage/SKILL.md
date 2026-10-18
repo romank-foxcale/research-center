@@ -20,6 +20,8 @@ A find deserves a card when at least one of these holds:
 
 Prefer finds surfaced by several tags, recent work over old tools that only got a new commit, and permissive licences for a company profile. Do not discard a strong find only because its licence is unusable, because the card will say so. Skip duplicates of the same idea, keeping the strongest.
 
+For the shared trends feed (the task says so), pick what could change how any of the listed profiles works or builds software: a better agent harness, a model class that runs locally, a tool that shifts cost. Not what matters to one niche only.
+
 Picking fewer than the maximum is right when little is worth it. Picking none is a valid answer.
 
 ## Output, exactly

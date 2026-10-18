@@ -54,7 +54,8 @@ Commands:
   tags suggest | accept [<tag>...|--all] | reject [<tag>...|--all]  Tags proposed from the profile's material
   scout [run] [--no-discover]  Discovery, then triage, technology cards and their challenge (about scout.calls agent calls)
   scout discover [--since D] [--tag T]  What is new for the profile's tags on GitHub, arXiv and OpenAlex (no agent)
-  scout cards | dismiss <card>  The profile's technology cards; close one for good"""
+  scout cards | dismiss <card>  The profile's technology cards; close one for good
+  trends init | [run] | discover | cards | dismiss <card> | tags ...  The shared trend feed, judged against every profile"""
 
 # The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
 CHECKS = [
@@ -76,6 +77,7 @@ CHECKS = [
     ("tags test", ["tags_test.py"]),
     ("scout test", ["scout/scout_test.py"]),
     ("cards test", ["scout/cards_test.py"]),
+    ("trends test", ["scout/trends_test.py"]),
 ]
 # Commands that hand over to one script with the root and the remaining arguments.
 SCRIPT_COMMANDS = {
@@ -185,6 +187,11 @@ def main(argv: list[str]) -> int:
         # Every profile's due topics; one failing does not stop the others.
         codes = [script(SCRIPT_COMMANDS["research"], str(ROOT / "profiles" / name), *args) for name in profiles()]
         return max(codes)
+    if command == "trends":
+        # The shared trend feed: trends/ is scouted like a profile (docs/decisions/0016-scouting.md).
+        if args[:1] == ["tags"]:
+            return script(SCRIPT_COMMANDS["tags"], str(ROOT / "trends"), *args[1:])
+        return script(SCRIPT_COMMANDS["scout"], str(ROOT / "trends"), *(args or ["run"]))
     if command in SCRIPT_COMMANDS:
         if command == "agents" and not args:
             args = ["check"]

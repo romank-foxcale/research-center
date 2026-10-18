@@ -17,6 +17,7 @@ relations:
 - **Interest tag**: a few searchable words in a profile's profile.json ("Japanese OCR") that the scout searches for; written by the user or proposed by the tagger with a reason and evidence, and accepted or rejected by the user.
 - **Candidate**: something new that discovery found for a profile's tags (a repository, a paper), with the tags that surfaced it and, for a repository, its licence verdict; kept once in the profile's seen-list.
 - **Technology card**: a scout's verdict on one find for a profile (worth testing, watch, not a fit), written for leaders and for engineers, quoting stored evidence, reviewed by a sceptic; scout/cards/.
+- **Trends feed**: trends/ at an instance's root, scouted like a profile with general tags; each trend card names the profiles it may affect.
 - **Inbox**: a profile's inbox/ folder; whatever the user drops there is ingested as the source inbox.
 - **Licence rule**: a company profile may use only permissive licences (templates/licences.json), a personal one any; the runner classifies every licence and flags the unusable ones.
 - **Scope**: a profile's optional scope.md: whom it serves, products and plug-in points, hard constraints, how value is measured, out of scope, scouting lens, source preferences.
