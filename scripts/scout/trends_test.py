@@ -115,6 +115,8 @@ def main() -> int:
         assert "small language models" in [tag["tag"] for tag in json.loads((trends / "profile.json").read_text(encoding="utf-8"))["tags"]]
         validator = profiles_test.load_module("validate_rc", SCRIPTS / "validate-research-center.py")
         assert validator.validate(root) == [], validator.validate(root)
+        knowledge = profiles_test.load_module("validate_knowledge", SCRIPTS / "validate-knowledge.py")
+        assert knowledge.stray_markdown(root) == [], "trend cards and evidence are Markdown the RC may hold"
     print("trends test passed")
     return 0
 
