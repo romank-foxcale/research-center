@@ -2,8 +2,8 @@
 id: hacks.index
 title: Hacks
 status: active
-summary: Workarounds currently in place, each linked to a decision or debt with its removal condition; none in RC v1.
-verified_at: 2026-10-09
+summary: Workarounds currently in place, each linked to a decision or debt with its removal condition.
+verified_at: 2026-10-18
 evidence:
   - AGENTS.md
 relations:
@@ -12,4 +12,4 @@ relations:
 
 # Hacks
 
-None yet.
+- [Atomic JSON writes retry the rename on Windows](windows-replace-retry.md)

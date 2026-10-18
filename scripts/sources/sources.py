@@ -29,6 +29,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "adapters"), str(HERE.parent / "runner")]
 import kit  # noqa: E402
+import rc  # noqa: E402
 
 
 def instance(root: Path) -> Path:
@@ -208,10 +209,7 @@ def log_search(log: Path | None, entry: dict[str, Any]) -> None:
         return
     entries = json.loads(log.read_text(encoding="utf-8")) if log.is_file() else []
     entries.append(entry)
-    log.parent.mkdir(parents=True, exist_ok=True)
-    temporary = log.with_suffix(log.suffix + ".tmp")
-    temporary.write_text(json.dumps(entries, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    temporary.replace(log)
+    rc.write_json(log, entries)
 
 
 def search(root: Path, identifier: str, query: str, filters: dict[str, str] | None = None, since: str | None = None,
