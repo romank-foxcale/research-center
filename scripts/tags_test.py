@@ -58,8 +58,8 @@ def raises(function, *args) -> str:
     raise AssertionError(f"{function.__name__} did not raise")
 
 
-def main() -> int:
-    providers.run = fake_run
+def test_tags(monkeypatch) -> None:
+    monkeypatch.setattr(providers, "run", fake_run)
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         assert "tags belong to a profile" in raises(tags.command_list, root)
@@ -126,9 +126,3 @@ def main() -> int:
         assert ingest.local_folder(alpha, "inbox") == alpha / "inbox" and ingest.folder_files(
             ingest.local_folder(alpha, "inbox")
         ) == ["about-us.md"]
-    print("tags test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

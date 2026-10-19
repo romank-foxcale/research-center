@@ -11,7 +11,6 @@ import argparse
 import importlib.util
 import io
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -98,7 +97,7 @@ def instance(base: Path) -> Path:
     return root
 
 
-def main() -> int:
+def test_profiles(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as bare:
         root = instance(Path(directory))
         # A folder with no research-center.json stands for the template, wherever this test runs.
@@ -202,14 +201,14 @@ def main() -> int:
         # rc chooses the profile: -p (or the old -u), RC_PROFILE, defaultProfile, the only one; several without a choice
         # is an error.
         cli = load_module("rc_cli", REPO / "rc.py")
-        cli.ROOT = root
+        monkeypatch.setattr(cli, "ROOT", root)
         for name in ("RC_PROFILE", "RC_USE_CASE"):
-            os.environ.pop(name, None)
+            monkeypatch.delenv(name, raising=False)
         assert cli.data_root("beta") == beta
         assert "several profiles" in raises(SystemExit, cli.data_root, None)
-        os.environ["RC_PROFILE"] = "alpha"
+        monkeypatch.setenv("RC_PROFILE", "alpha")
         assert cli.data_root(None) == alpha
-        os.environ.pop("RC_PROFILE")
+        monkeypatch.delenv("RC_PROFILE")
         settings = json.loads((root / "research-center.json").read_text(encoding="utf-8"))
         (root / "research-center.json").write_text(json.dumps({**settings, "defaultProfile": "beta"}), encoding="utf-8")
         assert cli.data_root(None) == beta
@@ -242,9 +241,3 @@ def main() -> int:
         assert hooks.markdown_allowed("profiles/alpha/scope.md") and hooks.markdown_allowed(
             "profiles/alpha/research/ocr/brief.md"
         )
-    print("profiles test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

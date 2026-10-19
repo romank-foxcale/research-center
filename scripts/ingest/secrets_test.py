@@ -19,7 +19,7 @@ SLACK = "xoxb-" + "1234567890-abcdefghijkl"
 KEY = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nabc\n-----END RSA PRIVATE KEY-----"
 
 
-def main() -> int:
+def test_secrets() -> None:
     for kind, value in (
         ("github-token", GITHUB),
         ("anthropic-key", ANTHROPIC),
@@ -64,9 +64,3 @@ def main() -> int:
         assert secrets_scan.scan(root, ["sources", "missing"]) == []
         (root / "sources" / "a" / "leak.txt").write_text(f"x\n{GITHUB}\n")
         assert secrets_scan.scan(root, ["sources"]) == ["sources/a/leak.txt:2: unredacted github-token"]
-    print("secrets test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

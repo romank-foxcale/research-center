@@ -107,7 +107,7 @@ def old_instance(base: Path) -> Path:
     return root
 
 
-def main() -> int:
+def test_upgrade_instance() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = old_instance(Path(directory))
         (root / "README.md").write_text("# Edited, not committed\n", encoding="utf-8")
@@ -176,9 +176,3 @@ def main() -> int:
         assert settings["pipeline"]["researchers"] == ["researcher-claude", "researcher-sonnet"], reset.stdout
         assert settings["pipeline"]["sceptics"] == ["sceptic-claude", "sceptic-sonnet"]
         assert upgrade(REPO).returncode == 1, "the template itself is not an instance"
-    print("upgrade instance test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

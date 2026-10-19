@@ -157,7 +157,7 @@ def check_attributed_commits(base: Path) -> None:
     assert len(found) == 1 and "GPT-5" in found[0], found
 
 
-def main() -> int:
+def test_rule_hooks() -> None:
     check_markdown_allowlist()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)
@@ -166,9 +166,3 @@ def main() -> int:
         check_attributed_commits(base)
     check_notes_and_drift()
     check_cli()
-    print("rule hooks test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

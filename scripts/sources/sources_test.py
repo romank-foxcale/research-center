@@ -22,7 +22,7 @@ import kit  # noqa: E402
 import sources  # noqa: E402
 
 REQUESTS: list[str] = []
-# Where adapter searches run: a template-like folder holding only the default adapters, set in main(), so the test
+# Where adapter searches run: a template-like folder holding only the default adapters, set in test_sources(), so the test
 # gives the same result in the template and inside any instance (whatever it enabled or configured).
 ROOT = REPO
 ROUTES = [  # (part of the URL, fixture, content type); the first match wins
@@ -68,7 +68,7 @@ def raises(error: type[BaseException], function, *args, **kwargs) -> str:
     raise AssertionError(f"{function.__name__} did not raise {error.__name__}")
 
 
-def test_keys_and_dates() -> None:
+def check_keys_and_dates() -> None:
     assert kit.canonical_url("HTTP://WWW.Example.org/Path/?b=2&utm_source=x#top") == "https://example.org/Path?b=2"
     assert kit.canonical_url("https://news.example.org/item?id=1") != kit.canonical_url(
         "https://news.example.org/item?id=2"
@@ -93,7 +93,7 @@ def test_keys_and_dates() -> None:
     raises(kit.AdapterError, kit.record, "x", "t", "https://x.org", "rumour")
 
 
-def test_scholarly(log: Path) -> None:
+def check_scholarly(log: Path) -> None:
     found = sources.search(ROOT, "openalex", "four-day week", {"type": "article"}, "2024-01-01", 50, log)
     assert [item["title"] for item in found] == [
         "Productivity under a four-day week",
@@ -160,7 +160,7 @@ def test_scholarly(log: Path) -> None:
     )
 
 
-def test_reference_books_news(log: Path) -> None:
+def check_reference_books_news(log: Path) -> None:
     page = sources.search(ROOT, "wikipedia", "four-day week", {}, None, 5, log)[0]
     assert (
         page["url"] == "https://en.wikipedia.org/wiki/Four-day_workweek"
@@ -185,7 +185,7 @@ def test_reference_books_news(log: Path) -> None:
     assert "too short" in message, message
 
 
-def test_feeds_and_pages(log: Path) -> None:
+def check_feeds_and_pages(log: Path) -> None:
     rss = sources.search(
         ROOT, "feed", "https://agency.example.org/feed", {"evidenceType": "official-statistics"}, None, 10, log
     )
@@ -221,7 +221,7 @@ def test_feeds_and_pages(log: Path) -> None:
     assert changed["extra"]["sha256"] != watched["extra"]["sha256"], "a changed page gets a new fingerprint"
 
 
-def test_contract(log: Path) -> None:
+def check_contract(log: Path) -> None:
     raises(ValueError, sources.search, ROOT, "openalex", "x", {"bogus": "1"})
     raises(ValueError, sources.search, ROOT, "nope", "x")
     raises(ValueError, sources.search, ROOT, "../runner/rc", "x")
@@ -290,7 +290,7 @@ def test_contract(log: Path) -> None:
         assert all(word in joined for word in ("module", "evidenceTypes", "watchable", "needsKeyEnv")), errors
 
 
-def test_packs_and_own_adapters() -> None:
+def check_packs_and_own_adapters() -> None:
     """Packs are enabled per instance without touching code; an adapter made with `new` passes its own fixture test;
     every shipped fixture passes."""
     assert sources.run_fixture(REPO, "pubmed") == [] and sources.run_fixture(REPO, "github") == [], "enabled or not"
@@ -355,7 +355,7 @@ def test_packs_and_own_adapters() -> None:
         assert "expected 3 records, got 1" in " ".join(sources.run_fixture(root, "city-council"))
 
 
-def test_rate_limit() -> None:
+def check_rate_limit() -> None:
     slept: list[float] = []
     clock, sleep = kit.time.monotonic, kit.time.sleep
     kit.time.monotonic, kit.time.sleep = (lambda: 1000.0), slept.append
@@ -368,27 +368,21 @@ def test_rate_limit() -> None:
     assert slept == [5.0], f"the second request to a host waits its turn; other hosts do not: {slept}"
 
 
-def main() -> int:
+def test_sources(monkeypatch) -> None:
     global ROOT
-    kit.TRANSPORT = transport
+    monkeypatch.setattr(kit, "TRANSPORT", transport)
     isolated = tempfile.TemporaryDirectory()
     ROOT = Path(isolated.name)
     (ROOT / "templates" / "adapters").mkdir(parents=True)
     for path in (REPO / "templates" / "adapters").glob("*.json"):
         shutil.copyfile(path, ROOT / "templates" / "adapters" / path.name)
-    test_keys_and_dates()
-    test_rate_limit()
-    test_packs_and_own_adapters()
-    kit.TRANSPORT = transport
+    check_keys_and_dates()
+    check_rate_limit()
+    check_packs_and_own_adapters()
+    monkeypatch.setattr(kit, "TRANSPORT", transport)
     with tempfile.TemporaryDirectory() as directory:
         log = Path(directory) / "searches.json"
-        test_scholarly(log)
-        test_reference_books_news(log)
-        test_feeds_and_pages(log)
-        test_contract(log)
-    print("sources test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        check_scholarly(log)
+        check_reference_books_news(log)
+        check_feeds_and_pages(log)
+        check_contract(log)

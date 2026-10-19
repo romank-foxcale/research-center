@@ -58,7 +58,8 @@ Commands:
   scout --due    Scout every profile and the trend feed whose cadence (scout.cadenceDays) has passed; for a weekly schedule
   trends init | [run] | discover | cards | dismiss <card> | tags ...  The shared trend feed, judged against every profile"""
 
-# The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
+# The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments;
+# a *_test.py file runs under pytest, one process per file.
 CHECKS = [
     ("knowledge", ["validate-knowledge.py", "{root}"]),
     ("contract", ["validate-research-center.py", "{root}"]),
@@ -145,8 +146,9 @@ def check() -> int:
         if not (SCRIPTS / name).is_file():
             continue
         started = time.monotonic()
+        runner = ["-m", "pytest", "-q"] if name.endswith("_test.py") else []
         result = subprocess.run(
-            [sys.executable, "-B", str(SCRIPTS / name), *(arg.format(root=ROOT) for arg in args)],
+            [sys.executable, "-B", *runner, str(SCRIPTS / name), *(arg.format(root=ROOT) for arg in args)],
             capture_output=True,
             text=True,
             encoding="utf-8",

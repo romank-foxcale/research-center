@@ -39,7 +39,7 @@ def raises(function, *args) -> str:
     raise AssertionError(f"{function.__name__} did not raise")
 
 
-def main() -> int:
+def test_dive(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         quiet(profiles.command_new, root, "alpha", "Alpha Corp", "company", "A forensic investigation firm")
@@ -66,7 +66,7 @@ def main() -> int:
         spec = importlib.util.spec_from_file_location("rc_cli", SCRIPTS.parent / "rc.py")
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
-        cli.ROOT = root
+        monkeypatch.setattr(cli, "ROOT", root)
         assert quiet(cli.main, ["scout", "--due"]) == 0
 
         # A deep dive: a draft brief from the card, which passes the brief check, and the card remembers it.
@@ -95,9 +95,3 @@ def main() -> int:
         (root / "trends" / "scout" / "cards").mkdir(parents=True)
         (root / "trends" / "scout" / "cards" / "t.json").write_text(json.dumps(card), encoding="utf-8")
         assert "from the profile it affects" in raises(scout.command_dive, root / "trends", "t")
-    print("dive test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

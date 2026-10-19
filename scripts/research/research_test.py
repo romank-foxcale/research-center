@@ -419,7 +419,7 @@ def write_brief(root: Path) -> None:
     assert "Status: accepted" in path.read_text()
 
 
-def test_living(root: Path, topic: Path) -> None:
+def check_living(root: Path, topic: Path) -> None:
     """A topic with a cadence becomes living; refresh costs nothing when nothing is new, and with one new contradicting
     record it adds the next claim ids, re-derives the conclusions, and flags the flipped verdict for review."""
     assert "Status: living" in (topic / "brief.md").read_text(encoding="utf-8")
@@ -568,11 +568,11 @@ def raises(error: type[BaseException], function, *args) -> str:
     raise AssertionError(f"{function.__name__} did not raise {error.__name__}")
 
 
-def main() -> int:
-    providers.run = fake_run
-    ingest.url_document = fake_page
-    ingest.guard = lambda root, lookup=None: None
-    kit.TRANSPORT = sources_test.transport
+def test_research(monkeypatch) -> None:
+    monkeypatch.setattr(providers, "run", fake_run)
+    monkeypatch.setattr(ingest, "url_document", fake_page)
+    monkeypatch.setattr(ingest, "guard", lambda root, lookup=None: None)
+    monkeypatch.setattr(kit, "TRANSPORT", sources_test.transport)
 
     assert research.quote_found("recall on every benchmark we tried in production", PAGE)
     assert not research.quote_found("never said anything like this at all", PAGE)
@@ -1016,10 +1016,4 @@ def main() -> int:
         assert sum(call.startswith("sceptic-") for call in CALLS) == 1 and CALLS[-1] == "reporter", CALLS
         assert not any(replies.rglob("*.json")), "finished stages keep no replies"
 
-        test_living(root, topic)
-    print("research test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        check_living(root, topic)

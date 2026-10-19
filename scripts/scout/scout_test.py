@@ -75,7 +75,7 @@ def quiet(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
-def main() -> int:
+def test_scout() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         shutil.copyfile(
@@ -150,9 +150,3 @@ def main() -> int:
         assert {call[0] for call in CALLS} == {"feed", "openalex"} and only["tags"] == ["Japanese OCR"], CALLS
         assert set(only["sourcesSkipped"]) == {"github-new", "github-active"} and len(only["failures"]) == 1
         assert profiles.meta_problems(tags.load(alpha), "alpha") == []
-    print("scout test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

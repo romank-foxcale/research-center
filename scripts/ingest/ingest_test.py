@@ -248,17 +248,11 @@ def check_folder_ingest(base: Path) -> None:
     assert any("ships no data" in error for error in load_validator().validate(template))
 
 
-def main() -> int:
-    providers.run = fake_run
+def test_ingest(monkeypatch) -> None:
+    monkeypatch.setattr(providers, "run", fake_run)
     check_extract()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)
         check_git_remote(base)
         check_guard(base)
         check_folder_ingest(base)
-    print("ingest test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

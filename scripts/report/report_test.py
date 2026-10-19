@@ -247,7 +247,7 @@ def fixture(root: Path) -> Path:
     return topic
 
 
-def main() -> int:
+def test_report() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         fixture(root)
@@ -383,9 +383,3 @@ def main() -> int:
             raise AssertionError("a missing topic must fail")
         except report.rc.RcError as error:
             assert "no topic nothing" in str(error)
-    print("report test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

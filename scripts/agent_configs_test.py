@@ -18,7 +18,7 @@ def run(root: Path, command: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def main() -> int:
+def test_agent_configs() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         (root / ".agents/skills/tdd").mkdir(parents=True)
@@ -45,9 +45,3 @@ def main() -> int:
         assert run(root, "sync").returncode == 0 and "hooks" in json.loads(settings.read_text()), (
             "sync creates the file"
         )
-    print("agent configs test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

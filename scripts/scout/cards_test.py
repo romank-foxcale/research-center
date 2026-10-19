@@ -175,9 +175,9 @@ def quiet(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
-def main() -> int:
-    providers.run = fake_run
-    kit.TRANSPORT = transport
+def test_cards(monkeypatch) -> None:
+    monkeypatch.setattr(providers, "run", fake_run)
+    monkeypatch.setattr(kit, "TRANSPORT", transport)
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         shutil.copyfile(
@@ -236,9 +236,3 @@ def main() -> int:
         assert (
             json.loads((alpha / "scout" / "seen.json").read_text(encoding="utf-8"))[jev["key"]]["status"] == "dismissed"
         )
-    print("cards test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

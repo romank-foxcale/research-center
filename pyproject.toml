@@ -14,6 +14,14 @@ dependencies = [
     "striprtf>=0.0.26",    # RTF (BSD-3-Clause)
 ]
 
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.pytest.ini_options]
+python_files = ["*_test.py"]
+# No .pytest_cache in the tree, as -B keeps __pycache__ out.
+addopts = "-p no:cacheprovider"
+
 [tool.uv]
 # A tool, not a package: uv only manages its environment.
 package = false

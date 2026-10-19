@@ -117,9 +117,9 @@ def quiet(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
-def main() -> int:
-    providers.run = fake_run
-    kit.TRANSPORT = transport
+def test_trends(monkeypatch) -> None:
+    monkeypatch.setattr(providers, "run", fake_run)
+    monkeypatch.setattr(kit, "TRANSPORT", transport)
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         shutil.copyfile(
@@ -167,7 +167,7 @@ def main() -> int:
         spec = importlib.util.spec_from_file_location("rc_cli", SCRIPTS.parent / "rc.py")
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
-        cli.ROOT = root
+        monkeypatch.setattr(cli, "ROOT", root)
         assert quiet(cli.main, ["trends", "tags", "add", "small language models"]) == 0
         assert "small language models" in [
             tag["tag"] for tag in json.loads((trends / "profile.json").read_text(encoding="utf-8"))["tags"]
@@ -176,9 +176,3 @@ def main() -> int:
         assert validator.validate(root) == [], validator.validate(root)
         knowledge = profiles_test.load_module("validate_knowledge", SCRIPTS / "validate-knowledge.py")
         assert knowledge.stray_markdown(root) == [], "trend cards and evidence are Markdown the RC may hold"
-    print("trends test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

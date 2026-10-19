@@ -74,7 +74,7 @@ def quiet(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
-def main() -> int:
+def test_home() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         quiet(profiles.command_new, root, "alpha", "Alpha Corp", "company", "A forensic investigation firm")
@@ -180,9 +180,3 @@ def main() -> int:
         content = home.render_home(root, fragment=True)
         assert content.startswith("<title>") and "<!doctype" not in content
         assert all(Path(path).read_text(encoding="utf-8").startswith("<!doctype html>") for path in beside.values())
-    print("home test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

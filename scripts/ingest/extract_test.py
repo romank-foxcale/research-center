@@ -116,7 +116,7 @@ def refused(name: str, data: bytes, reason: str) -> None:
     raise AssertionError(f"{name} must be skipped")
 
 
-def main() -> int:
+def test_extract() -> None:
     text = expect(
         "report.pdf",
         pdf(["Revenue rose 1.4 percent", "Output held"]),
@@ -169,9 +169,3 @@ def main() -> int:
     )
     refused("broken.docx", b"PK\x03\x04 not really a zip", "could not read it")
     refused("broken.pdf", b"%PDF-1.4 garbage", "PDF")
-    print("extract test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
