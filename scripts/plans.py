@@ -9,7 +9,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-
 ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 LIFECYCLES = ("active", "archived", "completed")
 
@@ -71,9 +70,9 @@ def closure(content: str, lifecycle: str, detail_label: str, detail: str) -> str
         r"## Lifecycle closure\n\nNot closed\.\s*$",
         (
             "## Lifecycle closure\n\n"
-            + f"- state: {lifecycle}\n"
-            + f"- date: {date.today().isoformat()}\n"
-            + f"- {detail_label}: {detail}\n"
+            f"- state: {lifecycle}\n"
+            f"- date: {date.today().isoformat()}\n"
+            f"- {detail_label}: {detail}\n"
         ),
         updated,
         count=1,

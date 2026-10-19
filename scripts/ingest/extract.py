@@ -15,17 +15,97 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 TEXT_SUFFIXES = {
-    ".md", ".markdown", ".txt", ".rst", ".adoc", ".org", ".tex", ".bib", ".csv", ".tsv", ".json", ".jsonl", ".yaml",
-    ".yml", ".toml", ".ini", ".cfg", ".conf", ".xml", ".sql", ".graphql", ".proto", ".nix", ".sh", ".bash", ".zsh",
-    ".ps1", ".bat", ".cmd", ".py", ".ipynb", ".r", ".jl", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".vue",
-    ".svelte", ".css", ".scss", ".java", ".kt", ".kts", ".scala", ".go", ".rs", ".c", ".h", ".cc", ".cpp", ".hpp",
-    ".cs", ".fs", ".swift", ".m", ".mm", ".rb", ".php", ".pl", ".lua", ".dart", ".ex", ".exs", ".erl", ".hs", ".clj",
-    ".elm", ".zig", ".tf", ".hcl", ".cmake", ".gradle", ".properties", ".env.example", ".dockerfile",
+    ".md",
+    ".markdown",
+    ".txt",
+    ".rst",
+    ".adoc",
+    ".org",
+    ".tex",
+    ".bib",
+    ".csv",
+    ".tsv",
+    ".json",
+    ".jsonl",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".xml",
+    ".sql",
+    ".graphql",
+    ".proto",
+    ".nix",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".ps1",
+    ".bat",
+    ".cmd",
+    ".py",
+    ".ipynb",
+    ".r",
+    ".jl",
+    ".js",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".vue",
+    ".svelte",
+    ".css",
+    ".scss",
+    ".java",
+    ".kt",
+    ".kts",
+    ".scala",
+    ".go",
+    ".rs",
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".hpp",
+    ".cs",
+    ".fs",
+    ".swift",
+    ".m",
+    ".mm",
+    ".rb",
+    ".php",
+    ".pl",
+    ".lua",
+    ".dart",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".hs",
+    ".clj",
+    ".elm",
+    ".zig",
+    ".tf",
+    ".hcl",
+    ".cmake",
+    ".gradle",
+    ".properties",
+    ".env.example",
+    ".dockerfile",
 }
 TEXT_NAMES = {"dockerfile", "makefile", "justfile", "license", "readme", "changelog", "contributing", "codeowners"}
 SKIPPED_NAMES = {
-    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "cargo.lock", "flake.lock", "poetry.lock", "uv.lock",
-    "composer.lock", "gemfile.lock", "go.sum",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "cargo.lock",
+    "flake.lock",
+    "poetry.lock",
+    "uv.lock",
+    "composer.lock",
+    "gemfile.lock",
+    "go.sum",
 }
 UNSEEN = ("script", "style", "noscript", "template", "svg", "iframe")
 CHARSET = re.compile(rb"""<meta[^>]+charset=["']?([\w-]+)""", re.IGNORECASE)
@@ -121,7 +201,9 @@ def epub_text(data: bytes) -> str:
     """The chapters of an EPUB in reading order (the OPF spine), each converted from XHTML."""
     with zipfile.ZipFile(io.BytesIO(data)) as book:
         container = safe_xml(book.read("META-INF/container.xml"))
-        rootfile = next((element.get("full-path") for element in container.iter() if element.tag.endswith("rootfile")), None)
+        rootfile = next(
+            (element.get("full-path") for element in container.iter() if element.tag.endswith("rootfile")), None
+        )
         if not rootfile:
             raise Skip("EPUB without a package file")
         package = safe_xml(book.read(rootfile))
@@ -163,7 +245,11 @@ def pptx_text(data: bytes) -> str:
     deck = Presentation(io.BytesIO(data))
     parts = []
     for number, slide in enumerate(deck.slides, 1):
-        texts = [shape.text_frame.text.strip() for shape in slide.shapes if shape.has_text_frame and shape.text_frame.text.strip()]
+        texts = [
+            shape.text_frame.text.strip()
+            for shape in slide.shapes
+            if shape.has_text_frame and shape.text_frame.text.strip()
+        ]
         notes = slide.notes_slide.notes_text_frame.text.strip() if slide.has_notes_slide else ""
         parts.append(f"## Slide {number}\n\n" + "\n\n".join(texts) + (f"\n\nNotes: {notes}" if notes else ""))
     return "\n\n".join(parts)
@@ -186,9 +272,15 @@ def xlsx_text(data: bytes, max_rows: int = 200) -> str:
 
 
 CONVERTERS = {
-    ".pdf": (pdf_text, "pypdfium2"), ".docx": (docx_text, "mammoth"), ".epub": (epub_text, "epub"),
-    ".odt": (odt_text, "odt"), ".rtf": (rtf_text, "striprtf"), ".html": (html_to_markdown, "markdownify"),
-    ".htm": (html_to_markdown, "markdownify"), ".pptx": (pptx_text, "python-pptx"), ".xlsx": (xlsx_text, "openpyxl"),
+    ".pdf": (pdf_text, "pypdfium2"),
+    ".docx": (docx_text, "mammoth"),
+    ".epub": (epub_text, "epub"),
+    ".odt": (odt_text, "odt"),
+    ".rtf": (rtf_text, "striprtf"),
+    ".html": (html_to_markdown, "markdownify"),
+    ".htm": (html_to_markdown, "markdownify"),
+    ".pptx": (pptx_text, "python-pptx"),
+    ".xlsx": (xlsx_text, "openpyxl"),
 }
 
 

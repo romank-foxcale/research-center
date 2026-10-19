@@ -47,8 +47,9 @@ sys.path.insert(0, str(HERE.parent / "sources"))
 import extract  # noqa: E402
 import ingest  # noqa: E402
 import kit  # noqa: E402
-import rc  # noqa: E402
 import sources as registry  # noqa: E402
+
+import rc  # noqa: E402
 
 STAGES = ("plan", "search", "screen", "collect", "analyze", "critique", "judge", "apply", "report")
 OUTPUTS = {
@@ -66,7 +67,16 @@ CLAIM_VERDICTS = ("HOLDS", "WEAK", "REFUTED", "UNSUPPORTED")
 IDEA_VERDICTS = ("SURVIVES", "WEAKENED", "FALLS")
 RINGS = ("ADOPT", "TRIAL", "ASSESS", "HOLD")
 EFFORTS = ("S", "M", "L")
-SECTIONS = ("Topic", "Questions", "Scope", "Out of scope", "Our needs", "Success criteria", "Source preferences", "Living")
+SECTIONS = (
+    "Topic",
+    "Questions",
+    "Scope",
+    "Out of scope",
+    "Our needs",
+    "Success criteria",
+    "Source preferences",
+    "Living",
+)
 # How often a living topic is refreshed, in days; derived follows the plan's horizon (living.py). none is one-shot.
 CADENCES = {"none": 0, "weekly": 7, "monthly": 30, "quarterly": 91, "derived": -1}
 # draft -> accepted -> living (after the first full run of a topic with a cadence) <-> paused; retired is final.
@@ -91,13 +101,21 @@ PLAIN_MAX_WORDS = 350  # the reporter aims at about 250 words; writers miscount,
 ASSUMPTION_ID = re.compile(r"A\d+")
 # ICD 203 likelihood words and the least certainty each may be said with; longest phrases are matched first.
 LIKELIHOOD = {
-    "almost no chance": "high", "almost certainly": "high", "almost certain": "high", "very unlikely": "moderate",
-    "very likely": "moderate", "roughly even chance": "low", "unlikely": "low", "likely": "low",
+    "almost no chance": "high",
+    "almost certainly": "high",
+    "almost certain": "high",
+    "very unlikely": "moderate",
+    "very likely": "moderate",
+    "roughly even chance": "low",
+    "unlikely": "low",
+    "likely": "low",
 }
 SCALE = re.compile(r"\b(" + "|".join(sorted(map(re.escape, LIKELIHOOD), key=len, reverse=True)) + r")\b")
 # Hedges that read as likelihood but map to no number; the scale says it instead.
-VAGUE = re.compile(r"\b(probably|possibly|perhaps|presumably|conceivably|undoubtedly|definitely|certainly|"
-                   r"probable|improbable|doubtful|in all likelihood)\b")
+VAGUE = re.compile(
+    r"\b(probably|possibly|perhaps|presumably|conceivably|undoubtedly|definitely|certainly|"
+    r"probable|improbable|doubtful|in all likelihood)\b"
+)
 WEB = "web"  # the avenue the researcher roles search themselves; every other avenue names an adapter
 STANCES = ("support", "disconfirm", "explore")
 HORIZONS = ("near", "medium", "long")
@@ -144,11 +162,22 @@ def answer_problems(answers: Any, known: list[str], claim_ids: set[str]) -> list
             continue
         for kind, allowed in (("downgrades", DOWNGRADES), ("upgrades", UPGRADES)):
             for entry in item.get(kind, []):
-                if entry.get("domain") not in allowed or entry.get("levels", 1) not in (1, 2) or not str(entry.get("reason", "")).strip():
-                    problems.append(f"{question}: each of {kind} needs a domain in {allowed}, levels 1 or 2, and a reason")
-                problems += [f"{question}: {kind} cites unknown claim {claim}" for claim in set(entry.get("claims", [])) - claim_ids]
+                if (
+                    entry.get("domain") not in allowed
+                    or entry.get("levels", 1) not in (1, 2)
+                    or not str(entry.get("reason", "")).strip()
+                ):
+                    problems.append(
+                        f"{question}: each of {kind} needs a domain in {allowed}, levels 1 or 2, and a reason"
+                    )
+                problems += [
+                    f"{question}: {kind} cites unknown claim {claim}"
+                    for claim in set(entry.get("claims", [])) - claim_ids
+                ]
         if certainty_of(item) != item["certainty"]:
-            problems.append(f"{question}: the downgrades and upgrades add up to {certainty_of(item)!r}, not {item['certainty']!r}")
+            problems.append(
+                f"{question}: the downgrades and upgrades add up to {certainty_of(item)!r}, not {item['certainty']!r}"
+            )
     return problems
 
 
@@ -167,7 +196,9 @@ def analysis_problems(data: dict[str, Any], known: list[str], claim_ids: set[str
         return ['expected "questions": [{"question", "assumptions": [...], "ach": {...}}] next to "ideas"']
     seen = {entry.get("question"): entry for entry in entries if isinstance(entry, dict)}
     problems = [f"no entry for {question} in questions" for question in known if question not in seen]
-    disconfirmed = {avenue.get("hypothesis") for avenue in plan.get("avenues", []) if avenue.get("stance") == "disconfirm"}
+    disconfirmed = {
+        avenue.get("hypothesis") for avenue in plan.get("avenues", []) if avenue.get("stance") == "disconfirm"
+    }
     assumption_ids: list[str] = []
     for question, entry in seen.items():
         assumptions = entry.get("assumptions")
@@ -178,7 +209,10 @@ def analysis_problems(data: dict[str, Any], known: list[str], claim_ids: set[str
             if not ASSUMPTION_ID.fullmatch(str(item.get("id", ""))) or not str(item.get("text", "")).strip():
                 problems.append(f"{question}: assumption {item} needs an id like A1 and a text")
             assumption_ids.append(item.get("id"))
-            problems += [f"{question}: assumption {item.get('id')} cites unknown claim {claim}" for claim in set(item.get("claims", [])) - claim_ids]
+            problems += [
+                f"{question}: assumption {item.get('id')} cites unknown claim {claim}"
+                for claim in set(item.get("claims", [])) - claim_ids
+            ]
         expected = plan_hypotheses(plan, question)
         ach = entry.get("ach")
         if len(expected) < 2 and not ach:
@@ -187,14 +221,24 @@ def analysis_problems(data: dict[str, Any], known: list[str], claim_ids: set[str
             problems.append(f"{question}: the plan weighs {', '.join(expected)} against each other; give an ach matrix")
             continue
         hypotheses = ach.get("hypotheses") or []
-        problems += [f"{question}: the matrix leaves out hypothesis {hypothesis}" for hypothesis in expected if hypothesis not in hypotheses]
+        problems += [
+            f"{question}: the matrix leaves out hypothesis {hypothesis}"
+            for hypothesis in expected
+            if hypothesis not in hypotheses
+        ]
         for hypothesis in hypotheses:
             if hypothesis not in {item["id"] for item in plan.get("hypotheses", [])}:
-                problems.append(f"{question}: {hypothesis} is not a hypothesis of the plan; list an alternative nobody searched for under untested")
+                problems.append(
+                    f"{question}: {hypothesis} is not a hypothesis of the plan; list an alternative nobody searched for under untested"
+                )
             elif hypothesis not in disconfirmed:
-                problems.append(f"{question}: {hypothesis} has no disconfirming search in the plan, so it cannot be weighed")
+                problems.append(
+                    f"{question}: {hypothesis} has no disconfirming search in the plan, so it cannot be weighed"
+                )
         if len(hypotheses) < 2:
-            problems.append(f"{question}: a matrix weighs at least two hypotheses; leave ach out for a question the plan gave fewer")
+            problems.append(
+                f"{question}: a matrix weighs at least two hypotheses; leave ach out for a question the plan gave fewer"
+            )
         rows = ach.get("matrix")
         if not isinstance(rows, list) or not rows:
             problems.append(f"{question}: the matrix needs a row per claim the answer relies on")
@@ -216,7 +260,9 @@ def ach_ranking(ach: dict[str, Any], verdicts: dict[str, str]) -> tuple[list[tup
     REFUTED or UNSUPPORTED do not count."""
     rows = [row for row in ach["matrix"] if verdicts.get(row["claim"]) not in ("REFUTED", "UNSUPPORTED")]
     score = {hypothesis: sum(row["ratings"][hypothesis] == "I" for row in rows) for hypothesis in ach["hypotheses"]}
-    diagnostic = [row["claim"] for row in rows if len({row["ratings"][hypothesis] for hypothesis in ach["hypotheses"]}) > 1]
+    diagnostic = [
+        row["claim"] for row in rows if len({row["ratings"][hypothesis] for hypothesis in ach["hypotheses"]}) > 1
+    ]
     return sorted(score.items(), key=lambda item: (item[1], int(item[0][1:]))), diagnostic
 
 
@@ -226,27 +272,33 @@ def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
     Assessment."""
     problems = []
     parts = re.split(r"^## (.+)$", markdown, flags=re.MULTILINE)
-    for heading, body in zip(parts[1::2], parts[2::2]):
+    for heading, body in zip(parts[1::2], parts[2::2], strict=True):
         question = re.match(r"(Q\d+)\b", heading.strip())
         if heading.strip() != "TL;DR" and not question:
             continue
         lowered = body.lower()
         # "almost certainly" is on the scale; its "certainly" is not a hedge of its own.
         for word in sorted({match.group(0) for match in VAGUE.finditer(SCALE.sub(" ", lowered))}):
-            problems.append(f"'{heading.strip()}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact")
+            problems.append(
+                f"'{heading.strip()}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact"
+            )
         if question and question.group(1) in certainty:
             have = CERTAINTIES.index(certainty[question.group(1)])
             for word in sorted({match.group(0) for match in SCALE.finditer(lowered)}):
                 if CERTAINTIES.index(LIKELIHOOD[word]) > have:
-                    problems.append(f"'{heading.strip()}' says '{word}', which needs {LIKELIHOOD[word]} certainty; "
-                                    f"the judgement gives {certainty[question.group(1)]}")
+                    problems.append(
+                        f"'{heading.strip()}' says '{word}', which needs {LIKELIHOOD[word]} certainty; "
+                        f"the judgement gives {certainty[question.group(1)]}"
+                    )
         assessed = False  # the bullets under an "Assessment: ...:" lead-in are that assessment
         for unit in re.split(r"\n\s*\n|\n(?=\s*[-*] )", body.strip()):
             text = unit.strip()
             bullet = re.match(r"^[-*]\s", text)
             if not bullet:
                 assessed = False
-            if BOLD_LABEL.fullmatch(text) or text.startswith("#"):  # a label or sub-heading heads what follows; it states nothing
+            if BOLD_LABEL.fullmatch(text) or text.startswith(
+                "#"
+            ):  # a label or sub-heading heads what follows; it states nothing
                 continue
             if not bullet and text.endswith(":") and "\n" not in text:  # a lead-in introduces the list after it
                 assessed = bool(re.match(r"^(?:\*\*)?Assessment\b", text))
@@ -254,7 +306,9 @@ def language_problems(markdown: str, certainty: dict[str, str]) -> list[str]:
             if bullet and assessed:
                 continue
             if text and not claim_refs(text) and not re.match(r"^(?:[-*]\s*)?(?:\*\*)?(Assessment|Certainty)\b", text):
-                problems.append(f"'{heading.strip()}': \"{text[:70]}\" neither cites a claim [C#] nor starts with 'Assessment:'")
+                problems.append(
+                    f"'{heading.strip()}': \"{text[:70]}\" neither cites a claim [C#] nor starts with 'Assessment:'"
+                )
     return problems
 
 
@@ -271,8 +325,10 @@ def plain_problems(markdown: str) -> list[str]:
     if claim_refs(body):
         problems.append(f"'{PLAIN}' cites claims; leave the [C#] citations to the TL;DR and the answers below it")
     lowered = body.lower()
-    problems += [f"'{PLAIN}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact"
-                 for word in sorted({match.group(0) for match in VAGUE.finditer(SCALE.sub(" ", lowered))})]
+    problems += [
+        f"'{PLAIN}' says '{word}': use the likelihood scale ({', '.join(LIKELIHOOD)}) or plain fact"
+        for word in sorted({match.group(0) for match in VAGUE.finditer(SCALE.sub(" ", lowered))})
+    ]
     return problems
 
 
@@ -320,7 +376,10 @@ def brief_living(text: str) -> dict[str, str]:
     body = sections(text).get("Living", "")
     cadence = re.search(r"^Cadence:\s*(\S+)", body, flags=re.MULTILINE)
     retire = re.search(r"^Retire when:\s*(\S.*)$", body, flags=re.MULTILINE)
-    return {"cadence": cadence.group(1).lower() if cadence else "none", "retireWhen": retire.group(1).strip() if retire else ""}
+    return {
+        "cadence": cadence.group(1).lower() if cadence else "none",
+        "retireWhen": retire.group(1).strip() if retire else "",
+    }
 
 
 def brief_hash(text: str) -> str:
@@ -341,7 +400,11 @@ def set_status(root: Path, topic: str, status: str) -> None:
         raise rc.RcError(f"status must be one of {TOPIC_STATUSES}")
     path = topic_dir(root, topic) / "brief.md"
     text = path.read_text(encoding="utf-8")
-    path.write_text(re.sub(r"^Status:\s*\S+", f"Status: {status}", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n")
+    path.write_text(
+        re.sub(r"^Status:\s*\S+", f"Status: {status}", text, count=1, flags=re.MULTILINE),
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def command_new(root: Path, args: argparse.Namespace) -> None:
@@ -352,7 +415,9 @@ def command_new(root: Path, args: argparse.Namespace) -> None:
     template = (rc.instance(root) / "templates" / "brief.md").read_text(encoding="utf-8")
     title = " ".join(args.title.split())
     rc.write_text(directory / "brief.md", template.replace("<topic-id>", args.topic).replace("<title>", title))
-    print(f"created research/{args.topic}/brief.md; fill it with the grill-research-topic skill, then ./rc research accept {args.topic}")
+    print(
+        f"created research/{args.topic}/brief.md; fill it with the grill-research-topic skill, then ./rc research accept {args.topic}"
+    )
 
 
 def command_accept(root: Path, args: argparse.Namespace) -> None:
@@ -391,8 +456,12 @@ def command_list(root: Path, _: argparse.Namespace) -> None:
         done = [stage for stage in STAGES if stage_done(directory, stage)]
         title = brief.read_text(encoding="utf-8").splitlines()[0].lstrip("# ")
         watch = rc.load_json(directory / "watch.json") if (directory / "watch.json").is_file() else None
-        living = (f"  v{watch['version']}, checked {watch['lastChecked']}, every {watch['cadenceDays']} days" if watch else "")
-        print(f"{directory.name:<32} {brief_status(brief.read_text(encoding='utf-8')):<9} {len(done)}/{len(STAGES)} stages  {title}{living}")
+        living = (
+            f"  v{watch['version']}, checked {watch['lastChecked']}, every {watch['cadenceDays']} days" if watch else ""
+        )
+        print(
+            f"{directory.name:<32} {brief_status(brief.read_text(encoding='utf-8')):<9} {len(done)}/{len(STAGES)} stages  {title}{living}"
+        )
 
 
 def command_show(root: Path, args: argparse.Namespace) -> None:
@@ -418,8 +487,10 @@ def require_profile(root: Path) -> None:
     or at least one interest tag."""
     meta = profile_meta(root)
     if meta is not None and not meta.get("description") and not meta.get("tags"):
-        raise rc.RcError(f"profile {root.name} has no description and no interest tags yet; describe it with "
-                         f"rc profile edit {root.name} --description \"...\" or add tags first")
+        raise rc.RcError(
+            f"profile {root.name} has no description and no interest tags yet; describe it with "
+            f'rc profile edit {root.name} --description "..." or add tags first'
+        )
 
 
 def context(root: Path, topic: str) -> str:
@@ -427,27 +498,43 @@ def context(root: Path, topic: str) -> str:
     lines = []
     meta = profile_meta(root)
     if meta is not None:
-        rule = ("a company profile: only permissive licences (templates/licences.json) are usable in what it ships; "
-                "flag every other licence" if meta.get("type") == "company" else "a personal profile: any licence is usable")
-        lines.append(f"Profile: profile.json (read it first): {meta.get('name', root.name)}, {rule}. Its description and "
-                     "interest tags say whom this research serves.")
+        rule = (
+            "a company profile: only permissive licences (templates/licences.json) are usable in what it ships; "
+            "flag every other licence"
+            if meta.get("type") == "company"
+            else "a personal profile: any licence is usable"
+        )
+        lines.append(
+            f"Profile: profile.json (read it first): {meta.get('name', root.name)}, {rule}. Its description and "
+            "interest tags say whom this research serves."
+        )
     if (root / "scope.md").is_file():
-        lines.append("Scope: scope.md, the profile's longer context: its products and the components a new technology "
-                     "could plug into, the hard constraints every recommendation must meet, and how value is measured.")
+        lines.append(
+            "Scope: scope.md, the profile's longer context: its products and the components a new technology "
+            "could plug into, the hard constraints every recommendation must meet, and how value is measured."
+        )
     lines.append(f"Topic: {topic}. Brief: research/{topic}/brief.md (read it first).")
     if (root / "knowledge" / "profile" / "index.md").is_file():
-        lines.append("Profile notes, built from the ingested sources: knowledge/profile/index.md and the notes it links.")
+        lines.append(
+            "Profile notes, built from the ingested sources: knowledge/profile/index.md and the notes it links."
+        )
     else:
         lines.append("No profile: nothing was ingested, so judge needs from the brief alone.")
     owned = [descriptor for descriptor in ingest.sources(root) if descriptor.get("origin", "user") == "user"]
     if owned:
         lines.append("Ingested sources (text under sources/<id>/text/, digest at knowledge/digests/<id>.md):")
-        lines += [f"- {item['id']} ({item['kind']}): {' '.join(item['locators'])} {item.get('note', '')}".rstrip() for item in owned]
+        lines += [
+            f"- {item['id']} ({item['kind']}): {' '.join(item['locators'])} {item.get('note', '')}".rstrip()
+            for item in owned
+        ]
     return "\n".join(lines)
 
 
 def questions(root: Path, topic: str) -> list[str]:
-    return [identifier for identifier, _ in QUESTION.findall((topic_dir(root, topic) / "brief.md").read_text(encoding="utf-8"))]
+    return [
+        identifier
+        for identifier, _ in QUESTION.findall((topic_dir(root, topic) / "brief.md").read_text(encoding="utf-8"))
+    ]
 
 
 def json_reply(check):
@@ -461,16 +548,23 @@ def json_reply(check):
 def usable_adapters(root: Path) -> dict[str, dict[str, Any]]:
     """The enabled adapters that can run here: one whose key is not in the environment would only fail, so the
     planner is not offered it."""
-    return {identifier: spec for identifier, spec in registry.descriptors(root).items()
-            if not spec.get("needsKeyEnv") or os.environ.get(spec["needsKeyEnv"])}
+    return {
+        identifier: spec
+        for identifier, spec in registry.descriptors(root).items()
+        if not spec.get("needsKeyEnv") or os.environ.get(spec["needsKeyEnv"])
+    }
 
 
 def adapter_menu(root: Path) -> str:
     """What the planner may choose from: every usable adapter's coverage, query syntax and filters, plus the web."""
-    lines = [f"- `{WEB}`: the researcher roles search the open web themselves (Claude and GPT). Use it for what no adapter covers."]
+    lines = [
+        f"- `{WEB}`: the researcher roles search the open web themselves (Claude and GPT). Use it for what no adapter covers."
+    ]
     for identifier, spec in usable_adapters(root).items():
         filters = "; ".join(f"{name}: {text}" for name, text in spec.get("filters", {}).items()) or "none"
-        lines.append(f"- `{identifier}` ({spec['family']}): {spec['covers']} Query: {spec['queryHelp']} Filters: {filters}.")
+        lines.append(
+            f"- `{identifier}` ({spec['family']}): {spec['covers']} Query: {spec['queryHelp']} Filters: {filters}."
+        )
     return "\n".join(lines)
 
 
@@ -483,7 +577,9 @@ def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]
         problems.append(f"horizon must be one of {HORIZONS}")
     hypotheses = data.get("hypotheses")
     if not isinstance(hypotheses, list) or not hypotheses:
-        problems.append("name at least one hypothesis (H1, H2, ...): the answers you expect, so they can be searched against")
+        problems.append(
+            "name at least one hypothesis (H1, H2, ...): the answers you expect, so they can be searched against"
+        )
         hypotheses = []
     hypothesis_ids = set()
     for hypothesis in hypotheses:
@@ -499,14 +595,22 @@ def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]
     for question in sorted(known, key=lambda value: int(value[1:])):
         answers = [item.get("id") for item in hypotheses if question in (item.get("questions") or [])]
         if len(answers) < 2 and question not in excused:
-            problems.append(f"{question} has {len(answers)} hypothesis: give it at least two competing answers, or list it under "
-                            "noAlternatives with why it has none")
+            problems.append(
+                f"{question} has {len(answers)} hypothesis: give it at least two competing answers, or list it under "
+                "noAlternatives with why it has none"
+            )
     exclusions = data.get("exclusions") if isinstance(data.get("exclusions"), list) else []
     for criterion in exclusions:
-        if not CRITERION_ID.fullmatch(str(criterion.get("id", ""))) or criterion.get("id") == OFF_TOPIC["id"] or not criterion.get("text"):
+        if (
+            not CRITERION_ID.fullmatch(str(criterion.get("id", "")))
+            or criterion.get("id") == OFF_TOPIC["id"]
+            or not criterion.get("text")
+        ):
             problems.append(f"exclusion {criterion} needs an id X1, X2, ... (X0 is reserved) and a text")
         if criterion.get("from") not in SECTIONS:
-            problems.append(f"exclusion {criterion.get('id')} must name the brief section it comes from, one of {SECTIONS}")
+            problems.append(
+                f"exclusion {criterion.get('id')} must name the brief section it comes from, one of {SECTIONS}"
+            )
     covered, disconfirmed, families = set(), set(), set()
     for number, avenue in enumerate(data["avenues"], 1):
         label = f"avenue {number} ({avenue.get('adapter')})"
@@ -538,8 +642,11 @@ def plan_problems(data: Any, known: set[str], adapters: dict[str, dict[str, Any]
             except (TypeError, ValueError):
                 problems.append(f"{label}: since must be YYYY-MM-DD")
     problems += [f"no avenue serves {question}" for question in sorted(known - covered)]
-    problems += [f"{hypothesis} has no disconfirming avenue: search for evidence that it is wrong"
-                 for hypothesis in sorted(hypothesis_ids - disconfirmed) if hypothesis]
+    problems += [
+        f"{hypothesis} has no disconfirming avenue: search for evidence that it is wrong"
+        for hypothesis in sorted(hypothesis_ids - disconfirmed)
+        if hypothesis
+    ]
     available = {spec["family"] for spec in adapters.values()}
     if len(families) < min(2, len(available)):
         problems.append(f"use adapters from at least two families besides the web; available: {sorted(available)}")
@@ -556,7 +663,9 @@ def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
             raise ValueError("; ".join(problems[:20]))
         return data
 
-    body = f"# Task\n\nPlan where to search.\n\n{context(root, topic)}\n\n# Avenues you can plan\n\n{adapter_menu(root)}"
+    body = (
+        f"# Task\n\nPlan where to search.\n\n{context(root, topic)}\n\n# Avenues you can plan\n\n{adapter_menu(root)}"
+    )
     data = session.call_checked(config["pipeline"]["sourcePlanner"], body, "plan", json_reply(check))
     data["exclusions"] = [OFF_TOPIC, *data.get("exclusions", [])]
     directory = topic_dir(root, topic)
@@ -565,15 +674,25 @@ def stage_plan(session: rc.Session, root: Path, topic: str) -> None:
     rc.write_json(directory / "source-plan.json", data)
     lines = [f"# Source plan: {topic}\n", f"Horizon: {data['horizon']}\n", "## Hypotheses\n"]
     lines += [f"- {item['id']}: {item['statement']}" for item in data["hypotheses"]]
-    lines += [f"- {item['question']} has no competing answers: {item['why']}" for item in data.get("noAlternatives", [])]
-    lines += ["", "## Exclusion criteria\n"] + [f"- {item['id']}: {item['text']} (from {item['from']})" for item in data["exclusions"]]
-    lines += ["", "## Avenues\n", "| # | Adapter | Query | Filters | Since | Stance | Questions | Why |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    lines += [
+        f"- {item['question']} has no competing answers: {item['why']}" for item in data.get("noAlternatives", [])
+    ]
+    lines += ["", "## Exclusion criteria\n"] + [
+        f"- {item['id']}: {item['text']} (from {item['from']})" for item in data["exclusions"]
+    ]
+    lines += [
+        "",
+        "## Avenues\n",
+        "| # | Adapter | Query | Filters | Since | Stance | Questions | Why |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
     for number, avenue in enumerate(data["avenues"], 1):
         stance = avenue["stance"] + (f" {avenue['hypothesis']}" if avenue.get("hypothesis") else "")
         filters = ", ".join(f"{key}={value}" for key, value in (avenue.get("filters") or {}).items())
-        lines.append(f"| {number} | {avenue['adapter']} | {cell(avenue['query'])} | {cell(filters)} | {avenue.get('since') or ''} | "
-                     f"{stance} | {', '.join(avenue['questions'])} | {cell(avenue['why'])} |")
+        lines.append(
+            f"| {number} | {avenue['adapter']} | {cell(avenue['query'])} | {cell(filters)} | {avenue.get('since') or ''} | "
+            f"{stance} | {', '.join(avenue['questions'])} | {cell(avenue['why'])} |"
+        )
     rc.write_text(directory / "source-plan.md", "\n".join(lines))
 
 
@@ -591,7 +710,9 @@ def stage_search(session: rc.Session, root: Path, topic: str) -> None:
             continue
         tried += 1
         try:
-            records = registry.search(root, avenue["adapter"], avenue["query"], avenue.get("filters") or {}, avenue.get("since"), limit, log)
+            records = registry.search(
+                root, avenue["adapter"], avenue["query"], avenue.get("filters") or {}, avenue.get("since"), limit, log
+            )
         except kit.AdapterError as error:
             failed += 1
             session.say(f"search {number} ({avenue['adapter']}): failed, {error}", "warn")
@@ -608,22 +729,41 @@ def stage_search(session: rc.Session, root: Path, topic: str) -> None:
         item["questions"] = sorted({question for other in same for question in other["questions"]})
         item.pop("avenue", None)
     rc.write_json(directory / "candidates.json", {"identified": len(found), "records": merged})
-    session.say(f"search: {len(found)} results, {len(found) - len(merged)} duplicates, {len(merged)} candidates to screen")
+    session.say(
+        f"search: {len(found)} results, {len(found) - len(merged)} duplicates, {len(merged)} candidates to screen"
+    )
 
 
 def candidate_line(item: dict[str, Any]) -> str:
     venue = item["extra"].get("venue") or item["extra"].get("domain") or ""
-    return json.dumps({"id": item["id"], "title": item["title"], "type": item["evidenceType"], "date": item["date"] or "undated",
-                       "by": ", ".join(item["authors"][:3]), "venue": venue, "url": item["url"], "questions": item["questions"],
-                       "found": item.get("via") or item["foundBy"],
-                       "abstract": item["abstract"][:700]}, ensure_ascii=False)
+    return json.dumps(
+        {
+            "id": item["id"],
+            "title": item["title"],
+            "type": item["evidenceType"],
+            "date": item["date"] or "undated",
+            "by": ", ".join(item["authors"][:3]),
+            "venue": venue,
+            "url": item["url"],
+            "questions": item["questions"],
+            "found": item.get("via") or item["foundBy"],
+            "abstract": item["abstract"][:700],
+        },
+        ensure_ascii=False,
+    )
 
 
 def record_text(item: dict[str, Any]) -> str:
     """What is stored for an included record whose page is not fetched: its metadata and abstract."""
     lines = [f"Source: {item['url']}", "", f"# {item['title']}", ""]
-    for label, value in (("Authors", ", ".join(item["authors"])), ("Date", item["date"]), ("Type", item["evidenceType"]),
-                         ("Venue", item["extra"].get("venue")), ("DOI", item["doi"]), ("Found by", ", ".join(item["foundBy"]))):
+    for label, value in (
+        ("Authors", ", ".join(item["authors"])),
+        ("Date", item["date"]),
+        ("Type", item["evidenceType"]),
+        ("Venue", item["extra"].get("venue")),
+        ("DOI", item["doi"]),
+        ("Found by", ", ".join(item["foundBy"])),
+    ):
         if value:
             lines.append(f"- {label}: {value}")
     lines += ["", "## Abstract", "", item["abstract"] or "(no abstract available)"]
@@ -642,15 +782,34 @@ def store_included(root: Path, topic: str, included: list[dict[str, Any]], appen
         if families.get(item["adapter"]) not in ("scholarly", "books"):
             try:
                 _, text, extractor, data = ingest.url_document(item["url"])
-            except (extract.Skip, urllib.error.URLError, http.client.HTTPException, subprocess.TimeoutExpired, OSError, ValueError):
+            except (
+                extract.Skip,
+                urllib.error.URLError,
+                http.client.HTTPException,
+                subprocess.TimeoutExpired,
+                OSError,
+                ValueError,
+            ):
                 text, extractor = record_text(item), "metadata"
         texts[stored] = text
-        entries[stored] = {"origin": item["url"], "sha256": hashlib.sha256(data or text.encode()).hexdigest(), "extractor": extractor}
+        entries[stored] = {
+            "origin": item["url"],
+            "sha256": hashlib.sha256(data or text.encode()).hexdigest(),
+            "extractor": extractor,
+        }
         item["stored"] = f"sources/{source_id}/text/{stored}"
     descriptor = {
-        "schemaVersion": 1, "id": source_id, "kind": "url", "locators": [item["url"] for item in included],
-        "include": [], "exclude": [], "depth": 0, "maxDocuments": len(included), "note": f"records included by research/{topic}",
-        "origin": f"research:{topic}", "addedAt": rc.today(),
+        "schemaVersion": 1,
+        "id": source_id,
+        "kind": "url",
+        "locators": [item["url"] for item in included],
+        "include": [],
+        "exclude": [],
+        "depth": 0,
+        "maxDocuments": len(included),
+        "note": f"records included by research/{topic}",
+        "origin": f"research:{topic}",
+        "addedAt": rc.today(),
     }
     rc.write_json(ingest.source_path(root, source_id), descriptor)
     store_appending(root, descriptor, entries, texts, [], append)
@@ -683,6 +842,7 @@ def screen_check(batch: list[dict[str, Any]], criteria: dict[str, Any], known: s
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return seen
+
     return check
 
 
@@ -690,7 +850,11 @@ def mark_retractions(session: rc.Session, root: Path, records: list[dict[str, An
     """Flag the records whose DOI a retraction-aware adapter (Crossref) lists as retracted, withdrawn or removed.
     Records that adapter found itself already carry the flag. Returns how the check went, for the screening log."""
     aware = {identifier for identifier, spec in registry.descriptors(root).items() if spec.get("retractions")}
-    dois = [item["doi"] for item in records if item.get("doi") and not item["extra"].get("retracted") and not set(item["foundBy"]) & aware]
+    dois = [
+        item["doi"]
+        for item in records
+        if item.get("doi") and not item["extra"].get("retracted") and not set(item["foundBy"]) & aware
+    ]
     if not dois:
         return "no DOIs to check"
     try:
@@ -705,8 +869,9 @@ def mark_retractions(session: rc.Session, root: Path, records: list[dict[str, An
     return f"{len(dois)} DOIs checked, {sum(item.get('doi') in found for item in records)} retracted"
 
 
-def screen_hop(session: rc.Session, root: Path, topic: str, records: list[dict[str, Any]], hop: int,
-               plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def screen_hop(
+    session: rc.Session, root: Path, topic: str, records: list[dict[str, Any]], hop: int, plan: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
     """Decisions for one set of records: retracted ones excluded by the runner, the rest by the screener in batches."""
     config = rc.settings(root)
     criteria = {item["id"]: item for item in plan["exclusions"]}
@@ -714,38 +879,64 @@ def screen_hop(session: rc.Session, root: Path, topic: str, records: list[dict[s
     decisions: dict[str, dict[str, Any]] = {}
     for item in records:
         if item["extra"].get("retracted"):
-            decisions[item["id"]] = {"decision": "exclude", "criterion": RETRACTED, "questions": [],
-                                     "reason": "the publisher or the index flags it as retracted"}
+            decisions[item["id"]] = {
+                "decision": "exclude",
+                "criterion": RETRACTED,
+                "questions": [],
+                "reason": "the publisher or the index flags it as retracted",
+            }
     pending = [item for item in records if item["id"] not in decisions]
     size = config["research"].get("screenBatch", 40)
-    batches = [pending[index:index + size] for index in range(0, len(pending), size)]
-    criteria_text = "\n".join(f"- {item['id']}: {item['text']} (from the brief's {item['from']})" for item in plan["exclusions"])
-    replies = session.parallel([
-        (f"screen-{hop}-{number}", lambda number=number, batch=batch: session.call_checked(
-            config["pipeline"]["screener"],
-            f"# Task\n\nScreen these {len(batch)} candidate records for research/{topic}.\n\n{context(root, topic)}\n\n"
-            f"# Exclusion criteria\n\n{criteria_text}\n\n# Candidates, one JSON object per line\n\n" + "\n".join(map(candidate_line, batch)),
-            f"screen-{hop}-{number}", json_reply(screen_check(batch, criteria, known))))
-        for number, batch in enumerate(batches, 1)
-    ])
+    batches = [pending[index : index + size] for index in range(0, len(pending), size)]
+    criteria_text = "\n".join(
+        f"- {item['id']}: {item['text']} (from the brief's {item['from']})" for item in plan["exclusions"]
+    )
+    replies = session.parallel(
+        [
+            (
+                f"screen-{hop}-{number}",
+                lambda number=number, batch=batch: session.call_checked(
+                    config["pipeline"]["screener"],
+                    f"# Task\n\nScreen these {len(batch)} candidate records for research/{topic}.\n\n{context(root, topic)}\n\n"
+                    f"# Exclusion criteria\n\n{criteria_text}\n\n# Candidates, one JSON object per line\n\n"
+                    + "\n".join(map(candidate_line, batch)),
+                    f"screen-{hop}-{number}",
+                    json_reply(screen_check(batch, criteria, known)),
+                ),
+            )
+            for number, batch in enumerate(batches, 1)
+        ]
+    )
     for seen in replies.values():
         for identifier, entry in seen.items():
-            decisions[identifier] = {"decision": entry["decision"], "criterion": entry.get("criterion") if entry["decision"] == "exclude" else None,
-                                     "questions": entry.get("questions", []) if entry["decision"] == "include" else [],
-                                     "reason": " ".join(str(entry["reason"]).split())}
+            decisions[identifier] = {
+                "decision": entry["decision"],
+                "criterion": entry.get("criterion") if entry["decision"] == "exclude" else None,
+                "questions": entry.get("questions", []) if entry["decision"] == "include" else [],
+                "reason": " ".join(str(entry["reason"]).split()),
+            }
     return decisions
 
 
-def snowball(session: rc.Session, root: Path, frontier: list[dict[str, Any]], seen: set[str], next_number: int, hop: int,
-             log: Path) -> tuple[list[dict[str, Any]], int]:
+def snowball(
+    session: rc.Session,
+    root: Path,
+    frontier: list[dict[str, Any]],
+    seen: set[str],
+    next_number: int,
+    hop: int,
+    log: Path,
+) -> tuple[list[dict[str, Any]], int]:
     """Follow the references (backward) and the citing works (forward) of the most cited included records.
     Returns the records not seen before, numbered on from next_number, and how many results the lookups gave."""
     config = rc.settings(root)["research"]
     followers = [identifier for identifier, spec in registry.descriptors(root).items() if spec.get("related")]
     if not followers:
         return [], 0
-    seeds = sorted((item for item in frontier if item.get("doi") or item["extra"].get("openalexId")),
-                   key=lambda item: -int(item["extra"].get("citedByCount") or 0))[: config.get("snowballSeeds", 5)]
+    seeds = sorted(
+        (item for item in frontier if item.get("doi") or item["extra"].get("openalexId")),
+        key=lambda item: -int(item["extra"].get("citedByCount") or 0),
+    )[: config.get("snowballSeeds", 5)]
     found: list[dict[str, Any]] = []
     for seed in seeds:
         for direction in kit.DIRECTIONS:
@@ -760,8 +951,12 @@ def snowball(session: rc.Session, root: Path, frontier: list[dict[str, Any]], se
         item["id"] = f"R{next_number + offset}"
         item["hop"] = hop
         item["via"] = sorted({other["via"] for other in found if other["key"] == item["key"]})
-        item["questions"] = sorted({question for other in found if other["key"] == item["key"] for question in other["questions"]})
-    session.say(f"snowball hop {hop}: {len(found)} references and citations from {len(seeds)} key works, {len(fresh)} new")
+        item["questions"] = sorted(
+            {question for other in found if other["key"] == item["key"] for question in other["questions"]}
+        )
+    session.say(
+        f"snowball hop {hop}: {len(found)} references and citations from {len(seeds)} key works, {len(fresh)} new"
+    )
     return fresh, len(found)
 
 
@@ -781,7 +976,9 @@ def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
     frontier = [item for item in records if decisions[item["id"]]["decision"] == "include"]
     citation_identified = 0
     for hop in range(1, config["research"].get("snowballDepth", 1) + 1):
-        fresh, identified = snowball(session, root, frontier, {item["key"] for item in records}, len(records) + 1, hop, log)
+        fresh, identified = snowball(
+            session, root, frontier, {item["key"] for item in records}, len(records) + 1, hop, log
+        )
         citation_identified += identified
         if not fresh:
             break
@@ -794,19 +991,42 @@ def stage_screen(session: rc.Session, root: Path, topic: str) -> None:
     included = [item for item in records if decisions[item["id"]]["decision"] == "include"]
     store_included(root, topic, included)
     stored = {item["id"]: item["stored"] for item in included}
-    rows = [{"id": item["id"], "key": item["key"], "title": item["title"], "url": item["url"], "doi": item["doi"],
-             "foundBy": item["foundBy"], "hop": item["hop"], "via": item["via"], "evidenceType": item["evidenceType"],
-             "fingerprint": item["extra"].get("sha256"), **decisions[item["id"]], "stored": stored.get(item["id"])} for item in records]
+    rows = [
+        {
+            "id": item["id"],
+            "key": item["key"],
+            "title": item["title"],
+            "url": item["url"],
+            "doi": item["doi"],
+            "foundBy": item["foundBy"],
+            "hop": item["hop"],
+            "via": item["via"],
+            "evidenceType": item["evidenceType"],
+            "fingerprint": item["extra"].get("sha256"),
+            **decisions[item["id"]],
+            "stored": stored.get(item["id"]),
+        }
+        for item in records
+    ]
     excluded_by: dict[str, int] = {}
     for row in rows:
         if row["decision"] == "exclude":
             excluded_by[row["criterion"]] = excluded_by.get(row["criterion"], 0) + 1
     searched = len(candidates["records"])
-    flow = {"identified": candidates["identified"], "duplicates": candidates["identified"] - searched,
-            "citationIdentified": citation_identified, "citationDuplicates": citation_identified - (len(records) - searched),
-            "screened": len(records), "excluded": sum(excluded_by.values()), "excludedBy": dict(sorted(excluded_by.items())),
-            "included": len(included)}
-    rc.write_json(directory / "screening.json", {"flow": flow, "criteria": plan["exclusions"], "retractionCheck": checks, "records": rows})
+    flow = {
+        "identified": candidates["identified"],
+        "duplicates": candidates["identified"] - searched,
+        "citationIdentified": citation_identified,
+        "citationDuplicates": citation_identified - (len(records) - searched),
+        "screened": len(records),
+        "excluded": sum(excluded_by.values()),
+        "excludedBy": dict(sorted(excluded_by.items())),
+        "included": len(included),
+    }
+    rc.write_json(
+        directory / "screening.json",
+        {"flow": flow, "criteria": plan["exclusions"], "retractionCheck": checks, "records": rows},
+    )
     rc.write_text(directory / "screening.md", render_screening(topic, flow, plan["exclusions"], rows, checks))
     session.say(f"screen: {flow['included']} included, {flow['excluded']} excluded of {flow['screened']} candidates")
 
@@ -816,28 +1036,51 @@ def flow_text(flow: dict[str, Any], criteria: list[dict[str, Any]]) -> str:
     names = {item["id"]: item["text"] for item in criteria} | {RETRACTED: "retracted"}
     lines = [f"- Identified by adapter searches: {flow['identified']}", f"- Duplicates removed: {flow['duplicates']}"]
     if flow.get("citationIdentified"):
-        lines += [f"- Identified by following references and citations: {flow['citationIdentified']}",
-                  f"- Of those, duplicates or already found: {flow['citationDuplicates']}"]
+        lines += [
+            f"- Identified by following references and citations: {flow['citationIdentified']}",
+            f"- Of those, duplicates or already found: {flow['citationDuplicates']}",
+        ]
     lines += [f"- Screened: {flow['screened']}", f"- Excluded: {flow['excluded']}"]
-    lines += [f"  - {criterion} ({names.get(criterion, criterion)}): {count}" for criterion, count in flow["excludedBy"].items()]
+    lines += [
+        f"  - {criterion} ({names.get(criterion, criterion)}): {count}"
+        for criterion, count in flow["excludedBy"].items()
+    ]
     lines.append(f"- Included: {flow['included']}")
     return "\n".join(lines)
 
 
-def render_screening(topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]],
-                     checks: list[str]) -> str:
+def render_screening(
+    topic: str, flow: dict[str, Any], criteria: list[dict[str, Any]], rows: list[dict[str, Any]], checks: list[str]
+) -> str:
     def found(row: dict[str, Any]) -> str:
         how = f"hop {row['hop']}: {', '.join(row['via'])}" if row["hop"] else f"search: {', '.join(row['foundBy'])}"
-        return how + (f" (refresh {row['addedAt']}{', changed page' if row.get('changed') else ''})" if row.get("addedAt") else "")
+        return how + (
+            f" (refresh {row['addedAt']}{', changed page' if row.get('changed') else ''})" if row.get("addedAt") else ""
+        )
 
-    lines = [f"# Screening: {topic}\n", flow_text(flow, criteria), "", f"Retraction check: {'; '.join(checks)}.", "", "## Included\n",
-             "Read these first: each record's text is stored at the path given.\n",
-             "| Record | Title | Type | Found | Questions | Stored | Reason |", "| --- | --- | --- | --- | --- | --- | --- |"]
-    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['evidenceType']} | {cell(found(row))} | {', '.join(row['questions'])} | "
-              f"{row['stored']} | {cell(row['reason'])} |" for row in rows if row["decision"] == "include"]
+    lines = [
+        f"# Screening: {topic}\n",
+        flow_text(flow, criteria),
+        "",
+        f"Retraction check: {'; '.join(checks)}.",
+        "",
+        "## Included\n",
+        "Read these first: each record's text is stored at the path given.\n",
+        "| Record | Title | Type | Found | Questions | Stored | Reason |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    lines += [
+        f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {row['evidenceType']} | {cell(found(row))} | {', '.join(row['questions'])} | "
+        f"{row['stored']} | {cell(row['reason'])} |"
+        for row in rows
+        if row["decision"] == "include"
+    ]
     lines += ["", "## Excluded\n", "| Record | Title | Found | Criterion | Reason |", "| --- | --- | --- | --- | --- |"]
-    lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {cell(found(row))} | {row['criterion']} | {cell(row['reason'])} |"
-              for row in rows if row["decision"] == "exclude"]
+    lines += [
+        f"| {row['id']} | [{cell(row['title'])}]({row['url']}) | {cell(found(row))} | {row['criterion']} | {cell(row['reason'])} |"
+        for row in rows
+        if row["decision"] == "exclude"
+    ]
     return "\n".join(lines)
 
 
@@ -869,9 +1112,11 @@ def quote_found(quote: str, text: str) -> bool:
         return False
     if f" {needle} " in haystack:
         return True
-    runs = [words[index:index + 5] for index in range(len(words) - 4)]
+    runs = [words[index : index + 5] for index in range(len(words) - 4)]
     found = [f" {' '.join(run)} " in haystack for run in runs]
-    critical = [hit for run, hit in zip(runs, found) if any(word.isdigit() or word in NEGATIONS for word in run)]
+    critical = [
+        hit for run, hit in zip(runs, found, strict=True) if any(word.isdigit() or word in NEGATIONS for word in run)
+    ]
     return all(critical) and sum(found) >= 0.8 * len(runs)
 
 
@@ -886,10 +1131,14 @@ def included_records(root: Path, topic: str) -> dict[str, dict[str, Any]]:
     path = topic_dir(root, topic) / "screening.json"
     if not path.is_file():
         return {}
-    return {row["key"]: row for row in rc.load_json(path)["records"] if row["decision"] == "include" and row.get("stored")}
+    return {
+        row["key"]: row for row in rc.load_json(path)["records"] if row["decision"] == "include" and row.get("stored")
+    }
 
 
-def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def stage_collect(
+    session: rc.Session, root: Path, topic: str, only: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Researchers read the included records and search the web; the runner stores every cited page and checks
     every quote. With only (a refresh), they read just those new records, without web search, and the sources
     and claims are appended to the ledger: existing ids never change. Returns the claims added."""
@@ -900,9 +1149,14 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
     types = evidence_types(root)
 
     def check(data: Any) -> dict[str, Any]:
-        if not isinstance(data, dict) or not isinstance(data.get("sources"), list) or not isinstance(data.get("claims"), list) \
-                or not data["sources"] or not data["claims"]:
-            raise ValueError("expected {\"sources\": [...], \"claims\": [...]} with at least one of each")
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("sources"), list)
+            or not isinstance(data.get("claims"), list)
+            or not data["sources"]
+            or not data["claims"]
+        ):
+            raise ValueError('expected {"sources": [...], "claims": [...]} with at least one of each')
         # Web sources past the limit are dropped with the claims citing them before anything else is checked, so
         # the merge below never meets a claim whose source is gone. Included records never count against it.
         web = [source for source in data["sources"] if source_key(str(source.get("url", ""))) not in records]
@@ -912,9 +1166,15 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         everything = {source.get("ref") for source in data["sources"]}
         unknown = [claim for claim in data["claims"] if claim.get("source") not in everything]
         if unknown:
-            raise ValueError(f"claim {unknown[0].get('text', '')[:60]!r} cites unknown source {unknown[0].get('source')}")
-        data = {**data, "sources": kept, "claims": [claim for claim in data["claims"] if claim.get("source") in refs],
-                "overLimit": len(data["sources"]) - len(kept)}
+            raise ValueError(
+                f"claim {unknown[0].get('text', '')[:60]!r} cites unknown source {unknown[0].get('source')}"
+            )
+        data = {
+            **data,
+            "sources": kept,
+            "claims": [claim for claim in data["claims"] if claim.get("source") in refs],
+            "overLimit": len(data["sources"]) - len(kept),
+        }
         if not data["claims"]:
             raise ValueError(f"no claim cites one of the first {limit} sources; list at most {limit} sources")
         for source in data["sources"]:
@@ -948,10 +1208,15 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
             f"record contradicts or updates it.\n\nNew records:\n{listing}\n\n{context(root, topic)}"
         )
     researchers = config["pipeline"]["researchers"]
-    replies = session.parallel([
-        (role_id, lambda role_id=role_id: session.call_checked(role_id, body, f"collect-{role_id}", json_reply(check)))
-        for role_id in researchers
-    ])
+    replies = session.parallel(
+        [
+            (
+                role_id,
+                lambda role_id=role_id: session.call_checked(role_id, body, f"collect-{role_id}", json_reply(check)),
+            )
+            for role_id in researchers
+        ]
+    )
 
     # Merge sources across researchers (and with the existing ledger on a refresh) by key, then store each new page
     # so every claim has committed evidence.
@@ -962,18 +1227,30 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
     for role_id in researchers:
         reply = replies[role_id]
         if reply["overLimit"]:
-            session.say(f"collect-{role_id}: {reply['overLimit']} sources past the limit of {limit} dropped with their claims", "warn")
+            session.say(
+                f"collect-{role_id}: {reply['overLimit']} sources past the limit of {limit} dropped with their claims",
+                "warn",
+            )
         local = {}
         for source in reply["sources"]:
             key = source_key(source["url"])
             evidence = records[key]["evidenceType"] if key in records else source["evidenceType"]
             ceiling = types[evidence]["reliabilityCeiling"]
-            entry = merged.setdefault(key, {
-                "id": f"S{len(merged) + 1}", "url": source["url"], "title": source.get("title", ""),
-                "published": source.get("published", "unknown"), "evidenceType": evidence,
-                "reliability": capped(source["reliability"], ceiling), "reliabilityReason": " ".join(str(source["reliabilityReason"]).split()),
-                "foundBy": [], "addedIn": version, "checkedAt": rc.today(),
-            })
+            entry = merged.setdefault(
+                key,
+                {
+                    "id": f"S{len(merged) + 1}",
+                    "url": source["url"],
+                    "title": source.get("title", ""),
+                    "published": source.get("published", "unknown"),
+                    "evidenceType": evidence,
+                    "reliability": capped(source["reliability"], ceiling),
+                    "reliabilityReason": " ".join(str(source["reliabilityReason"]).split()),
+                    "foundBy": [],
+                    "addedIn": version,
+                    "checkedAt": rc.today(),
+                },
+            )
             if capped(source["reliability"], ceiling) != source["reliability"]:
                 entry["reliabilityCapped"] = f"{role_id} said {source['reliability']}; {evidence} is at best {ceiling}"
             if key in records:
@@ -981,11 +1258,18 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
             entry["foundBy"] = sorted(set(entry["foundBy"]) | {role_id})
             local[source["ref"]] = entry["id"]
         for claim in reply["claims"]:
-            claims.append({
-                "text": " ".join(claim["text"].split()), "source": local[claim["source"]], "quote": " ".join(claim["quote"].split()),
-                "questions": claim.get("questions", []), "type": claim.get("type", "fact"), "foundBy": role_id, "addedIn": version,
-                **({"via": " ".join(str(claim["via"]).split())} if claim.get("via") else {}),
-            })
+            claims.append(
+                {
+                    "text": " ".join(claim["text"].split()),
+                    "source": local[claim["source"]],
+                    "quote": " ".join(claim["quote"].split()),
+                    "questions": claim.get("questions", []),
+                    "type": claim.get("type", "fact"),
+                    "foundBy": role_id,
+                    "addedIn": version,
+                    **({"via": " ".join(str(claim["via"]).split())} if claim.get("via") else {}),
+                }
+            )
 
     source_id = f"web-{topic}"[:60].strip("-")
     entries, texts, skipped = {}, {}, []
@@ -999,7 +1283,14 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         try:
             stored, text, extractor, data = ingest.url_document(entry["url"])
         # One unreadable page is recorded and skipped; it never fails a stage whose replies are already paid for.
-        except (extract.Skip, urllib.error.URLError, http.client.HTTPException, subprocess.TimeoutExpired, OSError, ValueError) as reason:
+        except (
+            extract.Skip,
+            urllib.error.URLError,
+            http.client.HTTPException,
+            subprocess.TimeoutExpired,
+            OSError,
+            ValueError,
+        ) as reason:
             entry["fetch"] = f"failed: {str(reason)[:160]}"
             entry["stored"] = None
             skipped.append({"origin": entry["url"], "reason": entry["fetch"]})
@@ -1009,9 +1300,17 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
         entry["fetch"] = "ok"
         entry["stored"] = f"sources/{source_id}/text/{stored}"
     descriptor = {
-        "schemaVersion": 1, "id": source_id, "kind": "url", "locators": [entry["url"] for entry in merged.values() if not entry.get("record")],
-        "include": [], "exclude": [], "depth": 0, "maxDocuments": len(merged), "note": f"pages cited by research/{topic}",
-        "origin": f"research:{topic}", "addedAt": rc.today(),
+        "schemaVersion": 1,
+        "id": source_id,
+        "kind": "url",
+        "locators": [entry["url"] for entry in merged.values() if not entry.get("record")],
+        "include": [],
+        "exclude": [],
+        "depth": 0,
+        "maxDocuments": len(merged),
+        "note": f"pages cited by research/{topic}",
+        "origin": f"research:{topic}",
+        "addedAt": rc.today(),
     }
     rc.write_json(ingest.source_path(root, source_id), descriptor)
     store_appending(root, descriptor, entries, texts, skipped, append=only is not None)
@@ -1020,10 +1319,14 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
     for number, claim in enumerate(claims, len(existing["claims"]) + 1):
         claim["id"] = f"C{number}"
         stored = sources_by_id[claim["source"]].get("stored")
-        claim["quoteVerified"] = bool(stored) and quote_found(claim["quote"], (root / stored).read_text(encoding="utf-8"))
+        claim["quoteVerified"] = bool(stored) and quote_found(
+            claim["quote"], (root / stored).read_text(encoding="utf-8")
+        )
         if claim.get("via"):
             # SIFT: a claim reported second-hand is traced when its original is itself in the ledger.
-            claim["traced"] = any(source_key(url.rstrip(".,;)")) in merged for url in re.findall(r"https?://\S+", claim["via"]))
+            claim["traced"] = any(
+                source_key(url.rstrip(".,;)")) in merged for url in re.findall(r"https?://\S+", claim["via"])
+            )
     added = [{"id": claim.pop("id"), **claim} for claim in claims]
     led = {"topic": topic, "sources": list(merged.values()), "claims": [*existing["claims"], *added]}
     directory = topic_dir(root, topic)
@@ -1031,13 +1334,21 @@ def stage_collect(session: rc.Session, root: Path, topic: str, only: list[dict[s
     rc.write_text(directory / "claims.md", render_ledger(led))
     fetched = sum(entry.get("fetch") == "ok" for entry in merged.values())
     verified = sum(claim["quoteVerified"] for claim in added)
-    session.say(f"collect: {len(added)} claims added, {len(led['claims'])} in the ledger from {len(merged)} sources ({fetched} stored); "
-                f"{verified} of the new quotes verified")
+    session.say(
+        f"collect: {len(added)} claims added, {len(led['claims'])} in the ledger from {len(merged)} sources ({fetched} stored); "
+        f"{verified} of the new quotes verified"
+    )
     return added
 
 
-def store_appending(root: Path, descriptor: dict[str, Any], entries: dict[str, Any], texts: dict[str, str],
-                    skipped: list[dict[str, str]], append: bool) -> None:
+def store_appending(
+    root: Path,
+    descriptor: dict[str, Any],
+    entries: dict[str, Any],
+    texts: dict[str, str],
+    skipped: list[dict[str, str]],
+    append: bool,
+) -> None:
     """ingest.store, which replaces a source's files; with append, the files an earlier version stored are kept."""
     if append:
         previous = ingest.read_manifest(root, descriptor["id"]).get("files", {})
@@ -1052,20 +1363,29 @@ def store_appending(root: Path, descriptor: dict[str, Any], entries: dict[str, A
 
 def render_ledger(ledger: dict[str, Any]) -> str:
     sources = {source["id"]: source for source in ledger["sources"]}
-    lines = [f"# Claims ledger: {ledger['topic']}\n", "A claim whose quote is not verified, or whose page could not be stored, "
-             "rests on the researcher's word alone. A drifted claim's page no longer says what was quoted.\n",
-             "| Claim | Text | Source | Reliability | Quote verified | Via | Questions |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    lines = [
+        f"# Claims ledger: {ledger['topic']}\n",
+        "A claim whose quote is not verified, or whose page could not be stored, "
+        "rests on the researcher's word alone. A drifted claim's page no longer says what was quoted.\n",
+        "| Claim | Text | Source | Reliability | Quote verified | Via | Questions |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
     for claim in ledger["claims"]:
         source = sources[claim["source"]]
         where = source.get("stored") or f"{source['url']} (not stored)"
         verified = "drifted" if claim.get("drifted") else "yes" if claim["quoteVerified"] else "no"
         via = f"{cell(claim['via'])} ({'traced' if claim.get('traced') else 'not traced'})" if claim.get("via") else ""
-        lines.append(f"| {claim['id']} | {cell(claim['text'])} | {source['id']}: {cell(where)} | {source.get('reliability', '?')} | "
-                     f"{verified} | {via} | {', '.join(claim['questions'])} |")
+        lines.append(
+            f"| {claim['id']} | {cell(claim['text'])} | {source['id']}: {cell(where)} | {source.get('reliability', '?')} | "
+            f"{verified} | {via} | {', '.join(claim['questions'])} |"
+        )
     lines += ["", "## Sources", ""]
-    lines += [f"- {source['id']}: [{source.get('title') or source['url']}]({source['url']}) ({source.get('evidenceType', source.get('kind', '?'))}, "
-              f"reliability {source.get('reliability', '?')}: {source.get('reliabilityReason', 'not graded')}; published {source['published']}) "
-              f"stored: {source.get('stored') or source.get('fetch')}" for source in ledger["sources"]]
+    lines += [
+        f"- {source['id']}: [{source.get('title') or source['url']}]({source['url']}) ({source.get('evidenceType', source.get('kind', '?'))}, "
+        f"reliability {source.get('reliability', '?')}: {source.get('reliabilityReason', 'not graded')}; published {source['published']}) "
+        f"stored: {source.get('stored') or source.get('fetch')}"
+        for source in ledger["sources"]
+    ]
     return "\n".join(lines)
 
 
@@ -1082,7 +1402,7 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
     def check(reply: str) -> tuple[str, dict[str, Any]]:
         ideas = rc.extract_json(reply)
         if not isinstance(ideas, dict) or not ideas.get("ideas"):
-            raise ValueError("end with a ```json block {\"ideas\": [{\"id\": \"I1\", \"name\", \"summary\", \"claims\": [...]}]}")
+            raise ValueError('end with a ```json block {"ideas": [{"id": "I1", "name", "summary", "claims": [...]}]}')
         markdown = re.sub(r"```json\s*\n.*?\n```\s*\Z", "", reply.strip(), flags=re.DOTALL).strip()
         unknown = set(claim_refs(markdown)) - claim_ids
         for idea in ideas["ideas"]:
@@ -1103,13 +1423,21 @@ def stage_analyze(session: rc.Session, root: Path, topic: str) -> None:
     if (topic_dir(root, topic) / "ideas.json").is_file():
         # A refresh: the ledger grew. Keep the ids of ideas that are still the same idea, so their history continues.
         previous = rc.load_json(topic_dir(root, topic) / "ideas.json")["ideas"]
-        body += ("\n\n# Previous version\n\nThe ledger has new claims since the last analysis. Its ideas were:\n"
-                 + "\n".join(f"- {idea['id']}: {idea['name']}" for idea in previous)
-                 + "\nKeep an idea's id when it is still the same idea, even if the evidence now weakens it; give new ideas new ids.")
-    competing = {question: plan_hypotheses(plan, question) for question in sorted(known) if len(plan_hypotheses(plan, question)) > 1}
+        body += (
+            "\n\n# Previous version\n\nThe ledger has new claims since the last analysis. Its ideas were:\n"
+            + "\n".join(f"- {idea['id']}: {idea['name']}" for idea in previous)
+            + "\nKeep an idea's id when it is still the same idea, even if the evidence now weakens it; give new ideas new ids."
+        )
+    competing = {
+        question: plan_hypotheses(plan, question)
+        for question in sorted(known)
+        if len(plan_hypotheses(plan, question)) > 1
+    }
     if competing:
-        body += ("\n\n# Competing hypotheses\n\nThe plan weighs these against each other; give each such question an ach matrix:\n"
-                 + "\n".join(f"- {question}: {', '.join(hypotheses)}" for question, hypotheses in competing.items()))
+        body += (
+            "\n\n# Competing hypotheses\n\nThe plan weighs these against each other; give each such question an ach matrix:\n"
+            + "\n".join(f"- {question}: {', '.join(hypotheses)}" for question, hypotheses in competing.items())
+        )
     markdown, ideas = session.call_checked(config["pipeline"]["analyst"], body, "analyze", check)
     directory = topic_dir(root, topic)
     rc.write_text(directory / "analysis.md", markdown + "\n\n" + render_structure(ideas, plan))
@@ -1123,12 +1451,24 @@ def render_structure(ideas: dict[str, Any], plan: dict[str, Any]) -> str:
     lines = ["## Assumptions and competing hypotheses (from the analysis's data)", ""]
     for entry in ideas.get("questions", []):
         lines += [f"### {entry['question']}", ""]
-        lines += [f"- {item['id']}: {item['text']}" + (f" (rests on {', '.join(item['claims'])})" if item.get("claims") else "")
-                  for item in entry.get("assumptions", [])]
+        lines += [
+            f"- {item['id']}: {item['text']}"
+            + (f" (rests on {', '.join(item['claims'])})" if item.get("claims") else "")
+            for item in entry.get("assumptions", [])
+        ]
         ach = entry.get("ach")
         if ach:
-            lines += ["", "| Claim | " + " | ".join(ach["hypotheses"]) + " |", "| --- |" + " --- |" * len(ach["hypotheses"])]
-            lines += [f"| {row['claim']} | " + " | ".join(row["ratings"][hypothesis] for hypothesis in ach["hypotheses"]) + " |" for row in ach["matrix"]]
+            lines += [
+                "",
+                "| Claim | " + " | ".join(ach["hypotheses"]) + " |",
+                "| --- |" + " --- |" * len(ach["hypotheses"]),
+            ]
+            lines += [
+                f"| {row['claim']} | "
+                + " | ".join(row["ratings"][hypothesis] for hypothesis in ach["hypotheses"])
+                + " |"
+                for row in ach["matrix"]
+            ]
             lines += [""] + [f"- {hypothesis}: {statements.get(hypothesis, '')}" for hypothesis in ach["hypotheses"]]
             lines += [f"- Untested alternative: {item}" for item in ach.get("untested", [])]
         lines.append("")
@@ -1150,7 +1490,11 @@ def cited_claims(root: Path, topic: str) -> list[str]:
 
 def assumptions_of(root: Path, topic: str) -> list[dict[str, Any]]:
     data = rc.load_json(topic_dir(root, topic) / "ideas.json")
-    return [{**item, "question": entry["question"]} for entry in data.get("questions", []) for item in entry.get("assumptions", [])]
+    return [
+        {**item, "question": entry["question"]}
+        for entry in data.get("questions", [])
+        for item in entry.get("assumptions", [])
+    ]
 
 
 def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
@@ -1161,7 +1505,9 @@ def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
     def check(data: Any) -> dict[str, Any]:
         verdicts = data.get("claims") if isinstance(data, dict) else None
         if not isinstance(verdicts, list):
-            raise ValueError("expected {\"claims\": [{\"claim\", \"verdict\", \"reason\", \"evidence\"}], \"assumptions\": [...], \"analysis\": [...]}")
+            raise ValueError(
+                'expected {"claims": [{"claim", "verdict", "reason", "evidence"}], "assumptions": [...], "analysis": [...]}'
+            )
         seen = {item.get("claim") for item in verdicts}
         missing = sorted(set(wanted) - seen, key=lambda value: int(value[1:]))
         bad = [item for item in verdicts if item.get("verdict") not in CLAIM_VERDICTS or not item.get("reason")]
@@ -1169,7 +1515,9 @@ def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
         missing += [f"assumption {identifier}" for identifier in assumptions if identifier not in tested]
         bad += [item for item in tested.values() if item.get("verdict") not in CLAIM_VERDICTS or not item.get("reason")]
         if missing or bad:
-            raise ValueError(f"missing verdicts for {missing}; invalid entries {bad[:3]} (verdict one of {CLAIM_VERDICTS} with a reason)")
+            raise ValueError(
+                f"missing verdicts for {missing}; invalid entries {bad[:3]} (verdict one of {CLAIM_VERDICTS} with a reason)"
+            )
         return data
 
     body = (
@@ -1178,10 +1526,15 @@ def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
         + f". The ledger is research/{topic}/claims.md; stored pages are under sources/.\n\n{context(root, topic)}"
     )
     sceptics = config["pipeline"]["sceptics"]
-    reviews = session.parallel([
-        (role_id, lambda role_id=role_id: session.call_checked(role_id, body, f"critique-{role_id}", json_reply(check)))
-        for role_id in sceptics
-    ])
+    reviews = session.parallel(
+        [
+            (
+                role_id,
+                lambda role_id=role_id: session.call_checked(role_id, body, f"critique-{role_id}", json_reply(check)),
+            )
+            for role_id in sceptics
+        ]
+    )
     # Committed reviews carry neutral labels; who wrote which stays in the ignored run state.
     labels = list(string.ascii_lowercase[: len(sceptics)])
     random.shuffle(labels)
@@ -1189,7 +1542,7 @@ def stage_critique(session: rc.Session, root: Path, topic: str) -> None:
     if directory.exists():
         shutil.rmtree(directory)
     mapping = {}
-    for role_id, label in zip(sceptics, labels):
+    for role_id, label in zip(sceptics, labels, strict=True):
         rc.write_json(directory / f"review-{label}.json", reviews[role_id])
         mapping[label] = role_id
     rc.write_json(root / ".rc-local" / "research" / topic / "reviewers.json", mapping)
@@ -1200,32 +1553,53 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
     directory = topic_dir(root, topic)
     wanted = cited_claims(root, topic)
     ideas = [idea["id"] for idea in rc.load_json(directory / "ideas.json")["ideas"]]
-    reviews = {path.stem.removeprefix("review-").upper(): rc.load_json(path) for path in sorted((directory / "critique").glob("review-*.json"))}
+    reviews = {
+        path.stem.removeprefix("review-").upper(): rc.load_json(path)
+        for path in sorted((directory / "critique").glob("review-*.json"))
+    }
     claim_ids = {claim["id"] for claim in ledger(root, topic)["claims"]}
     assumptions = [item["id"] for item in assumptions_of(root, topic)]
 
     def check(data: Any) -> dict[str, Any]:
         if not isinstance(data, dict):
-            raise ValueError("expected {\"claims\": [...], \"ideas\": [...], \"assumptions\": [...], \"answers\": [...]}")
+            raise ValueError('expected {"claims": [...], "ideas": [...], "assumptions": [...], "answers": [...]}')
         claim_seen = {item.get("claim"): item for item in data.get("claims", [])}
         idea_seen = {item.get("idea"): item for item in data.get("ideas", [])}
         problems = [f"no verdict for {claim}" for claim in wanted if claim not in claim_seen]
         problems += [f"no verdict for idea {idea}" for idea in ideas if idea not in idea_seen]
-        problems += [f"{key}: verdict must be one of {CLAIM_VERDICTS}" for key, item in claim_seen.items() if item.get("verdict") not in CLAIM_VERDICTS]
-        problems += [f"{key}: verdict must be one of {IDEA_VERDICTS}" for key, item in idea_seen.items() if item.get("verdict") not in IDEA_VERDICTS]
-        problems += [f"{key}: credibility must be one of {CREDIBILITY}" for key, item in claim_seen.items()
-                     if item.get("credibility") not in CREDIBILITY]
+        problems += [
+            f"{key}: verdict must be one of {CLAIM_VERDICTS}"
+            for key, item in claim_seen.items()
+            if item.get("verdict") not in CLAIM_VERDICTS
+        ]
+        problems += [
+            f"{key}: verdict must be one of {IDEA_VERDICTS}"
+            for key, item in idea_seen.items()
+            if item.get("verdict") not in IDEA_VERDICTS
+        ]
+        problems += [
+            f"{key}: credibility must be one of {CREDIBILITY}"
+            for key, item in claim_seen.items()
+            if item.get("credibility") not in CREDIBILITY
+        ]
         problems += answer_problems(data.get("answers"), questions(root, topic), claim_ids)
         settled = {item.get("assumption"): item for item in data.get("assumptions", []) if isinstance(item, dict)}
-        problems += [f"no verdict for assumption {identifier}" for identifier in assumptions if identifier not in settled]
-        problems += [f"assumption {key}: verdict must be one of {CLAIM_VERDICTS}" for key, item in settled.items()
-                     if item.get("verdict") not in CLAIM_VERDICTS]
+        problems += [
+            f"no verdict for assumption {identifier}" for identifier in assumptions if identifier not in settled
+        ]
+        problems += [
+            f"assumption {key}: verdict must be one of {CLAIM_VERDICTS}"
+            for key, item in settled.items()
+            if item.get("verdict") not in CLAIM_VERDICTS
+        ]
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return data
 
-    shown = "\n\n".join(f"## Review {label}\n\n```json\n{json.dumps(review, ensure_ascii=False, indent=1)[:60000]}\n```"
-                        for label, review in reviews.items())
+    shown = "\n\n".join(
+        f"## Review {label}\n\n```json\n{json.dumps(review, ensure_ascii=False, indent=1)[:60000]}\n```"
+        for label, review in reviews.items()
+    )
     body = (
         f"# Task\n\nSettle every claim ({', '.join(wanted)}) and idea ({', '.join(ideas)}) of research/{topic}/analysis.md "
         f"and ideas.json from these anonymous reviews, checking them against the stored sources"
@@ -1236,23 +1610,42 @@ def stage_judge(session: rc.Session, root: Path, topic: str) -> None:
     # A claim one reviewer refuted but the judge kept is contested: the report says so; only the user can settle it.
     contested = []
     for item in data["claims"]:
-        refuted_by = [label for label, review in reviews.items()
-                      if any(entry.get("claim") == item["claim"] and entry.get("verdict") == "REFUTED" for entry in review.get("claims", []))]
+        refuted_by = [
+            label
+            for label, review in reviews.items()
+            if any(
+                entry.get("claim") == item["claim"] and entry.get("verdict") == "REFUTED"
+                for entry in review.get("claims", [])
+            )
+        ]
         if refuted_by and item["verdict"] in ("HOLDS", "WEAK"):
             contested.append({"claim": item["claim"], "refutedBy": [f"Review {label}" for label in refuted_by]})
     data["contested"] = contested
     previous = rc.load_json(directory / "judgement.json") if (directory / "judgement.json").is_file() else {}
-    data["claims"] = with_history(data["claims"], previous.get("claims", []), "claim", "verdict", topic_version(directory))
+    data["claims"] = with_history(
+        data["claims"], previous.get("claims", []), "claim", "verdict", topic_version(directory)
+    )
     data["ideas"] = with_history(data["ideas"], previous.get("ideas", []), "idea", "verdict", topic_version(directory))
     rc.write_json(directory / "judgement.json", data)
-    lines = [f"# Judgement: {topic}\n", "## Certainty of the answers\n", certainty_text(data["answers"]), "",
-             "| Claim | Verdict | Credibility | Reason |", "| --- | --- | --- | --- |"]
-    lines += [f"| {item['claim']} | {item['verdict']}{' (earlier version)' if item.get('carried') else ''} | {item.get('credibility', '?')} | "
-              f"{cell(item.get('reason', ''))} |" for item in data["claims"]]
+    lines = [
+        f"# Judgement: {topic}\n",
+        "## Certainty of the answers\n",
+        certainty_text(data["answers"]),
+        "",
+        "| Claim | Verdict | Credibility | Reason |",
+        "| --- | --- | --- | --- |",
+    ]
+    lines += [
+        f"| {item['claim']} | {item['verdict']}{' (earlier version)' if item.get('carried') else ''} | {item.get('credibility', '?')} | "
+        f"{cell(item.get('reason', ''))} |"
+        for item in data["claims"]
+    ]
     lines += ["", "| Idea | Verdict | Reason |", "| --- | --- | --- |"]
     lines += [f"| {item['idea']} | {item['verdict']} | {cell(item.get('reason', ''))} |" for item in data["ideas"]]
     if contested:
-        lines += ["", "## Contested", ""] + [f"- {item['claim']}: refuted by {', '.join(item['refutedBy'])}, kept by the judge" for item in contested]
+        lines += ["", "## Contested", ""] + [
+            f"- {item['claim']}: refuted by {', '.join(item['refutedBy'])}, kept by the judge" for item in contested
+        ]
     rc.write_text(directory / "judgement.md", "\n".join(lines))
 
 
@@ -1260,8 +1653,12 @@ def certainty_text(answers: list[dict[str, Any]]) -> str:
     """One line per question: its certainty and why it is not higher."""
     lines = []
     for item in sorted(answers, key=lambda answer: int(answer["question"][1:])):
-        reasons = [f"{entry['domain']} -{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("downgrades", [])]
-        reasons += [f"{entry['domain']} +{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("upgrades", [])]
+        reasons = [
+            f"{entry['domain']} -{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("downgrades", [])
+        ]
+        reasons += [
+            f"{entry['domain']} +{entry.get('levels', 1)}: {entry['reason']}" for entry in item.get("upgrades", [])
+        ]
         lines.append(f"- {item['question']}: **{item['certainty']}**" + (f" ({'; '.join(reasons)})" if reasons else ""))
     return "\n".join(lines)
 
@@ -1272,7 +1669,9 @@ def topic_version(directory: Path) -> int:
     return rc.load_json(path)["version"] if path.is_file() else 1
 
 
-def with_history(items: list[dict[str, Any]], previous: list[dict[str, Any]], key: str, field: str, version: int) -> list[dict[str, Any]]:
+def with_history(
+    items: list[dict[str, Any]], previous: list[dict[str, Any]], key: str, field: str, version: int
+) -> list[dict[str, Any]]:
     """items, each carrying its earlier history plus today's value; earlier items not settled this time are kept
     as they were, marked carried. A full re-run starts over (ids change), a refresh continues the history."""
     before = {item[key]: item for item in previous}
@@ -1288,8 +1687,11 @@ def with_history(items: list[dict[str, Any]], previous: list[dict[str, Any]], ke
 def surviving_ideas(root: Path, topic: str) -> list[dict[str, Any]]:
     directory = topic_dir(root, topic)
     verdicts = {item["idea"]: item for item in rc.load_json(directory / "judgement.json")["ideas"]}
-    return [{**idea, "verdict": verdicts[idea["id"]]["verdict"]} for idea in rc.load_json(directory / "ideas.json")["ideas"]
-            if verdicts.get(idea["id"], {}).get("verdict") != "FALLS"]
+    return [
+        {**idea, "verdict": verdicts[idea["id"]]["verdict"]}
+        for idea in rc.load_json(directory / "ideas.json")["ideas"]
+        if verdicts.get(idea["id"], {}).get("verdict") != "FALLS"
+    ]
 
 
 def stage_apply(session: rc.Session, root: Path, topic: str) -> None:
@@ -1307,7 +1709,7 @@ def stage_apply(session: rc.Session, root: Path, topic: str) -> None:
     def check(data: Any) -> dict[str, Any]:
         fits = data.get("fits") if isinstance(data, dict) else None
         if not isinstance(fits, list):
-            raise ValueError("expected {\"fits\": [...]}")
+            raise ValueError('expected {"fits": [...]}')
         problems = [f"no fit for {idea['id']}" for idea in ideas if idea["id"] not in {fit.get("idea") for fit in fits}]
         for fit in fits:
             if fit.get("ring") not in RINGS or fit.get("effort") not in EFFORTS:
@@ -1316,28 +1718,46 @@ def stage_apply(session: rc.Session, root: Path, topic: str) -> None:
             if unknown:
                 problems.append(f"{fit.get('idea')}: sources {sorted(unknown)} are not ingested sources")
             text = json.dumps(fit)
-            problems += [f"{fit.get('idea')}: cites missing {path}" for path in ingest.CITATION.findall(text) if not (root / path).is_file()]
-            problems += [f"{fit.get('idea')}: cites unknown claim {claim}" for claim in set(claim_refs(text)) - claim_ids]
+            problems += [
+                f"{fit.get('idea')}: cites missing {path}"
+                for path in ingest.CITATION.findall(text)
+                if not (root / path).is_file()
+            ]
+            problems += [
+                f"{fit.get('idea')}: cites unknown claim {claim}" for claim in set(claim_refs(text)) - claim_ids
+            ]
             if not fit.get("rationale"):
                 problems.append(f"{fit.get('idea')}: rationale is empty")
         if problems:
             raise ValueError("; ".join(problems[:20]))
         return data
 
-    listing = "\n".join(f"- {idea['id']} ({idea['verdict']}): {idea['name']}: {idea.get('summary', '')}" for idea in ideas)
+    listing = "\n".join(
+        f"- {idea['id']} ({idea['verdict']}): {idea['name']}: {idea.get('summary', '')}" for idea in ideas
+    )
     body = (
         f"# Task\n\nAssess how each surviving idea fits the user's or company's needs and repos.\n\nIdeas:\n{listing}\n\n"
         f"Analysis: research/{topic}/analysis.md. Judgement: research/{topic}/judgement.md.\n\n{context(root, topic)}"
     )
     data = session.call_checked(config["pipeline"]["applier"], body, "apply", json_reply(check))
     previous = rc.load_json(directory / "fit.json")["fits"] if (directory / "fit.json").is_file() else []
-    data["fits"] = [fit for fit in with_history(data["fits"], previous, "idea", "ring", topic_version(directory)) if not fit.get("carried")]
+    data["fits"] = [
+        fit
+        for fit in with_history(data["fits"], previous, "idea", "ring", topic_version(directory))
+        if not fit.get("carried")
+    ]
     rc.write_json(directory / "fit.json", data)
     names = {idea["id"]: idea["name"] for idea in ideas}
-    lines = [f"# Fit: {topic}\n", "| Idea | Ring | Effort | Sources touched | Replaces |", "| --- | --- | --- | --- | --- |"]
+    lines = [
+        f"# Fit: {topic}\n",
+        "| Idea | Ring | Effort | Sources touched | Replaces |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for fit in data["fits"]:
-        lines.append(f"| {fit['idea']}: {cell(names.get(fit['idea'], ''))} | {fit['ring']} | {fit['effort']} | "
-                     f"{', '.join(fit.get('sources', [])) or '-'} | {cell(fit.get('replaces', '-'))} |")
+        lines.append(
+            f"| {fit['idea']}: {cell(names.get(fit['idea'], ''))} | {fit['ring']} | {fit['effort']} | "
+            f"{', '.join(fit.get('sources', [])) or '-'} | {cell(fit.get('replaces', '-'))} |"
+        )
     for fit in data["fits"]:
         lines += ["", f"## {fit['idea']}: {names.get(fit['idea'], '')} ({fit['ring']})", "", fit["rationale"].strip()]
         if fit.get("risks"):
@@ -1364,19 +1784,44 @@ def handoff(root: Path, topic: str, chosen: list[dict[str, Any]], names: dict[st
         nonlocal text
         text = text.replace(f"## {heading}\n", f"## {heading}\n\n{body.strip()}\n", 1)
 
-    fill("Outcome", "\n".join(f"- {fit['idea']}: {names.get(fit['idea'], '')} ({fit['ring']}, effort {fit['effort']}). "
-                              f"{' '.join(str(fit.get('nextStep', '')).split())}" for fit in chosen))
+    fill(
+        "Outcome",
+        "\n".join(
+            f"- {fit['idea']}: {names.get(fit['idea'], '')} ({fit['ring']}, effort {fit['effort']}). "
+            f"{' '.join(str(fit.get('nextStep', '')).split())}"
+            for fit in chosen
+        ),
+    )
     fill("Non-goals", "Ideas the research ranked ASSESS or HOLD, and everything outside the research brief's scope.")
-    fill("Evidence and current behavior", f"From the Research Center: research/{topic}/report.md, fit.md and claims.md "
-         "(every claim there is cited and judged). Copy the relevant facts here while grilling; do not link to a path the CC cannot read.")
+    fill(
+        "Evidence and current behavior",
+        f"From the Research Center: research/{topic}/report.md, fit.md and claims.md "
+        "(every claim there is cited and judged). Copy the relevant facts here while grilling; do not link to a path the CC cannot read.",
+    )
     rows = []
     for fit in chosen:
         for source in fit.get("sources", []):
-            rows.append(f"| {source} ({cell(portable(root, source))}) | to decide | to decide | {cell(names.get(fit['idea'], ''))} |")
-    text = text.replace("| --- | --- | --- | --- |\n\n## Invariants", "| --- | --- | --- | --- |\n" + "\n".join(rows) + "\n\n## Invariants", 1)
-    fill("Invariants and decisions", "\n".join(f"- {fit['idea']}: {' '.join(str(fit['rationale']).split())}" for fit in chosen))
-    question_rows = [f"| Risks of {fit['idea']}: {cell(fit.get('risks', 'not stated'))} | to assess | grill-task-planning |" for fit in chosen]
-    text = text.replace("| --- | --- | --- |\n\n## Work packages", "| --- | --- | --- |\n" + "\n".join(question_rows) + "\n\n## Work packages", 1)
+            rows.append(
+                f"| {source} ({cell(portable(root, source))}) | to decide | to decide | {cell(names.get(fit['idea'], ''))} |"
+            )
+    text = text.replace(
+        "| --- | --- | --- | --- |\n\n## Invariants",
+        "| --- | --- | --- | --- |\n" + "\n".join(rows) + "\n\n## Invariants",
+        1,
+    )
+    fill(
+        "Invariants and decisions",
+        "\n".join(f"- {fit['idea']}: {' '.join(str(fit['rationale']).split())}" for fit in chosen),
+    )
+    question_rows = [
+        f"| Risks of {fit['idea']}: {cell(fit.get('risks', 'not stated'))} | to assess | grill-task-planning |"
+        for fit in chosen
+    ]
+    text = text.replace(
+        "| --- | --- | --- |\n\n## Work packages",
+        "| --- | --- | --- |\n" + "\n".join(question_rows) + "\n\n## Work packages",
+        1,
+    )
     return text
 
 
@@ -1391,13 +1836,26 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
     def check(reply: str) -> str:
         markdown = re.sub(r"\A---\n.*?\n---\n", "", reply.strip(), flags=re.DOTALL).strip()
         cited = set(claim_refs(markdown))
-        problems = [f"cites {claim}, which is not in the ledger" for claim in sorted(cited) if claim not in {c["id"] for c in led["claims"]}]
-        problems += [f"relies on {claim}, judged {verdicts[claim]}: drop it or name it as refuted outside a [C#] citation"
-                     for claim in sorted(cited) if verdicts.get(claim) in ("REFUTED", "UNSUPPORTED")]
-        problems += [f"does not answer {question}" for question in known if not re.search(rf"^## {question}\b", markdown, flags=re.MULTILINE)]
+        problems = [
+            f"cites {claim}, which is not in the ledger"
+            for claim in sorted(cited)
+            if claim not in {c["id"] for c in led["claims"]}
+        ]
+        problems += [
+            f"relies on {claim}, judged {verdicts[claim]}: drop it or name it as refuted outside a [C#] citation"
+            for claim in sorted(cited)
+            if verdicts.get(claim) in ("REFUTED", "UNSUPPORTED")
+        ]
+        problems += [
+            f"does not answer {question}"
+            for question in known
+            if not re.search(rf"^## {question}\b", markdown, flags=re.MULTILINE)
+        ]
         if not cited:
             problems.append("cites no claim: every finding needs a [C#] citation")
-        problems += language_problems(markdown, {item["question"]: item["certainty"] for item in judgement.get("answers", [])})
+        problems += language_problems(
+            markdown, {item["question"]: item["certainty"] for item in judgement.get("answers", [])}
+        )
         problems += plain_problems(markdown)
         if problems:
             raise ValueError("; ".join(problems[:20]))
@@ -1414,51 +1872,116 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
     credibility = {item["claim"]: item.get("credibility", "?") for item in judgement["claims"]}
     appendix = []
     if judgement.get("answers"):
-        appendix += ["", "## Certainty of the answers", "", "How sure each answer is, starting from high and lowered for each "
-                     "named weakness of its evidence:", "", certainty_text(judgement["answers"])]
+        appendix += [
+            "",
+            "## Certainty of the answers",
+            "",
+            "How sure each answer is, starting from high and lowered for each named weakness of its evidence:",
+            "",
+            certainty_text(judgement["answers"]),
+        ]
     structure = rc.load_json(directory / "ideas.json").get("questions", [])
-    statements = {item["id"]: item["statement"] for item in rc.load_json(directory / "source-plan.json").get("hypotheses", [])}
+    statements = {
+        item["id"]: item["statement"] for item in rc.load_json(directory / "source-plan.json").get("hypotheses", [])
+    }
     for entry in structure:
         if not entry.get("ach"):
             continue
         ranking, diagnostic = ach_ranking(entry["ach"], verdicts)
-        appendix += ["", f"## Competing hypotheses for {entry['question']}", "",
-                     "Ranked by how much surviving evidence is inconsistent with each, fewest first (Analysis of Competing Hypotheses):", ""]
-        appendix += [f"{rank}. {hypothesis}: {statements.get(hypothesis, '')} ({count} inconsistent)" for rank, (hypothesis, count) in enumerate(ranking, 1)]
-        appendix += ["", f"Diagnostic claims, the ones that tell the hypotheses apart: {', '.join(diagnostic) or 'none'}."]
-        appendix += [f"Untested alternative (no search looked for evidence against it): {item}" for item in entry["ach"].get("untested", [])]
+        appendix += [
+            "",
+            f"## Competing hypotheses for {entry['question']}",
+            "",
+            "Ranked by how much surviving evidence is inconsistent with each, fewest first (Analysis of Competing Hypotheses):",
+            "",
+        ]
+        appendix += [
+            f"{rank}. {hypothesis}: {statements.get(hypothesis, '')} ({count} inconsistent)"
+            for rank, (hypothesis, count) in enumerate(ranking, 1)
+        ]
+        appendix += [
+            "",
+            f"Diagnostic claims, the ones that tell the hypotheses apart: {', '.join(diagnostic) or 'none'}.",
+        ]
+        appendix += [
+            f"Untested alternative (no search looked for evidence against it): {item}"
+            for item in entry["ach"].get("untested", [])
+        ]
     settled = {item["assumption"]: item for item in judgement.get("assumptions", [])}
     assumed = [item for entry in structure for item in entry.get("assumptions", [])]
     if assumed:
-        appendix += ["", "## Key assumptions", "", "| Assumption | Question | Verdict | Reason |", "| --- | --- | --- | --- |"]
-        appendix += [f"| {item['id']}: {cell(item['text'])} | {entry['question']} | {settled.get(item['id'], {}).get('verdict', 'not judged')} | "
-                     f"{cell(settled.get(item['id'], {}).get('reason', ''))} |" for entry in structure for item in entry.get("assumptions", [])]
-    appendix += ["", "## Evidence", "", "Reliability of the source: A completely reliable to E unreliable, F cannot be judged. "
-                 "Credibility of the claim: 1 confirmed to 5 improbable, 6 cannot be judged.", "",
-                 "| Claim | Verdict | Credibility | Reliability | Quote verified | Source |", "| --- | --- | --- | --- | --- | --- |"]
+        appendix += [
+            "",
+            "## Key assumptions",
+            "",
+            "| Assumption | Question | Verdict | Reason |",
+            "| --- | --- | --- | --- |",
+        ]
+        appendix += [
+            f"| {item['id']}: {cell(item['text'])} | {entry['question']} | {settled.get(item['id'], {}).get('verdict', 'not judged')} | "
+            f"{cell(settled.get(item['id'], {}).get('reason', ''))} |"
+            for entry in structure
+            for item in entry.get("assumptions", [])
+        ]
+    appendix += [
+        "",
+        "## Evidence",
+        "",
+        "Reliability of the source: A completely reliable to E unreliable, F cannot be judged. "
+        "Credibility of the claim: 1 confirmed to 5 improbable, 6 cannot be judged.",
+        "",
+        "| Claim | Verdict | Credibility | Reliability | Quote verified | Source |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
     for claim_id in used:
         claim, source = claims[claim_id], sources[claims[claim_id]["source"]]
         verified = "drifted" if claim.get("drifted") else "yes" if claim["quoteVerified"] else "no"
-        appendix.append(f"| {claim_id} | {verdicts.get(claim_id, 'not judged')} | {credibility.get(claim_id, '?')} | {source.get('reliability', '?')} | "
-                        f"{verified} | [{cell(source.get('title') or source['url'])}]({source['url']}){' — ' + source['stored'] if source.get('stored') else ''} |")
+        appendix.append(
+            f"| {claim_id} | {verdicts.get(claim_id, 'not judged')} | {credibility.get(claim_id, '?')} | {source.get('reliability', '?')} | "
+            f"{verified} | [{cell(source.get('title') or source['url'])}]({source['url']}){' — ' + source['stored'] if source.get('stored') else ''} |"
+        )
     if (directory / "screening.json").is_file():
         screening = rc.load_json(directory / "screening.json")
         web = [source for source in led["sources"] if not source.get("record")]
-        appendix += ["", "## How the sources were found", "", flow_text(screening["flow"], screening["criteria"]),
-                     f"- Found by the researchers' web search: {len(web)} pages, {sum(source.get('stored') is not None for source in web)} stored",
-                     "", f"Every search with its exact query: research/{topic}/searches.json. Every screening decision with its reason: "
-                     f"research/{topic}/screening.md."]
+        appendix += [
+            "",
+            "## How the sources were found",
+            "",
+            flow_text(screening["flow"], screening["criteria"]),
+            f"- Found by the researchers' web search: {len(web)} pages, {sum(source.get('stored') is not None for source in web)} stored",
+            "",
+            f"Every search with its exact query: research/{topic}/searches.json. Every screening decision with its reason: "
+            f"research/{topic}/screening.md.",
+        ]
     dropped = [item for item in judgement["claims"] if item["verdict"] in ("REFUTED", "UNSUPPORTED")]
     if dropped:
         appendix += ["", "## Refuted or unsupported", ""]
-        appendix += [f"- {item['claim']} ({item['verdict']}): {claims[item['claim']]['text']} — {' '.join(str(item.get('reason', '')).split())}"
-                     for item in dropped if item["claim"] in claims]
+        appendix += [
+            f"- {item['claim']} ({item['verdict']}): {claims[item['claim']]['text']} — {' '.join(str(item.get('reason', '')).split())}"
+            for item in dropped
+            if item["claim"] in claims
+        ]
     if judgement.get("contested"):
-        appendix += ["", "## Contested", "", "A reviewer refuted these claims and the judge kept them; settle them before acting:", ""]
-        appendix += [f"- {item['claim']}: {claims[item['claim']]['text']}" for item in judgement["contested"] if item["claim"] in claims]
+        appendix += [
+            "",
+            "## Contested",
+            "",
+            "A reviewer refuted these claims and the judge kept them; settle them before acting:",
+            "",
+        ]
+        appendix += [
+            f"- {item['claim']}: {claims[item['claim']]['text']}"
+            for item in judgement["contested"]
+            if item["claim"] in claims
+        ]
     if (directory / "handoff.md").is_file():
-        appendix += ["", "## Handoff", "", f"research/{topic}/handoff.md is a Control Center task plan for the ideas ranked ADOPT or TRIAL: "
-                     "copy it into the CC's plans/active and refine it with grill-task-planning."]
+        appendix += [
+            "",
+            "## Handoff",
+            "",
+            f"research/{topic}/handoff.md is a Control Center task plan for the ideas ranked ADOPT or TRIAL: "
+            "copy it into the CC's plans/active and refine it with grill-task-planning.",
+        ]
     header = f"Topic: {topic} · Date: {rc.today()} · Claims: {len(led['claims'])} · Sources: {len(led['sources'])}\n\n"
     title = (directory / "brief.md").read_text(encoding="utf-8").splitlines()[0]
     body_text = re.sub(r"\A# .*\n+", "", markdown)
@@ -1466,8 +1989,15 @@ def stage_report(session: rc.Session, root: Path, topic: str) -> None:
 
 
 RUNNERS = {
-    "plan": stage_plan, "search": stage_search, "screen": stage_screen, "collect": stage_collect, "analyze": stage_analyze, "critique": stage_critique,
-    "judge": stage_judge, "apply": stage_apply, "report": stage_report,
+    "plan": stage_plan,
+    "search": stage_search,
+    "screen": stage_screen,
+    "collect": stage_collect,
+    "analyze": stage_analyze,
+    "critique": stage_critique,
+    "judge": stage_judge,
+    "apply": stage_apply,
+    "report": stage_report,
 }
 
 
@@ -1480,7 +2010,7 @@ def clear_from(root: Path, topic: str, stage: str, keep_replies: bool = False) -
     """Remove the outputs of stage and every later one, and their kept replies. keep_replies spares the replies
     of stage itself: a stage that stopped half way resumes from the calls it already paid for."""
     directory = topic_dir(root, topic)
-    for later in STAGES[STAGES.index(stage):]:
+    for later in STAGES[STAGES.index(stage) :]:
         for name in OUTPUTS[later]:
             path = directory / name
             if path.is_dir():
@@ -1499,7 +2029,9 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
     if brief_status(text) == "retired":
         raise rc.RcError(f"research/{topic} is retired; its report stays as it is")
     if brief_status(text) not in ("accepted", "living", "paused"):
-        raise rc.RcError(f"research/{topic}/brief.md is {brief_status(text)}; grill it, then ./rc research accept {topic}")
+        raise rc.RcError(
+            f"research/{topic}/brief.md is {brief_status(text)}; grill it, then ./rc research accept {topic}"
+        )
     ingest.guard(root)
     plan_path = directory / "source-plan.json"
     if not start and plan_path.is_file() and rc.load_json(plan_path).get("briefHash") not in (None, brief_hash(text)):
@@ -1516,6 +2048,7 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
     first = STAGES.index(todo[0])
     clear_from(root, topic, STAGES[first], keep_replies=True)
     import living  # living.py builds on this module, so it is imported where it is used
+
     living.begin_run(root, topic)
     with rc.Session(root, f"research-{topic}", budget or config["budget"]["researchCalls"]) as session:
         for stage in STAGES[first:]:
@@ -1526,8 +2059,13 @@ def run_research(root: Path, topic: str, start: str | None, budget: int | None) 
             shutil.rmtree(session.replies, ignore_errors=True)
         watch = living.after_run(root, topic)
         if watch:
-            session.say(f"living topic, version {watch['version']}: refreshed every {watch['cadenceDays']} days with ./rc research refresh {topic}")
-        session.say(f"report ready: research/{topic}/report.md ({session.calls} agent calls); review, then commit research/ and sources/", "gate")
+            session.say(
+                f"living topic, version {watch['version']}: refreshed every {watch['cadenceDays']} days with ./rc research refresh {topic}"
+            )
+        session.say(
+            f"report ready: research/{topic}/report.md ({session.calls} agent calls); review, then commit research/ and sources/",
+            "gate",
+        )
     return 0
 
 
@@ -1558,6 +2096,7 @@ def main() -> int:
     root = args.root.resolve()
     try:
         import living  # living.py builds on this module, so it is imported where it is used
+
         if args.command == "refresh":
             if args.due:
                 return living.refresh_due(root, args.budget)

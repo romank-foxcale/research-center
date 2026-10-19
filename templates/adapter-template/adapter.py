@@ -17,10 +17,20 @@ API = "https://api.example.org/search"
 
 def to_record(item: dict[str, Any]) -> dict[str, Any]:
     """One result of the API as a record; kit.each skips results this cannot convert."""
-    return kit.record(NAME, item["title"], item["url"], "__EVIDENCE__", doi=item.get("doi"), authors=item.get("authors", []),
-                      date=kit.iso_date(item.get("date")), abstract=item.get("summary", ""))
+    return kit.record(
+        NAME,
+        item["title"],
+        item["url"],
+        "__EVIDENCE__",
+        doi=item.get("doi"),
+        authors=item.get("authors", []),
+        date=kit.iso_date(item.get("date")),
+        abstract=item.get("summary", ""),
+    )
 
 
-def search(query: str, filters: dict[str, str], since: str | None, limit: int, options: dict[str, Any]) -> list[dict[str, Any]]:
+def search(
+    query: str, filters: dict[str, str], since: str | None, limit: int, options: dict[str, Any]
+) -> list[dict[str, Any]]:
     data = kit.fetch_json(API, {"q": query, "limit": limit, "from": since}, options["interval"])
     return kit.after(kit.each(data.get("results", []), to_record), since)

@@ -29,9 +29,23 @@ PAPERS = iter(range(1, 1000))  # every arXiv answer is a paper never seen before
 
 
 def repo(name: str, licence: str | None, stars: int) -> dict:
-    return kit.record("github", name, f"https://github.com/{name}", "documentation", authors=[name.split("/")[0]], date="2026-10-10",
-                      abstract=f"{name} does things", extra={"stars": stars, "language": "Python", "topics": [], "created": "2026-10-01",
-                                                             "archived": False, "license": licence})
+    return kit.record(
+        "github",
+        name,
+        f"https://github.com/{name}",
+        "documentation",
+        authors=[name.split("/")[0]],
+        date="2026-10-10",
+        abstract=f"{name} does things",
+        extra={
+            "stars": stars,
+            "language": "Python",
+            "topics": [],
+            "created": "2026-10-01",
+            "archived": False,
+            "license": licence,
+        },
+    )
 
 
 def fake_search(root, adapter, query, filters, since, limit, log):
@@ -44,7 +58,15 @@ def fake_search(root, adapter, query, filters, since, limit, log):
     if adapter == "github":
         return [repo("big/reranker", None, 5000)]
     if adapter == "feed":
-        return [kit.record("feed", f"A paper on {query[-40:]}", f"https://arxiv.org/abs/2610.{next(PAPERS):05d}", "preprint", date="2026-10-12")]
+        return [
+            kit.record(
+                "feed",
+                f"A paper on {query[-40:]}",
+                f"https://arxiv.org/abs/2610.{next(PAPERS):05d}",
+                "preprint",
+                date="2026-10-12",
+            )
+        ]
     return []
 
 
@@ -53,11 +75,15 @@ def quiet(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
-def main() -> int:
+def test_scout() -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    CALLS.clear()
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
-        shutil.copyfile(SCRIPTS.parent / "templates" / "packs" / "software" / "adapters" / "github.json",
-                        root / "catalog" / "adapters" / "github.json")
+        shutil.copyfile(
+            SCRIPTS.parent / "templates" / "packs" / "software" / "adapters" / "github.json",
+            root / "catalog" / "adapters" / "github.json",
+        )
         quiet(profiles.command_new, root, "alpha", "Alpha Corp", "company", "A forensic investigation firm")
         alpha = root / "profiles" / "alpha"
         try:
@@ -74,23 +100,45 @@ def main() -> int:
         new, active, arxiv, works = CALLS[:4]
         assert new == ("github", "Japanese OCR", {"created": "2026-09-18", "sort": "stars"}, None), new
         assert active == ("github", "Japanese OCR", {"minStars": "50", "sort": "stars"}, "2026-09-18"), active
-        assert arxiv[0] == "feed" and "export.arxiv.org/api/query" in arxiv[1] and "Japanese+OCR" in arxiv[1] and "submittedDate" in arxiv[1]
+        assert (
+            arxiv[0] == "feed"
+            and "export.arxiv.org/api/query" in arxiv[1]
+            and "Japanese+OCR" in arxiv[1]
+            and "submittedDate" in arxiv[1]
+        )
         assert works == ("openalex", '"Japanese OCR"', {}, "2026-09-18"), "a tag is searched as a phrase"
-        assert summary["failures"] == ["openalex for 'Japanese OCR': openalex: HTTP 429", "openalex for 'cross-encoder reranking': openalex: HTTP 429"]
+        assert summary["failures"] == [
+            "openalex for 'Japanese OCR': openalex: HTTP 429",
+            "openalex for 'cross-encoder reranking': openalex: HTTP 429",
+        ]
 
-        found = json.loads((alpha / "scout" / "candidates" / f"{summary['stamp']}.json").read_text(encoding="utf-8"))["candidates"]
+        found = json.loads((alpha / "scout" / "candidates" / f"{summary['stamp']}.json").read_text(encoding="utf-8"))[
+            "candidates"
+        ]
         by_title = {item["title"]: item for item in found}
         shared = by_title["acme/ocr-kit"]
-        assert shared["tags"] == ["Japanese OCR", "cross-encoder reranking"] and shared["sources"] == ["github-new"], shared
-        assert [item["title"] for item in found[:2]] == ["big/reranker", "acme/ocr-kit"], "most tags first, then most stars"
+        assert shared["tags"] == ["Japanese OCR", "cross-encoder reranking"] and shared["sources"] == ["github-new"], (
+            shared
+        )
+        assert [item["title"] for item in found[:2]] == ["big/reranker", "acme/ocr-kit"], (
+            "most tags first, then most stars"
+        )
         assert shared["licence"] == {"spdx": "MIT", "class": "permissive", "usable": True, "reason": ""}
-        assert not by_title["acme/gpl-tool"]["licence"]["usable"] and by_title["acme/gpl-tool"]["licence"]["class"] == "copyleft"
-        assert by_title["big/reranker"]["licence"]["class"] == "unknown" and by_title["big/reranker"]["kind"] == "repository"
+        assert (
+            not by_title["acme/gpl-tool"]["licence"]["usable"]
+            and by_title["acme/gpl-tool"]["licence"]["class"] == "copyleft"
+        )
+        assert (
+            by_title["big/reranker"]["licence"]["class"] == "unknown"
+            and by_title["big/reranker"]["kind"] == "repository"
+        )
         assert sum(item["kind"] == "paper" for item in found) == 2 and summary["new"] == len(found) == 5
 
         # The seen-list: a second run surfaces nothing it already saw, and starts from the last discovery.
         seen = json.loads((alpha / "scout" / "seen.json").read_text(encoding="utf-8"))
-        assert set(seen) == {item["key"] for item in found} and all(entry["status"] == "candidate" for entry in seen.values())
+        assert set(seen) == {item["key"] for item in found} and all(
+            entry["status"] == "candidate" for entry in seen.values()
+        )
         CALLS.clear()
         again = quiet(scout.discover, alpha, search=fake_search)
         assert again["since"] == scout.datetime.date.today().isoformat(), again
@@ -104,9 +152,3 @@ def main() -> int:
         assert {call[0] for call in CALLS} == {"feed", "openalex"} and only["tags"] == ["Japanese OCR"], CALLS
         assert set(only["sourcesSkipped"]) == {"github-new", "github-active"} and len(only["failures"]) == 1
         assert profiles.meta_problems(tags.load(alpha), "alpha") == []
-    print("scout test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

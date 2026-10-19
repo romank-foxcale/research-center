@@ -15,7 +15,7 @@ sys.path.insert(0, str(HERE))
 import providers  # noqa: E402
 
 # The fake answers `auth status` / `login status`, and in --print / exec mode streams events like the real CLI.
-FAKE = '''import json, os, sys
+FAKE = """import json, os, sys
 name, args = sys.argv[1], sys.argv[2:]
 logged_in = os.environ.get("FAKE_LOGIN") == "1"
 if args[:2] == ["auth", "status"]:
@@ -40,7 +40,7 @@ else:
     emit({"type": "item.completed", "item": {"type": "agent_message", "text": "reading"}})
     Path(args[args.index("--output-last-message") + 1]).write_text("codex answer", encoding="utf-8")
     emit({"type": "turn.completed"})
-'''
+"""
 
 
 def install_fake(bin_dir: Path, name: str) -> None:
@@ -66,7 +66,7 @@ def refused(role: dict) -> bool:
 def after(argv: list[str], flag: str) -> list[str]:
     """The values of a variadic flag: everything up to the next flag."""
     values = []
-    for item in argv[argv.index(flag) + 1:]:
+    for item in argv[argv.index(flag) + 1 :]:
         if item.startswith("--"):
             break
         values.append(item)
@@ -85,7 +85,9 @@ def check_access_flags() -> None:
     assert "WebSearch" in after(argv, "--tools") and "WebFetch" in after(argv, "--allowedTools")
     assert not {"Write", "Edit", "Bash"} & set(after(argv, "--tools")), argv
 
-    argv = providers.command({**claude, "access": "connector-read", "connectors": ["notion"]}, Path("."), Path("last.txt"))
+    argv = providers.command(
+        {**claude, "access": "connector-read", "connectors": ["notion"]}, Path("."), Path("last.txt")
+    )
     allowed = after(argv, "--allowedTools")
     assert "--tools" not in argv and "--strict-mcp-config" not in argv, "connectors surface through ToolSearch"
     assert "mcp__claude_ai_Notion__notion-fetch" in allowed and not any("Drive" in tool for tool in allowed), allowed
@@ -103,7 +105,7 @@ def check_access_flags() -> None:
     assert refused({"id": "j", "provider": "cursor", "model": "grok", "access": "read-only"}), "cursor support is gone"
 
 
-def main() -> int:
+def test_providers(monkeypatch) -> None:
     check_access_flags()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)
@@ -112,8 +114,9 @@ def main() -> int:
         for name in ("claude", "codex"):
             install_fake(bin_dir, name)
         seen = base / "seen.json"
-        os.environ.update({"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "FAKE_SEEN": str(seen)})
-        os.environ.pop("FAKE_LOGIN", None)
+        monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setenv("FAKE_SEEN", str(seen))
+        monkeypatch.delenv("FAKE_LOGIN", raising=False)
 
         resolved = Path(providers.executable("codex"))
         assert resolved.parent == bin_dir, f"codex resolves to the launcher on PATH, .cmd on Windows: {resolved}"
@@ -123,7 +126,7 @@ def main() -> int:
         assert providers.login_status("codex") == (False, "not logged in; run: codex login")
         assert providers.models("claude") == [], "no models while logged out"
         assert providers.login_status("cursor") == (False, "unknown provider cursor")
-        os.environ["FAKE_LOGIN"] = "1"
+        monkeypatch.setenv("FAKE_LOGIN", "1")
         assert providers.login_status("claude") == (True, "logged in (claude.ai)")
         assert providers.login_status("codex")[0]
 
@@ -131,27 +134,26 @@ def main() -> int:
         work.mkdir()
         said: list[str] = []
         role = {"id": "analyst", "provider": "claude", "model": "opus", "access": "read-only"}
-        reply = providers.run(role, "プロンプト: 調べて", work, base / "logs" / "analyst.log", timeout=60, on_say=said.append)
+        reply = providers.run(
+            role, "プロンプト: 調べて", work, base / "logs" / "analyst.log", timeout=60, on_say=said.append
+        )
         assert reply == "答え: 週4日勤務 DONE", f"UTF-8 survives the console code page: {reply!r}"
         assert said == ["調査を始めます"], said
         log = (base / "logs" / "analyst.log").read_text(encoding="utf-8")
         assert "tool: Read brief.md" in log and "say: 調査を始めます" in log, log
         import json
-        assert json.loads(seen.read_text(encoding="utf-8"))["prompt"] == "プロンプト: 調べて", "the prompt reaches stdin as UTF-8"
+
+        assert json.loads(seen.read_text(encoding="utf-8"))["prompt"] == "プロンプト: 調べて", (
+            "the prompt reaches stdin as UTF-8"
+        )
 
         codex = {"id": "researcher", "provider": "codex", "model": "gpt", "access": "web-read"}
         assert providers.run(codex, "go", work, base / "logs" / "codex.log", timeout=60) == "codex answer"
 
-        os.environ["FAKE_FAIL"] = "1"
+        monkeypatch.setenv("FAKE_FAIL", "1")
         try:
             providers.run(role, "go", work, base / "logs" / "fail.log", timeout=60)
             raise AssertionError("a failing CLI must raise")
         except providers.ProviderError as error:
             assert "failed; see" in str(error)
-        os.environ.pop("FAKE_FAIL")
-    print("providers test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        monkeypatch.delenv("FAKE_FAIL")

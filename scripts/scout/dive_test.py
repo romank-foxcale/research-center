@@ -39,7 +39,7 @@ def raises(function, *args) -> str:
     raise AssertionError(f"{function.__name__} did not raise")
 
 
-def main() -> int:
+def test_dive(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         quiet(profiles.command_new, root, "alpha", "Alpha Corp", "company", "A forensic investigation firm")
@@ -57,12 +57,16 @@ def main() -> int:
         # rc scout --due goes through every profile and the trend feed, and runs none that is not due.
         quiet(scout.command_init_trends, root / "trends")
         (root / "trends" / "scout").mkdir()
-        (root / "trends" / "scout" / "state.json").write_text(json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8")
-        (alpha / "scout" / "state.json").write_text(json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8")
+        (root / "trends" / "scout" / "state.json").write_text(
+            json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8"
+        )
+        (alpha / "scout" / "state.json").write_text(
+            json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8"
+        )
         spec = importlib.util.spec_from_file_location("rc_cli", SCRIPTS.parent / "rc.py")
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
-        cli.ROOT = root
+        monkeypatch.setattr(cli, "ROOT", root)
         assert quiet(cli.main, ["scout", "--due"]) == 0
 
         # A deep dive: a draft brief from the card, which passes the brief check, and the card remembers it.
@@ -74,9 +78,16 @@ def main() -> int:
         text = brief.read_text(encoding="utf-8")
         assert research.brief_problems(text) == [], research.brief_problems(text)
         assert "# Should acme/ocr-kit change DI OCR?" in text and "Status: draft" in text
-        assert "- Q1: Does acme/ocr-kit do better than what DI OCR does today, measured as character error rate, on data like ours?" in text
+        assert (
+            "- Q1: Does acme/ocr-kit do better than what DI OCR does today, measured as character error rate, on data like ours?"
+            in text
+        )
         assert "Today: Tesseract. Alternatives: PaddleOCR" in text
-        assert "pass bar below 3%" in text and "Cadence: none" in text and "Its licence (MIT, permissive) is usable" in text
+        assert (
+            "pass bar below 3%" in text
+            and "Cadence: none" in text
+            and "Its licence (MIT, permissive) is usable" in text
+        )
         dived = json.loads((alpha / "scout" / "cards" / "acme-ocr.json").read_text(encoding="utf-8"))
         assert dived["status"] == "deep dive" and dived["research"] == "ocr-kit"
         assert "already exists" in raises(scout.command_dive, alpha, "acme-ocr")
@@ -84,9 +95,3 @@ def main() -> int:
         (root / "trends" / "scout" / "cards").mkdir(parents=True)
         (root / "trends" / "scout" / "cards" / "t.json").write_text(json.dumps(card), encoding="utf-8")
         assert "from the profile it affects" in raises(scout.command_dive, root / "trends", "t")
-    print("dive test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

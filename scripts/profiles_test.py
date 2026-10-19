@@ -11,7 +11,6 @@ import argparse
 import importlib.util
 import io
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -25,9 +24,10 @@ sys.path[:0] = [str(HERE), str(HERE / "runner"), str(HERE / "ingest"), str(HERE 
 import ingest  # noqa: E402
 import licences  # noqa: E402
 import profiles  # noqa: E402
-import rc  # noqa: E402
 import research  # noqa: E402
 import sources  # noqa: E402
+
+import rc  # noqa: E402
 
 SCOPE = """# Alpha Corp technology scouting
 
@@ -97,25 +97,35 @@ def instance(base: Path) -> Path:
     return root
 
 
-def main() -> int:
+def test_profiles(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as bare:
         root = instance(Path(directory))
         # A folder with no research-center.json stands for the template, wherever this test runs.
-        assert "template" in raises(ValueError, profiles.command_new, Path(bare), "alpha", "Alpha", "company"), \
+        assert "template" in raises(ValueError, profiles.command_new, Path(bare), "alpha", "Alpha", "company"), (
             "profiles live in instances"
+        )
         quiet(profiles.command_new, root, "alpha", "Alpha Corp", "company", "A forensic investigation firm")
         quiet(profiles.command_new, root, "beta", "Personal learning", "personal")
         assert "already exists" in raises(ValueError, profiles.command_new, root, "alpha", "again", "company")
         assert "hyphen-case" in raises(ValueError, profiles.command_new, root, "Bad Name", "x", "company")
         assert "type must be" in raises(ValueError, profiles.command_new, root, "gamma", "x", "startup")
         alpha, beta = root / "profiles" / "alpha", root / "profiles" / "beta"
-        assert profiles.ids(root) == ["alpha", "beta"] and (alpha / "catalog" / "sources").is_dir() and (alpha / "inbox").is_dir()
+        assert (
+            profiles.ids(root) == ["alpha", "beta"]
+            and (alpha / "catalog" / "sources").is_dir()
+            and (alpha / "inbox").is_dir()
+        )
         meta = profiles.load(root, "alpha")
-        assert meta["type"] == "company" and meta["tags"] == [] and meta["description"] == "A forensic investigation firm"
+        assert (
+            meta["type"] == "company" and meta["tags"] == [] and meta["description"] == "A forensic investigation firm"
+        )
 
         # Editing changes only what is given.
         quiet(profiles.command_edit, root, "alpha", "Alpha Corp Japan", None, None)
-        assert profiles.load(root, "alpha")["name"] == "Alpha Corp Japan" and profiles.load(root, "alpha")["type"] == "company"
+        assert (
+            profiles.load(root, "alpha")["name"] == "Alpha Corp Japan"
+            and profiles.load(root, "alpha")["type"] == "company"
+        )
         assert "type must be" in raises(ValueError, profiles.command_edit, root, "alpha", None, "startup", None)
 
         # scope.md is optional; once started, it is accepted only when every section is filled.
@@ -128,11 +138,19 @@ def main() -> int:
         assert "Status: accepted" in (alpha / "scope.md").read_text(encoding="utf-8")
 
         # The type sets the licence verdict: a company may use only permissive licences, a person any.
-        assert licences.verdict(alpha, "MIT", "company") == {"spdx": "MIT", "class": "permissive", "usable": True, "reason": ""}
+        assert licences.verdict(alpha, "MIT", "company") == {
+            "spdx": "MIT",
+            "class": "permissive",
+            "usable": True,
+            "reason": "",
+        }
         gpl = licences.verdict(alpha, "GPL-3.0-or-later", "company")
         assert gpl["class"] == "copyleft" and not gpl["usable"] and "same licence" in gpl["reason"], gpl
         assert licences.verdict(alpha, "gpl-3.0", "personal")["usable"], "a personal profile may use any licence"
-        assert licences.classify(alpha, "CC-BY-NC-4.0") == "non-commercial" and licences.classify(alpha, "BUSL-1.1") == "source-available"
+        assert (
+            licences.classify(alpha, "CC-BY-NC-4.0") == "non-commercial"
+            and licences.classify(alpha, "BUSL-1.1") == "source-available"
+        )
         unknown = licences.verdict(alpha, "NOASSERTION", "company")
         assert unknown["class"] == "unknown" and not unknown["usable"] and unknown["reason"], unknown
         assert licences.verdict(alpha, None, "company")["class"] == "unknown"
@@ -150,8 +168,20 @@ def main() -> int:
             notes = Path(directory) / name
             notes.mkdir()
             (notes / "readme.md").write_text(f"# {name}\n", encoding="utf-8")
-            quiet(ingest.command_add, space, argparse.Namespace(kind="folder", locators=[str(notes)], id=name, include=[],
-                                                                 exclude=[], note=f"{name} files", depth=1, max_documents=20))
+            quiet(
+                ingest.command_add,
+                space,
+                argparse.Namespace(
+                    kind="folder",
+                    locators=[str(notes)],
+                    id=name,
+                    include=[],
+                    exclude=[],
+                    note=f"{name} files",
+                    depth=1,
+                    max_documents=20,
+                ),
+            )
         assert [item["id"] for item in ingest.sources(alpha)] == ["alpha-docs"]
         assert [item["id"] for item in ingest.sources(beta)] == ["beta-notes"]
         assert not (root / "catalog" / "sources").exists(), "nothing lands in the instance root"
@@ -164,25 +194,30 @@ def main() -> int:
 
         # Research needs a description or tags, so its results can be judged against whom they serve.
         quiet(research.command_new, beta, argparse.Namespace(topic="habits", title="Habits"))
-        assert "no description and no interest tags" in raises(rc.RcError, research.run_research, beta, "habits", None, None)
+        assert "no description and no interest tags" in raises(
+            rc.RcError, research.run_research, beta, "habits", None, None
+        )
 
         # rc chooses the profile: -p (or the old -u), RC_PROFILE, defaultProfile, the only one; several without a choice
         # is an error.
         cli = load_module("rc_cli", REPO / "rc.py")
-        cli.ROOT = root
+        monkeypatch.setattr(cli, "ROOT", root)
         for name in ("RC_PROFILE", "RC_USE_CASE"):
-            os.environ.pop(name, None)
+            monkeypatch.delenv(name, raising=False)
         assert cli.data_root("beta") == beta
         assert "several profiles" in raises(SystemExit, cli.data_root, None)
-        os.environ["RC_PROFILE"] = "alpha"
+        monkeypatch.setenv("RC_PROFILE", "alpha")
         assert cli.data_root(None) == alpha
-        os.environ.pop("RC_PROFILE")
+        monkeypatch.delenv("RC_PROFILE")
         settings = json.loads((root / "research-center.json").read_text(encoding="utf-8"))
         (root / "research-center.json").write_text(json.dumps({**settings, "defaultProfile": "beta"}), encoding="utf-8")
         assert cli.data_root(None) == beta
         assert "no profile gamma" in raises(SystemExit, cli.data_root, "gamma")
         assert quiet(cli.main, ["research", "refresh", "--due"]) == 0, "refresh --due covers every profile"
-        assert quiet(cli.main, ["-u", "alpha", "research", "list"]) == 0 and quiet(cli.main, ["-p", "alpha", "research", "list"]) == 0
+        assert (
+            quiet(cli.main, ["-u", "alpha", "research", "list"]) == 0
+            and quiet(cli.main, ["-p", "alpha", "research", "list"]) == 0
+        )
         (root / "usecases").mkdir()
         assert "rc upgrade" in raises(SystemExit, cli.data_root, "alpha"), "a leftover usecases/ folder is refused"
 
@@ -193,16 +228,16 @@ def main() -> int:
         assert validator.validate(root) == [], validator.validate(root)
         meta = json.loads((beta / "profile.json").read_text(encoding="utf-8"))
         (beta / "profile.json").write_text(json.dumps({**meta, "id": "other", "type": "startup"}), encoding="utf-8")
-        (alpha / "scope.md").write_text(SCOPE.replace("Status: draft", "Status: accepted").replace("Kernel drivers.", "<later>"),
-                                        encoding="utf-8")
+        (alpha / "scope.md").write_text(
+            SCOPE.replace("Status: draft", "Status: accepted").replace("Kernel drivers.", "<later>"), encoding="utf-8"
+        )
         errors = " ".join(validator.validate(root))
-        assert "profiles/beta/profile.json: id must equal" in errors and "profiles/beta/profile.json: type must be" in errors, errors
+        assert (
+            "profiles/beta/profile.json: id must equal" in errors
+            and "profiles/beta/profile.json: type must be" in errors
+        ), errors
         assert "profiles/alpha/scope.md: section '## Out of scope'" in errors, errors
         hooks = load_module("hooks", HERE / "rule_hooks.py")
-        assert hooks.markdown_allowed("profiles/alpha/scope.md") and hooks.markdown_allowed("profiles/alpha/research/ocr/brief.md")
-    print("profiles test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        assert hooks.markdown_allowed("profiles/alpha/scope.md") and hooks.markdown_allowed(
+            "profiles/alpha/research/ocr/brief.md"
+        )

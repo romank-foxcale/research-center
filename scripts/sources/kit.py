@@ -22,7 +22,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ElementTree
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 USER_AGENT = "research-center/1 (+https://github.com/romank-foxcale/research-center)"
 TIMEOUT = 30
@@ -31,9 +32,25 @@ RETRIES = 2
 
 # What kind of evidence a record is. Domain-agnostic; how much each kind can be trusted is graded later.
 EVIDENCE_TYPES = (
-    "dataset", "review", "peer-reviewed", "preprint", "thesis", "report", "official-statistics", "regulation",
-    "court-ruling", "standard", "company-filing", "documentation", "book", "journalism", "vendor", "commentary",
-    "forum", "reference", "unknown",
+    "dataset",
+    "review",
+    "peer-reviewed",
+    "preprint",
+    "thesis",
+    "report",
+    "official-statistics",
+    "regulation",
+    "court-ruling",
+    "standard",
+    "company-filing",
+    "documentation",
+    "book",
+    "journalism",
+    "vendor",
+    "commentary",
+    "forum",
+    "reference",
+    "unknown",
 )
 FAMILIES = ("scholarly", "web", "news", "feed", "reference", "books", "code", "data", "legal", "regulatory", "patents")
 DIRECTIONS = ("backward", "forward")
@@ -57,8 +74,13 @@ def canonical_url(url: str) -> str:
     host = (parts.hostname or "").lower().removeprefix("www.")
     if parts.port and parts.port not in (80, 443):
         host = f"{host}:{parts.port}"
-    query = urllib.parse.urlencode([(key, value) for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-                                    if not TRACKING.match(key)])
+    query = urllib.parse.urlencode(
+        [
+            (key, value)
+            for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+            if not TRACKING.match(key)
+        ]
+    )
     path = parts.path.rstrip("/")
     return urllib.parse.urlunsplit(("https", host, path, query, ""))
 
@@ -75,8 +97,18 @@ def record_key(doi: str | None, url: str) -> str:
     return f"doi:{doi}" if doi else f"url:{canonical_url(url)}"
 
 
-def record(adapter: str, title: str, url: str, evidence_type: str, *, doi: str | None = None,
-           authors: list[str] | None = None, date: str = "", abstract: str = "", extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def record(
+    adapter: str,
+    title: str,
+    url: str,
+    evidence_type: str,
+    *,
+    doi: str | None = None,
+    authors: list[str] | None = None,
+    date: str = "",
+    abstract: str = "",
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """One search result in the shape every adapter returns."""
     title = " ".join(str(title or "").split())
     if not title:
@@ -87,10 +119,16 @@ def record(adapter: str, title: str, url: str, evidence_type: str, *, doi: str |
         raise AdapterError(f"{adapter}: unknown evidence type {evidence_type!r}")
     doi = bare_doi(doi)
     return {
-        "adapter": adapter, "key": record_key(doi, url), "title": title,
+        "adapter": adapter,
+        "key": record_key(doi, url),
+        "title": title,
         "authors": [" ".join(name.split()) for name in authors or [] if name and name.strip()],
-        "date": date, "url": url, "doi": doi, "evidenceType": evidence_type,
-        "abstract": " ".join(abstract.split()), "extra": extra or {},
+        "date": date,
+        "url": url,
+        "doi": doi,
+        "evidenceType": evidence_type,
+        "abstract": " ".join(abstract.split()),
+        "extra": extra or {},
     }
 
 
@@ -181,8 +219,9 @@ def build_url(url: str, params: dict[str, Any] | None = None) -> str:
     return f"{url}?{urllib.parse.urlencode(query)}" if query else url
 
 
-def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0,
-          headers: dict[str, str] | None = None) -> tuple[bytes, str]:
+def fetch(
+    url: str, params: dict[str, Any] | None = None, interval: float = 1.0, headers: dict[str, str] | None = None
+) -> tuple[bytes, str]:
     """(body, content type) of a GET, retrying 429 and 5xx; AdapterError when it cannot be had."""
     full = build_url(url, params)
     if TRANSPORT is not None:
@@ -213,8 +252,9 @@ def fetch(url: str, params: dict[str, Any] | None = None, interval: float = 1.0,
     raise AdapterError(f"{host}: no response")
 
 
-def fetch_json(url: str, params: dict[str, Any] | None = None, interval: float = 1.0,
-               headers: dict[str, str] | None = None) -> Any:
+def fetch_json(
+    url: str, params: dict[str, Any] | None = None, interval: float = 1.0, headers: dict[str, str] | None = None
+) -> Any:
     data, _ = fetch(url, params, interval, headers)
     try:
         return json.loads(data.decode("utf-8"))

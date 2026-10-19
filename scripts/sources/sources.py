@@ -29,6 +29,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "adapters"), str(HERE.parent / "runner")]
 import kit  # noqa: E402
+
 import rc  # noqa: E402
 
 
@@ -40,6 +41,7 @@ def instance(root: Path) -> Path:
             return candidate
     return root
 
+
 ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 DEFAULT_LIMIT = 20
 
@@ -47,11 +49,15 @@ DEFAULT_LIMIT = 20
 def adapters_dir(root: Path) -> Path:
     """An instance's own catalog; the template's defaults when run in the template itself."""
     base = instance(root)
-    return base / "catalog" / "adapters" if (base / "research-center.json").is_file() else base / "templates" / "adapters"
+    return (
+        base / "catalog" / "adapters" if (base / "research-center.json").is_file() else base / "templates" / "adapters"
+    )
 
 
 def descriptors(root: Path) -> dict[str, dict[str, Any]]:
-    return {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in sorted(adapters_dir(root).glob("*.json"))}
+    return {
+        path.stem: json.loads(path.read_text(encoding="utf-8")) for path in sorted(adapters_dir(root).glob("*.json"))
+    }
 
 
 def descriptor(root: Path, identifier: str) -> dict[str, Any]:
@@ -71,7 +77,9 @@ def module(spec: dict[str, Any], root: Path | None = None):
         return importlib.import_module(spec["module"])
     path = instance(root) / "catalog" / "adapters" / "code" / f"{spec['module']}.py"
     if not path.is_file():
-        raise ValueError(f"adapter {spec['id']}: no module {spec['module']} in scripts/sources/adapters or catalog/adapters/code")
+        raise ValueError(
+            f"adapter {spec['id']}: no module {spec['module']} in scripts/sources/adapters or catalog/adapters/code"
+        )
     loaded = importlib.util.spec_from_file_location(f"rc_adapter_{spec['module']}", path)
     code = importlib.util.module_from_spec(loaded)
     loaded.loader.exec_module(code)
@@ -89,7 +97,10 @@ def packs() -> dict[str, dict[str, Any]]:
     found = {}
     for path in sorted(PACKS.glob("*/pack.json")):
         pack = json.loads(path.read_text(encoding="utf-8"))
-        pack["descriptors"] = {item.stem: json.loads(item.read_text(encoding="utf-8")) for item in sorted((path.parent / "adapters").glob("*.json"))}
+        pack["descriptors"] = {
+            item.stem: json.loads(item.read_text(encoding="utf-8"))
+            for item in sorted((path.parent / "adapters").glob("*.json"))
+        }
         found[pack["id"]] = pack
     return found
 
@@ -109,7 +120,9 @@ def set_pack(root: Path, identifier: str, enabled: bool) -> list[str]:
     target.mkdir(parents=True, exist_ok=True)
     for name, spec in known[identifier]["descriptors"].items():
         if enabled:
-            (target / f"{name}.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+            (target / f"{name}.json").write_text(
+                json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
+            )
         else:
             (target / f"{name}.json").unlink(missing_ok=True)
     return list(known[identifier]["descriptors"])
@@ -122,8 +135,11 @@ def scaffold(root: Path, identifier: str, family: str, evidence: str) -> list[Pa
     if not ID.fullmatch(identifier):
         raise ValueError(f"adapter id {identifier!r} must be lowercase hyphen-case")
     name = identifier.replace("-", "_")
-    taken = set(descriptors(root)) | {path.stem for path in (HERE / "adapters").glob("*.py")} | {
-        adapter for pack in packs().values() for adapter in pack["descriptors"]}
+    taken = (
+        set(descriptors(root))
+        | {path.stem for path in (HERE / "adapters").glob("*.py")}
+        | {adapter for pack in packs().values() for adapter in pack["descriptors"]}
+    )
     if identifier in taken or name in taken:
         raise ValueError(f"{identifier} is already an adapter id or module name")
     if family not in kit.FAMILIES or evidence not in kit.EVIDENCE_TYPES:
@@ -131,10 +147,18 @@ def scaffold(root: Path, identifier: str, family: str, evidence: str) -> list[Pa
     code = instance(root) / "catalog" / "adapters" / "code"
     code.mkdir(parents=True, exist_ok=True)
     written = []
-    for source, target in (("adapter.json", adapters_dir(root) / f"{identifier}.json"), ("adapter.py", code / f"{name}.py"),
-                           ("adapter.fixture.json", code / f"{identifier}.fixture.json")):
+    for source, target in (
+        ("adapter.json", adapters_dir(root) / f"{identifier}.json"),
+        ("adapter.py", code / f"{name}.py"),
+        ("adapter.fixture.json", code / f"{identifier}.fixture.json"),
+    ):
         text = (TEMPLATE / source).read_text(encoding="utf-8")
-        for placeholder, value in (("__ID__", identifier), ("__MODULE__", name), ("__FAMILY__", family), ("__EVIDENCE__", evidence)):
+        for placeholder, value in (
+            ("__ID__", identifier),
+            ("__MODULE__", name),
+            ("__FAMILY__", family),
+            ("__EVIDENCE__", evidence),
+        ):
             text = text.replace(placeholder, value)
         target.write_text(text, encoding="utf-8", newline="\n")
         written.append(target)
@@ -167,13 +191,20 @@ def run_fixture(root: Path, identifier: str) -> list[str]:
         for response in fixture["responses"]:
             if response["match"] in url:
                 body = response["body"]
-                return (body if isinstance(body, str) else json.dumps(body)).encode("utf-8"), response.get("contentType", "application/json")
+                return (body if isinstance(body, str) else json.dumps(body)).encode("utf-8"), response.get(
+                    "contentType", "application/json"
+                )
         raise kit.AdapterError(f"the fixture has no response for {url}")
 
     previous, kit.TRANSPORT = kit.TRANSPORT, transport
     try:
-        found = module(spec, root).search(fixture["query"], fixture.get("filters", {}), fixture.get("since"), fixture.get("limit", 20),
-                                          {"interval": 0, "contactEmail": None})
+        found = module(spec, root).search(
+            fixture["query"],
+            fixture.get("filters", {}),
+            fixture.get("since"),
+            fixture.get("limit", 20),
+            {"interval": 0, "contactEmail": None},
+        )
     except (kit.AdapterError, KeyError, TypeError, ValueError) as error:
         return [f"{identifier}: {type(error).__name__}: {error}"]
     finally:
@@ -192,14 +223,19 @@ def options(root: Path, spec: dict[str, Any]) -> dict[str, Any]:
     email only when the user set research.contactEmail. Nothing else of the instance reaches a third party."""
     settings_path = instance(root) / "research-center.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
-    found = {"interval": float(spec.get("rateLimit", 1.0)), "contactEmail": settings.get("research", {}).get("contactEmail") or None}
+    found = {
+        "interval": float(spec.get("rateLimit", 1.0)),
+        "contactEmail": settings.get("research", {}).get("contactEmail") or None,
+    }
     if spec.get("optionalKeyEnv") and os.environ.get(spec["optionalKeyEnv"]):
         found["key"] = os.environ[spec["optionalKeyEnv"]]
         found["interval"] = float(spec.get("rateLimitWithKey", found["interval"]))
     if spec.get("needsKeyEnv"):
         key = os.environ.get(spec["needsKeyEnv"])
         if not key:
-            raise kit.AdapterError(f"{spec['id']} needs the environment variable {spec['needsKeyEnv']}; it is never stored in the repo")
+            raise kit.AdapterError(
+                f"{spec['id']} needs the environment variable {spec['needsKeyEnv']}; it is never stored in the repo"
+            )
         found["key"] = key
     return found
 
@@ -212,19 +248,34 @@ def log_search(log: Path | None, entry: dict[str, Any]) -> None:
     rc.write_json(log, entries)
 
 
-def search(root: Path, identifier: str, query: str, filters: dict[str, str] | None = None, since: str | None = None,
-           limit: int = DEFAULT_LIMIT, log: Path | None = None) -> list[dict[str, Any]]:
+def search(
+    root: Path,
+    identifier: str,
+    query: str,
+    filters: dict[str, str] | None = None,
+    since: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    log: Path | None = None,
+) -> list[dict[str, Any]]:
     """Run one adapter query and log it. A failing adapter is logged with status error and raises AdapterError;
     it never silently returns nothing."""
     spec = descriptor(root, identifier)
     filters = dict(filters or {})
     unknown = sorted(set(filters) - set(spec.get("filters", {})))
     if unknown:
-        raise ValueError(f"{identifier} has no filter {', '.join(unknown)}; it has: {', '.join(spec.get('filters', {})) or 'none'}")
+        raise ValueError(
+            f"{identifier} has no filter {', '.join(unknown)}; it has: {', '.join(spec.get('filters', {})) or 'none'}"
+        )
     if since:
         datetime.date.fromisoformat(since)
-    entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
-             "query": query, "filters": filters, "since": since, "limit": limit}
+    entry = {
+        "at": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "adapter": identifier,
+        "query": query,
+        "filters": filters,
+        "since": since,
+        "limit": limit,
+    }
     try:
         found = module(spec, root).search(query, filters, since, limit, options(root, spec))
     except kit.AdapterError as error:
@@ -234,16 +285,27 @@ def search(root: Path, identifier: str, query: str, filters: dict[str, str] | No
     return found
 
 
-def related(root: Path, identifier: str, item: dict[str, Any], direction: str, limit: int = DEFAULT_LIMIT,
-            log: Path | None = None) -> list[dict[str, Any]]:
+def related(
+    root: Path,
+    identifier: str,
+    item: dict[str, Any],
+    direction: str,
+    limit: int = DEFAULT_LIMIT,
+    log: Path | None = None,
+) -> list[dict[str, Any]]:
     """The works a record cites (backward) or that cite it (forward), for adapters that support it."""
     spec = descriptor(root, identifier)
     if direction not in kit.DIRECTIONS:
         raise ValueError(f"direction must be one of {kit.DIRECTIONS}")
     if not spec.get("related"):
         raise ValueError(f"{identifier} cannot follow references or citations")
-    entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
-             "related": item["key"], "direction": direction, "limit": limit}
+    entry = {
+        "at": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "adapter": identifier,
+        "related": item["key"],
+        "direction": direction,
+        "limit": limit,
+    }
     try:
         found = module(spec, root).related(item, direction, limit, options(root, spec))
     except kit.AdapterError as error:
@@ -262,8 +324,11 @@ def retractions(root: Path, dois: list[str], log: Path | None = None) -> dict[st
     for identifier, spec in descriptors(root).items():
         if not spec.get("retractions"):
             continue
-        entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "adapter": identifier,
-                 "retractionCheck": len(dois)}
+        entry = {
+            "at": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+            "adapter": identifier,
+            "retractionCheck": len(dois),
+        }
         try:
             result = module(spec, root).retracted(dois, options(root, spec))
         except kit.AdapterError as error:
@@ -356,11 +421,17 @@ def main() -> int:
             print(f"edit the module and its fixture, then ./rc sources test {args.adapter}")
             return 0
         if args.command == "test":
-            targets = [args.adapter] if args.adapter else [identifier for identifier in testable(root) if fixture_path(root, identifier).is_file()]
+            targets = (
+                [args.adapter]
+                if args.adapter
+                else [identifier for identifier in testable(root) if fixture_path(root, identifier).is_file()]
+            )
             problems = [problem for identifier in targets for problem in run_fixture(root, identifier)]
             for problem in problems:
                 print(f"fail: {problem}", file=sys.stderr)
-            print(f"{len(targets) - len({problem.split(':')[0] for problem in problems})} of {len(targets)} adapter fixtures passed")
+            print(
+                f"{len(targets) - len({problem.split(':')[0] for problem in problems})} of {len(targets)} adapter fixtures passed"
+            )
             return 1 if problems else 0
         if args.command == "list":
             for identifier, spec in descriptors(root).items():
@@ -369,8 +440,15 @@ def main() -> int:
                     print(f"{'':<24}--filter {name}=...  {help_text}")
             return 0
         if args.command == "search":
-            found = search(root, args.adapter, " ".join(args.query), parse_filters(args.filter), args.since, args.limit,
-                           args.log.resolve() if args.log else None)
+            found = search(
+                root,
+                args.adapter,
+                " ".join(args.query),
+                parse_filters(args.filter),
+                args.since,
+                args.limit,
+                args.log.resolve() if args.log else None,
+            )
         else:
             stub = {"key": f"{args.adapter}:{args.id}", "title": args.id, "extra": {"openalexId": args.id}}
             found = related(root, args.adapter, stub, args.direction, args.limit)
