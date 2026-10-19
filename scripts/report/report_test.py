@@ -33,7 +33,7 @@ Retrieval.
 - Q1: Which retrieval approach gives the best recall for us?
 - Q2: Which vendors offer it?
 """
-REPORT = f"""# Which retrieval for product search?
+REPORT = """# Which retrieval for product search?
 
 Topic: retrieval · Date: 2026-10-16 · Claims: 3 · Sources: 2 · Version 2
 
