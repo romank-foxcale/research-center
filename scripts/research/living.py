@@ -326,7 +326,6 @@ def build_delta(directory: Path, topic: str, stamp: str, watch: dict[str, Any], 
              if before["rings"].get(key) != ring]
     contested = [claim for claim in after["contested"] if claim not in before["contested"]]
     drifted = [claims[identifier] for identifier in pending.get("drifted", [])]
-    review = bool(flips or idea_flips or moves or contested or drifted)
     if material:
         summary = "material change: " + ("verdicts or rings moved, see Needs your review" if flips or idea_flips or moves or contested
                                          else "new or drifted evidence, conclusions unchanged")
