@@ -8,8 +8,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import secrets_scan
+# Imported by its package path, the name mutation testing gives the module's functions.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.ingest import secrets_scan
 
 # Built from parts so this file itself never holds a full token pattern.
 GITHUB = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
@@ -64,3 +65,54 @@ def test_secrets() -> None:
         assert secrets_scan.scan(root, ["sources", "missing"]) == []
         (root / "sources" / "a" / "leak.txt").write_text(f"x\n{GITHUB}\n")
         assert secrets_scan.scan(root, ["sources"]) == ["sources/a/leak.txt:2: unredacted github-token"]
+
+
+def test_credential_shapes() -> None:
+    # A symbol counts as a character class: lower, digit and symbol make three.
+    assert secrets_scan.redact('password = "hunter2-xyz!"')[1] == [{"kind": "assigned-secret", "line": 1}]
+    # Two classes are enough from 20 characters on, unless the value is an identifier.
+    assert secrets_scan.redact("api_key = abcdefghij-klmnopqrs")[1] == [{"kind": "assigned-secret", "line": 1}]
+    for line in (
+        "api_key = abcdefghij-klmnopqr",  # 19 characters
+        "token = abcdefghijklmnopqrst_uvw",  # an identifier
+        "token = some-thing-here",  # two classes, short
+        "secret = config.Get(KEY_1)",  # a call, however mixed
+        "db: postgres://app:pw[REDACTED:url-credentials]@db.internal/app",  # already redacted
+    ):
+        assert secrets_scan.redact(line) == (line, []), line
+
+
+def test_adjacent_secrets_and_lines() -> None:
+    _, found = secrets_scan.redact(f"{GITHUB}{KEY}{GITHUB}")
+    assert found == [
+        {"kind": "github-token", "line": 1},
+        {"kind": "private-key", "line": 1},
+        {"kind": "github-token", "line": 4},
+    ], found
+    assert secrets_scan.redact(f"\n{GITHUB}")[1] == [{"kind": "github-token", "line": 2}]
+
+
+def test_scan_reads_broken_bytes(tmp_path: Path) -> None:
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "sources" / "dump.txt").write_bytes(b"\xff\xfe\n" + GITHUB.encode())
+    assert secrets_scan.scan(tmp_path, ["sources"]) == ["sources/dump.txt:2: unredacted github-token"]
+
+
+def test_main(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["secrets_scan.py", str(tmp_path)])
+    assert secrets_scan.main() == 2
+    assert capsys.readouterr().err == "usage: secrets_scan.py <root> <folder>...\n"
+
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "sources" / "clean.md").write_text("nothing here\n")
+    monkeypatch.setattr(sys, "argv", ["secrets_scan.py", str(tmp_path), "sources", "notes"])
+    assert secrets_scan.main() == 0
+    assert capsys.readouterr().out == "secret scan passed: sources, notes\n"
+
+    (tmp_path / "sources" / "leak.md").write_text(f"{GITHUB}\n")
+    monkeypatch.setattr(sys, "argv", ["secrets_scan.py", str(tmp_path), "sources"])  # one folder is enough
+    assert secrets_scan.main() == 1
+    assert capsys.readouterr().err == (
+        "secret scan failed (redact the values, then re-run ./rc check):\n"
+        "- sources/leak.md:1: unredacted github-token\n"
+    )

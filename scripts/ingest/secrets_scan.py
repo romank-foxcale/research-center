@@ -87,7 +87,11 @@ def scan(root: Path, folders: list[str]) -> list[str]:
         for path in sorted(base.rglob("*")):
             if not path.is_file():
                 continue
-            text = path.read_text(encoding="utf-8", errors="replace")
+            text = path.read_text(
+                # Equivalent mutant on Linux, whose default is UTF-8; it matters on Windows.
+                encoding="utf-8",  # pragma: no mutate
+                errors="replace",
+            )
             for item in find(text):
                 problems.append(f"{path.relative_to(root).as_posix()}:{item['line']}: unredacted {item['kind']}")
     return problems
