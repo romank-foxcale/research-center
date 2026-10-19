@@ -57,8 +57,12 @@ def main() -> int:
         # rc scout --due goes through every profile and the trend feed, and runs none that is not due.
         quiet(scout.command_init_trends, root / "trends")
         (root / "trends" / "scout").mkdir()
-        (root / "trends" / "scout" / "state.json").write_text(json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8")
-        (alpha / "scout" / "state.json").write_text(json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8")
+        (root / "trends" / "scout" / "state.json").write_text(
+            json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8"
+        )
+        (alpha / "scout" / "state.json").write_text(
+            json.dumps({"lastRun": datetime.date.today().isoformat()}), encoding="utf-8"
+        )
         spec = importlib.util.spec_from_file_location("rc_cli", SCRIPTS.parent / "rc.py")
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
@@ -74,9 +78,16 @@ def main() -> int:
         text = brief.read_text(encoding="utf-8")
         assert research.brief_problems(text) == [], research.brief_problems(text)
         assert "# Should acme/ocr-kit change DI OCR?" in text and "Status: draft" in text
-        assert "- Q1: Does acme/ocr-kit do better than what DI OCR does today, measured as character error rate, on data like ours?" in text
+        assert (
+            "- Q1: Does acme/ocr-kit do better than what DI OCR does today, measured as character error rate, on data like ours?"
+            in text
+        )
         assert "Today: Tesseract. Alternatives: PaddleOCR" in text
-        assert "pass bar below 3%" in text and "Cadence: none" in text and "Its licence (MIT, permissive) is usable" in text
+        assert (
+            "pass bar below 3%" in text
+            and "Cadence: none" in text
+            and "Its licence (MIT, permissive) is usable" in text
+        )
         dived = json.loads((alpha / "scout" / "cards" / "acme-ocr.json").read_text(encoding="utf-8"))
         assert dived["status"] == "deep dive" and dived["research"] == "ocr-kit"
         assert "already exists" in raises(scout.command_dive, alpha, "acme-ocr")

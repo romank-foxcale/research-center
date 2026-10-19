@@ -33,25 +33,37 @@ def command_list(root: Path) -> None:
     used = slots(root)
     for path in sorted(roles_dir(root).glob("*.json")):
         role = json.loads(path.read_text(encoding="utf-8"))
-        print(f"{role['id']:<20} {role['provider']:<7} {role['model']:<18} {role['access']:<15} {', '.join(used.get(role['id'], ['unused']))}")
+        print(
+            f"{role['id']:<20} {role['provider']:<7} {role['model']:<18} {role['access']:<15} {', '.join(used.get(role['id'], ['unused']))}"
+        )
 
 
 def command_show(root: Path) -> None:
     """./rc settings: the RC's settings as text, like ./cc settings show (no panel yet)."""
     path = root / "research-center.json"
-    config = json.loads((path if path.is_file() else root / "templates" / "research-center.json").read_text(encoding="utf-8"))
-    print(f"Research Center {config.get('name')}  status {config.get('status', 'unknown')}"
-          f"{'' if path.is_file() else '  (template)'}")
-    print(f"\nBudgets   ingest {config['budget']['ingestCalls']} calls · research {config['budget']['researchCalls']} calls"
-          f" · refresh {config['budget'].get('refreshCalls', 16)} calls")
+    config = json.loads(
+        (path if path.is_file() else root / "templates" / "research-center.json").read_text(encoding="utf-8")
+    )
+    print(
+        f"Research Center {config.get('name')}  status {config.get('status', 'unknown')}"
+        f"{'' if path.is_file() else '  (template)'}"
+    )
+    print(
+        f"\nBudgets   ingest {config['budget']['ingestCalls']} calls · research {config['budget']['researchCalls']} calls"
+        f" · refresh {config['budget'].get('refreshCalls', 16)} calls"
+    )
     ingest = config["ingest"]
-    print(f"Ingest    max file {ingest['maxFileBytes']} B · max source {ingest['maxSourceBytes']} B · chunk {ingest['chunkBytes']} B")
+    print(
+        f"Ingest    max file {ingest['maxFileBytes']} B · max source {ingest['maxSourceBytes']} B · chunk {ingest['chunkBytes']} B"
+    )
     print(f"Research  max {config['research']['maxSourcesPerResearcher']} sources per researcher")
     print(f"Remote    privateRemoteConfirmed {str(config.get('privateRemoteConfirmed', False)).lower()}")
     print("\nAgents")
     command_list(root)
-    print("\nChange a role: ./rc roles set <role> --provider <claude|codex> --model <model>; "
-          f"other settings: edit {path.name}")
+    print(
+        "\nChange a role: ./rc roles set <role> --provider <claude|codex> --model <model>; "
+        f"other settings: edit {path.name}"
+    )
 
 
 def command_set(root: Path, args: argparse.Namespace) -> None:
@@ -69,7 +81,10 @@ def command_set(root: Path, args: argparse.Namespace) -> None:
         raise ValueError(str(error)) from error
     available = providers.models(role["provider"])
     if available and role["model"] not in available:
-        print(f"warning: {role['model']} is not among {role['provider']}'s listed models: {', '.join(available[:12])}", file=sys.stderr)
+        print(
+            f"warning: {role['model']} is not among {role['provider']}'s listed models: {', '.join(available[:12])}",
+            file=sys.stderr,
+        )
     path.write_text(json.dumps(role, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"{args.id}: {role['provider']} {role['model']} ({role['access']})")
 

@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import secrets_scan  # noqa: E402
+import secrets_scan
 
 # Built from parts so this file itself never holds a full token pattern.
 GITHUB = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
@@ -20,7 +20,12 @@ KEY = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nabc\n-----END RSA PRIVATE KEY---
 
 
 def main() -> int:
-    for kind, value in (("github-token", GITHUB), ("anthropic-key", ANTHROPIC), ("aws-access-key", AWS), ("slack-token", SLACK)):
+    for kind, value in (
+        ("github-token", GITHUB),
+        ("anthropic-key", ANTHROPIC),
+        ("aws-access-key", AWS),
+        ("slack-token", SLACK),
+    ):
         text, found = secrets_scan.redact(f"token in prose: {value} end")
         assert value not in text and f"[REDACTED:{kind}]" in text, (kind, text)
         assert found == [{"kind": kind, "line": 1}], found

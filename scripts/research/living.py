@@ -24,9 +24,10 @@ from typing import Any
 
 import ingest
 import kit
-import rc
 import research
 import sources as registry
+
+import rc
 
 WATCH = "watch.json"
 # Days between refreshes for "Cadence: derived", from the plan's horizon, clamped to weekly-quarterly.
@@ -51,10 +52,17 @@ def cadence_days(cadence: str, horizon: str | None) -> int:
 def watch_queries(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
     """The plan's adapter avenues whose adapter can be watched; the web avenues are the researchers' and are not saved."""
     adapters = registry.descriptors(root)
-    return [{"avenue": number, "adapter": avenue["adapter"], "query": avenue["query"], "filters": avenue.get("filters") or {},
-             "questions": avenue["questions"]}
-            for number, avenue in enumerate(plan["avenues"], 1)
-            if avenue["adapter"] in adapters and adapters[avenue["adapter"]].get("watchable")]
+    return [
+        {
+            "avenue": number,
+            "adapter": avenue["adapter"],
+            "query": avenue["query"],
+            "filters": avenue.get("filters") or {},
+            "questions": avenue["questions"],
+        }
+        for number, avenue in enumerate(plan["avenues"], 1)
+        if avenue["adapter"] in adapters and adapters[avenue["adapter"]].get("watchable")
+    ]
 
 
 def begin_run(root: Path, topic: str) -> None:
@@ -78,10 +86,20 @@ def after_run(root: Path, topic: str) -> dict[str, Any] | None:
         return None
     today = rc.today()
     watch = {
-        "cadence": living["cadence"], "cadenceDays": days, "retireWhen": living["retireWhen"], "briefHash": research.brief_hash(text),
-        "version": previous["version"] if previous else 1, "running": False, "pending": None,
-        "lastChecked": today, "lastChanged": today, "queries": watch_queries(root, plan),
-        "log": [*(previous or {}).get("log", []), {"date": today, "version": previous["version"] if previous else 1, "kind": "run"}],
+        "cadence": living["cadence"],
+        "cadenceDays": days,
+        "retireWhen": living["retireWhen"],
+        "briefHash": research.brief_hash(text),
+        "version": previous["version"] if previous else 1,
+        "running": False,
+        "pending": None,
+        "lastChecked": today,
+        "lastChanged": today,
+        "queries": watch_queries(root, plan),
+        "log": [
+            *(previous or {}).get("log", []),
+            {"date": today, "version": previous["version"] if previous else 1, "kind": "run"},
+        ],
     }
     save_watch(directory, watch)
     if research.brief_status(text) in ("accepted", "living"):
@@ -99,7 +117,9 @@ def stamp_report(directory: Path, watch: dict[str, Any]) -> None:
     for index, line in enumerate(lines):
         if line.startswith("Topic: "):
             base = line.split(" · Version ", 1)[0]
-            lines[index] = f"{base} · Version {watch['version']} · Checked {watch['lastChecked']} · Changed {watch['lastChanged']}"
+            lines[index] = (
+                f"{base} · Version {watch['version']} · Checked {watch['lastChecked']} · Changed {watch['lastChanged']}"
+            )
             break
     report.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
@@ -124,17 +144,23 @@ def due(root: Path) -> list[str]:
 
 def snapshot(directory: Path) -> dict[str, Any]:
     """The conclusions before a refresh, for the delta."""
+
     def read(name: str, field: str) -> list[dict[str, Any]]:
         return rc.load_json(directory / name).get(field, []) if (directory / name).is_file() else []
+
     judgement = rc.load_json(directory / "judgement.json") if (directory / "judgement.json").is_file() else {}
-    return {"claims": {item["claim"]: item["verdict"] for item in judgement.get("claims", [])},
-            "ideas": {item["idea"]: item["verdict"] for item in judgement.get("ideas", [])},
-            "contested": [item["claim"] for item in judgement.get("contested", [])],
-            "rings": {fit["idea"]: fit["ring"] for fit in read("fit.json", "fits")},
-            "names": {idea["id"]: idea["name"] for idea in read("ideas.json", "ideas")}}
+    return {
+        "claims": {item["claim"]: item["verdict"] for item in judgement.get("claims", [])},
+        "ideas": {item["idea"]: item["verdict"] for item in judgement.get("ideas", [])},
+        "contested": [item["claim"] for item in judgement.get("contested", [])],
+        "rings": {fit["idea"]: fit["ring"] for fit in read("fit.json", "fits")},
+        "names": {idea["id"]: idea["name"] for idea in read("ideas.json", "ideas")},
+    }
 
 
-def search_new(session: rc.Session, root: Path, topic: str, watch: dict[str, Any], log: Path) -> tuple[list[dict[str, Any]], int]:
+def search_new(
+    session: rc.Session, root: Path, topic: str, watch: dict[str, Any], log: Path
+) -> tuple[list[dict[str, Any]], int]:
     """Run the saved queries since the last check; return the records not screened before, numbered on, and the
     number of results."""
     directory = research.topic_dir(root, topic)
@@ -142,7 +168,9 @@ def search_new(session: rc.Session, root: Path, topic: str, watch: dict[str, Any
     found = []
     for query in watch["queries"]:
         try:
-            records = registry.search(root, query["adapter"], query["query"], query["filters"], watch["lastChecked"], limit, log)
+            records = registry.search(
+                root, query["adapter"], query["query"], query["filters"], watch["lastChecked"], limit, log
+            )
         except kit.AdapterError as error:
             session.say(f"refresh search {query['avenue']} ({query['adapter']}): failed, {error}", "warn")
             continue
@@ -155,8 +183,15 @@ def search_new(session: rc.Session, root: Path, topic: str, watch: dict[str, Any
         fingerprint = item["extra"].get("sha256")
         if before and not (fingerprint and before.get("fingerprint") and fingerprint != before["fingerprint"]):
             continue
-        fresh.append({**item, "changed": bool(before), "hop": 0, "via": [],
-                      "questions": sorted({q for other in found if other["key"] == item["key"] for q in other["questions"]})})
+        fresh.append(
+            {
+                **item,
+                "changed": bool(before),
+                "hop": 0,
+                "via": [],
+                "questions": sorted({q for other in found if other["key"] == item["key"] for q in other["questions"]}),
+            }
+        )
     start = max((int(row["id"][1:]) for row in rows), default=0) + 1
     for offset, item in enumerate(fresh):
         item["id"] = f"R{start + offset}"
@@ -171,13 +206,21 @@ def recheck(session: rc.Session, root: Path, topic: str) -> list[str]:
     led = research.ledger(root, topic)
     types = research.evidence_types(root)
     families = {identifier: spec["family"] for identifier, spec in registry.descriptors(root).items()}
-    screened = {row["id"]: row for row in rc.load_json(directory / "screening.json")["records"]} if (directory / "screening.json").is_file() else {}
+    screened = (
+        {row["id"]: row for row in rc.load_json(directory / "screening.json")["records"]}
+        if (directory / "screening.json").is_file()
+        else {}
+    )
     today = datetime.date.fromisoformat(rc.today())
     drifted = []
     for source in led["sources"]:
         checked = source.get("checkedAt")
         half_life = types.get(source.get("evidenceType", "unknown"), types["unknown"])["halfLifeDays"]
-        if not source.get("stored") or not checked or datetime.date.fromisoformat(checked) + datetime.timedelta(days=half_life) > today:
+        if (
+            not source.get("stored")
+            or not checked
+            or datetime.date.fromisoformat(checked) + datetime.timedelta(days=half_life) > today
+        ):
             continue
         row = screened.get(source.get("record"), {})
         if any(families.get(adapter) in ("scholarly", "books") for adapter in row.get("foundBy", [])):
@@ -191,14 +234,23 @@ def recheck(session: rc.Session, root: Path, topic: str) -> list[str]:
             if claim["source"] != source["id"] or not claim["quoteVerified"]:
                 continue
             if text is None or not research.quote_found(claim["quote"], text):
-                claim.update({"quoteVerified": False, "drifted": {"at": rc.today(), "reason": reason if text is None else
-                              "the page no longer contains the quote"}})
+                claim.update(
+                    {
+                        "quoteVerified": False,
+                        "drifted": {
+                            "at": rc.today(),
+                            "reason": reason if text is None else "the page no longer contains the quote",
+                        },
+                    }
+                )
                 drifted.append(claim["id"])
         if text is not None:
             # Keep the page as it reads now: that is what the claims were checked against today.
             source_id, name = source["stored"].split("/")[1], source["stored"].split("/text/", 1)[1]
             descriptor = rc.load_json(ingest.source_path(root, source_id))
-            entries = {name: {"origin": source["url"], "sha256": hashlib.sha256(data).hexdigest(), "extractor": extractor}}
+            entries = {
+                name: {"origin": source["url"], "sha256": hashlib.sha256(data).hexdigest(), "extractor": extractor}
+            }
             research.store_appending(root, descriptor, entries, {name: text}, [], append=True)
         source["checkedAt"] = rc.today()
     if drifted:
@@ -208,7 +260,9 @@ def recheck(session: rc.Session, root: Path, topic: str) -> list[str]:
     return drifted
 
 
-def screen_new(session: rc.Session, root: Path, topic: str, fresh: list[dict[str, Any]], stamp: str, log: Path) -> list[dict[str, Any]]:
+def screen_new(
+    session: rc.Session, root: Path, topic: str, fresh: list[dict[str, Any]], stamp: str, log: Path
+) -> list[dict[str, Any]]:
     """Screen the new records like the first run did, store the included ones, and append them to screening.json."""
     directory = research.topic_dir(root, topic)
     plan = rc.load_json(directory / "source-plan.json")
@@ -219,15 +273,34 @@ def screen_new(session: rc.Session, root: Path, topic: str, fresh: list[dict[str
         research.store_included(root, topic, included, append=True)
     screening = rc.load_json(directory / "screening.json")
     stored = {item["id"]: item.get("stored") for item in included}
-    rows = [{"id": item["id"], "key": item["key"], "title": item["title"], "url": item["url"], "doi": item["doi"],
-             "foundBy": item["foundBy"], "hop": 0, "via": [], "evidenceType": item["evidenceType"],
-             "fingerprint": item["extra"].get("sha256"), "addedAt": stamp, "changed": item["changed"],
-             **decisions[item["id"]], "stored": stored.get(item["id"])} for item in fresh]
+    rows = [
+        {
+            "id": item["id"],
+            "key": item["key"],
+            "title": item["title"],
+            "url": item["url"],
+            "doi": item["doi"],
+            "foundBy": item["foundBy"],
+            "hop": 0,
+            "via": [],
+            "evidenceType": item["evidenceType"],
+            "fingerprint": item["extra"].get("sha256"),
+            "addedAt": stamp,
+            "changed": item["changed"],
+            **decisions[item["id"]],
+            "stored": stored.get(item["id"]),
+        }
+        for item in fresh
+    ]
     screening["records"] += rows
     screening["retractionCheck"] = [*screening.get("retractionCheck", []), f"refresh {stamp}: {check}"]
     rc.write_json(directory / "screening.json", screening)
-    rc.write_text(directory / "screening.md", research.render_screening(topic, screening["flow"], screening["criteria"],
-                                                                        screening["records"], screening["retractionCheck"]))
+    rc.write_text(
+        directory / "screening.md",
+        research.render_screening(
+            topic, screening["flow"], screening["criteria"], screening["records"], screening["retractionCheck"]
+        ),
+    )
     return rows
 
 
@@ -238,15 +311,22 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
     text = (directory / "brief.md").read_text(encoding="utf-8")
     status = research.brief_status(text)
     if status in ("paused", "retired"):
-        raise rc.RcError(f"research/{topic} is {status}; " + ("./rc research resume it first" if status == "paused" else "it is not refreshed any more"))
+        raise rc.RcError(
+            f"research/{topic} is {status}; "
+            + ("./rc research resume it first" if status == "paused" else "it is not refreshed any more")
+        )
     watch = load_watch(directory)
     if watch is None or not (directory / "report.md").is_file():
-        raise rc.RcError(f"research/{topic} is not living: give its brief a Living cadence and finish ./rc research run {topic}")
+        raise rc.RcError(
+            f"research/{topic} is not living: give its brief a Living cadence and finish ./rc research run {topic}"
+        )
     if watch.get("running"):
         raise rc.RcError(f"research/{topic} has an unfinished run; finish it with ./rc research run {topic}")
     if research.brief_hash(text) != watch["briefHash"]:
-        raise rc.RcError(f"research/{topic}/brief.md was amended after version {watch['version']}; ./rc research run {topic} "
-                         "redoes the research from plan, since the amendment changes what is searched")
+        raise rc.RcError(
+            f"research/{topic}/brief.md was amended after version {watch['version']}; ./rc research run {topic} "
+            "redoes the research from plan, since the amendment changes what is searched"
+        )
     ingest.guard(root)
     config = rc.settings(root)
     pending = watch.get("pending") or {}
@@ -262,8 +342,14 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
             fresh, identified = search_new(session, root, topic, watch, log)
             session.say(f"refresh: {identified} results, {len(fresh)} not screened before")
             rows = screen_new(session, root, topic, fresh, stamp, log) if fresh else []
-            pending = {"stamp": stamp, "step": "screened", "identified": identified, "records": [row["id"] for row in rows], "added": [],
-                       "drifted": drifted}
+            pending = {
+                "stamp": stamp,
+                "step": "screened",
+                "identified": identified,
+                "records": [row["id"] for row in rows],
+                "added": [],
+                "drifted": drifted,
+            }
             save_watch(directory, {**watch, "pending": pending})
         rows = [row for row in rc.load_json(directory / "screening.json")["records"] if row["id"] in pending["records"]]
         included = [row for row in rows if row["decision"] == "include"]
@@ -293,8 +379,16 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
         before = rc.load_json(before_path)
         delta = build_delta(directory, topic, stamp, watch, pending, rows, claims, before, material)
         today = rc.today()
-        watch = {**watch, "pending": None, "lastChecked": today, "lastChanged": today if material else watch["lastChanged"],
-                 "log": [*watch.get("log", []), {"date": today, "version": watch["version"], "kind": "refresh", "material": material}]}
+        watch = {
+            **watch,
+            "pending": None,
+            "lastChecked": today,
+            "lastChanged": today if material else watch["lastChanged"],
+            "log": [
+                *watch.get("log", []),
+                {"date": today, "version": watch["version"], "kind": "refresh", "material": material},
+            ],
+        }
         save_watch(directory, watch)
         write_delta(directory, stamp, delta, watch)
         stamp_report(directory, watch)
@@ -302,7 +396,10 @@ def refresh(root: Path, topic: str, budget: int | None = None) -> dict[str, Any]
             research.set_status(root, topic, "living")
         shutil.rmtree(session.replies, ignore_errors=True)
         before_path.unlink(missing_ok=True)
-        session.say(f"refresh of {topic}: {delta['summary']} (research/{topic}/delta/{stamp}.md, {session.calls} agent calls)", "gate")
+        session.say(
+            f"refresh of {topic}: {delta['summary']} (research/{topic}/delta/{stamp}.md, {session.calls} agent calls)",
+            "gate",
+        )
     return delta
 
 
@@ -314,53 +411,114 @@ def delta_stamp(directory: Path) -> str:
     return stamp
 
 
-def build_delta(directory: Path, topic: str, stamp: str, watch: dict[str, Any], pending: dict[str, Any], rows: list[dict[str, Any]],
-                claims: dict[str, dict[str, Any]], before: dict[str, Any], material: bool) -> dict[str, Any]:
+def build_delta(
+    directory: Path,
+    topic: str,
+    stamp: str,
+    watch: dict[str, Any],
+    pending: dict[str, Any],
+    rows: list[dict[str, Any]],
+    claims: dict[str, dict[str, Any]],
+    before: dict[str, Any],
+    material: bool,
+) -> dict[str, Any]:
     after = snapshot(directory)
     added = [claims[identifier] for identifier in pending["added"]]
-    flips = [{"claim": key, "from": value, "to": after["claims"][key]} for key, value in before["claims"].items()
-             if key in after["claims"] and after["claims"][key] != value]
-    idea_flips = [{"idea": key, "from": value, "to": after["ideas"][key]} for key, value in before["ideas"].items()
-                  if key in after["ideas"] and after["ideas"][key] != value]
-    moves = [{"idea": key, "from": before["rings"].get(key, "new"), "to": ring} for key, ring in after["rings"].items()
-             if before["rings"].get(key) != ring]
+    flips = [
+        {"claim": key, "from": value, "to": after["claims"][key]}
+        for key, value in before["claims"].items()
+        if key in after["claims"] and after["claims"][key] != value
+    ]
+    idea_flips = [
+        {"idea": key, "from": value, "to": after["ideas"][key]}
+        for key, value in before["ideas"].items()
+        if key in after["ideas"] and after["ideas"][key] != value
+    ]
+    moves = [
+        {"idea": key, "from": before["rings"].get(key, "new"), "to": ring}
+        for key, ring in after["rings"].items()
+        if before["rings"].get(key) != ring
+    ]
     contested = [claim for claim in after["contested"] if claim not in before["contested"]]
     drifted = [claims[identifier] for identifier in pending.get("drifted", [])]
     if material:
-        summary = "material change: " + ("verdicts or rings moved, see Needs your review" if flips or idea_flips or moves or contested
-                                         else "new or drifted evidence, conclusions unchanged")
+        summary = "material change: " + (
+            "verdicts or rings moved, see Needs your review"
+            if flips or idea_flips or moves or contested
+            else "new or drifted evidence, conclusions unchanged"
+        )
     elif drifted:
         summary = "no material change: some evidence drifted, none the conclusions rest on"
     elif not rows:
         summary = "no material change: nothing new was found"
     else:
         summary = "no material change: new records, but no new verified evidence"
-    return {"topic": topic, "stamp": stamp, "version": watch["version"], "since": watch["lastChecked"], "material": material,
-            "summary": summary, "identified": pending.get("identified", 0), "records": rows, "added": added, "flips": flips,
-            "ideaFlips": idea_flips, "moves": moves, "contested": contested, "drifted": drifted, "names": after["names"] or before["names"]}
+    return {
+        "topic": topic,
+        "stamp": stamp,
+        "version": watch["version"],
+        "since": watch["lastChecked"],
+        "material": material,
+        "summary": summary,
+        "identified": pending.get("identified", 0),
+        "records": rows,
+        "added": added,
+        "flips": flips,
+        "ideaFlips": idea_flips,
+        "moves": moves,
+        "contested": contested,
+        "drifted": drifted,
+        "names": after["names"] or before["names"],
+    }
 
 
 def write_delta(directory: Path, stamp: str, delta: dict[str, Any], watch: dict[str, Any]) -> None:
     rc.write_json(directory / "delta" / f"{stamp}.json", delta)
     cell, names = research.cell, delta["names"]
-    lines = [f"# Delta: {delta['topic']}, {stamp}\n", f"Version {delta['version']} · searched since {delta['since']} · "
-             f"{delta['identified']} results, {len(delta['records'])} not screened before\n", f"**{delta['summary'][0].upper()}{delta['summary'][1:]}.**"]
+    lines = [
+        f"# Delta: {delta['topic']}, {stamp}\n",
+        f"Version {delta['version']} · searched since {delta['since']} · "
+        f"{delta['identified']} results, {len(delta['records'])} not screened before\n",
+        f"**{delta['summary'][0].upper()}{delta['summary'][1:]}.**",
+    ]
     review = [f"- {item['claim']}: {item['from']} → {item['to']}" for item in delta["flips"]]
-    review += [f"- Idea {item['idea']} ({names.get(item['idea'], '')}): {item['from']} → {item['to']}" for item in delta["ideaFlips"]]
-    review += [f"- Idea {item['idea']} ({names.get(item['idea'], '')}) moved {item['from']} → {item['to']}" for item in delta["moves"]]
+    review += [
+        f"- Idea {item['idea']} ({names.get(item['idea'], '')}): {item['from']} → {item['to']}"
+        for item in delta["ideaFlips"]
+    ]
+    review += [
+        f"- Idea {item['idea']} ({names.get(item['idea'], '')}) moved {item['from']} → {item['to']}"
+        for item in delta["moves"]
+    ]
     review += [f"- {claim}: newly contested (a reviewer refuted it, the judge kept it)" for claim in delta["contested"]]
     review += [f"- {claim['id']}: drifted, {claim['drifted']['reason']}" for claim in delta.get("drifted", [])]
     if review:
-        lines += ["", "## Needs your review", "", "These changed since the previous version. Check them before relying on the report.", "", *review]
+        lines += [
+            "",
+            "## Needs your review",
+            "",
+            "These changed since the previous version. Check them before relying on the report.",
+            "",
+            *review,
+        ]
     if delta["records"]:
         lines += ["", "## New records", "", "| Record | Title | Decision | Reason |", "| --- | --- | --- | --- |"]
-        lines += [f"| {row['id']} | [{cell(row['title'])}]({row['url']}){' (changed page)' if row.get('changed') else ''} | "
-                  f"{row['decision']}{' ' + row['criterion'] if row.get('criterion') else ''} | {cell(row['reason'])} |" for row in delta["records"]]
+        lines += [
+            f"| {row['id']} | [{cell(row['title'])}]({row['url']}){' (changed page)' if row.get('changed') else ''} | "
+            f"{row['decision']}{' ' + row['criterion'] if row.get('criterion') else ''} | {cell(row['reason'])} |"
+            for row in delta["records"]
+        ]
     if delta["added"]:
         lines += ["", "## New claims", "", "| Claim | Text | Quote verified |", "| --- | --- | --- |"]
-        lines += [f"| {claim['id']} | {cell(claim['text'])} | {'yes' if claim['quoteVerified'] else 'no'} |" for claim in delta["added"]]
-    lines += ["", f"Retire when: {watch['retireWhen'].rstrip('.')}. If that has happened, `./rc research retire {delta['topic']}`.",
-              f"Next refresh due {(datetime.date.fromisoformat(watch['lastChecked']) + datetime.timedelta(days=watch['cadenceDays'])).isoformat()}."]
+        lines += [
+            f"| {claim['id']} | {cell(claim['text'])} | {'yes' if claim['quoteVerified'] else 'no'} |"
+            for claim in delta["added"]
+        ]
+    lines += [
+        "",
+        f"Retire when: {watch['retireWhen'].rstrip('.')}. If that has happened, `./rc research retire {delta['topic']}`.",
+        f"Next refresh due {(datetime.date.fromisoformat(watch['lastChecked']) + datetime.timedelta(days=watch['cadenceDays'])).isoformat()}.",
+    ]
     rc.write_text(directory / "delta" / f"{stamp}.md", "\n".join(lines))
 
 

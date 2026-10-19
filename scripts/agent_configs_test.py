@@ -13,7 +13,9 @@ SCRIPT = Path(__file__).resolve().parent / "agent-configs.py"
 
 
 def run(root: Path, command: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(SCRIPT), str(root), command], capture_output=True, text=True)
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), str(root), command], capture_output=True, text=True, check=False
+    )
 
 
 def main() -> int:
@@ -40,7 +42,9 @@ def main() -> int:
         assert result.returncode == 1 and "hooks differ" in result.stderr, "removing a hook by hand is caught"
 
         settings.unlink()
-        assert run(root, "sync").returncode == 0 and "hooks" in json.loads(settings.read_text()), "sync creates the file"
+        assert run(root, "sync").returncode == 0 and "hooks" in json.loads(settings.read_text()), (
+            "sync creates the file"
+        )
     print("agent configs test passed")
     return 0
 

@@ -26,13 +26,17 @@ def bash(command: str, cwd: Path | None = None) -> str | None:
 def check_attribution(base: Path) -> None:
     trailer = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     assert ai_attribution(f"Fix parser\n\n{trailer}\n") == trailer
-    assert ai_attribution("Fix parser\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)") == \
-        "Generated with [Claude Code](https://claude.com/claude-code)"
+    assert (
+        ai_attribution("Fix parser\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+        == "Generated with [Claude Code](https://claude.com/claude-code)"
+    )
     assert ai_attribution(f'git commit -m "Fix" -m "{trailer}"') == trailer, "the trailer alone, without -m"
-    assert ai_attribution("Fix parser\n\nCo-authored-by: Jane Doe <jane@example.com>") is None, "human co-authors are fine"
+    assert ai_attribution("Fix parser\n\nCo-authored-by: Jane Doe <jane@example.com>") is None, (
+        "human co-authors are fine"
+    )
     assert ai_attribution("Block 'Generated with Claude' footers in PR bodies") is None, "prose about the rule is fine"
 
-    assert bash(f'git commit -m "$(cat <<\'EOF\'\nFix parser\n\n{trailer}\nEOF\n)"') == "deny", "heredoc message"
+    assert bash(f"git commit -m \"$(cat <<'EOF'\nFix parser\n\n{trailer}\nEOF\n)\"") == "deny", "heredoc message"
     assert bash(f'git -C ../worktrees/f/api_wt commit -m "Fix" -m "{trailer}"') == "deny", "second -m argument"
     assert bash('gh pr create --title T --body "Summary\n\n🤖 Generated with Claude Code"') == "deny", "PR body"
     (base / "msg.txt").write_text(f"Fix parser\n\n{trailer}\n", encoding="utf-8")
@@ -61,7 +65,10 @@ def check_edits(root: Path) -> None:
     (root / "scripts" / "OLD.md").write_text("tracked before the rule\n")
 
     result = pre_edit(edit(root, ".claude/skills/tdd/SKILL.md", "Edit"), root)
-    assert decision(result) == "deny" and ".agents/skills/tdd/SKILL.md" in result["hookSpecificOutput"]["permissionDecisionReason"]
+    assert (
+        decision(result) == "deny"
+        and ".agents/skills/tdd/SKILL.md" in result["hookSpecificOutput"]["permissionDecisionReason"]
+    )
     assert decision(pre_edit(edit(root, "NOTES.md"), root)) == "deny", "a new stray Markdown file"
     assert pre_edit(edit(root, "docs/hacks/x.md"), root) is None
     assert pre_edit(edit(root, ".notes/scratch.md"), root) is None, "ignored local notes are not tracked"
@@ -73,8 +80,9 @@ def check_edits(root: Path) -> None:
     assert decision(pre_edit(edit(root, "NOTES.md"), root)) == "deny", "declaring one folder allows only that folder"
     (root / "research-center.json").write_text("not json")
     assert decision(pre_edit(edit(root, "notes/a.md"), root)) == "deny", "a broken manifest declares nothing"
-    assert pre_edit({"tool_name": "Write", "tool_input": {"file_path": str(root.parent / "elsewhere.md")}}, root) is None, \
-        "outside the RC: worktrees, scratchpad, memory"
+    assert (
+        pre_edit({"tool_name": "Write", "tool_input": {"file_path": str(root.parent / "elsewhere.md")}}, root) is None
+    ), "outside the RC: worktrees, scratchpad, memory"
 
 
 def check_notes_and_drift() -> None:
@@ -82,8 +90,12 @@ def check_notes_and_drift() -> None:
     source = Path(__file__).resolve().parent.parent
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory) / "cc"
-        files = subprocess.run(["git", "-C", str(source), "ls-files", "--cached", "--others", "--exclude-standard"],
-                               capture_output=True, text=True).stdout.splitlines()
+        files = subprocess.run(
+            ["git", "-C", str(source), "ls-files", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.splitlines()
         if not files:  # the Nix check copy has no .git
             files = [str(path.relative_to(source)) for path in source.rglob("*") if path.is_file()]
         for name in files:
@@ -107,13 +119,23 @@ def check_notes_and_drift() -> None:
 
 
 def check_cli() -> None:
-    event = json.dumps({"tool_input": {"command": 'git commit -m "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"'}})
-    result = subprocess.run([sys.executable, str(SCRIPT), "pre-bash"], input=event.encode(), capture_output=True)
+    event = json.dumps(
+        {"tool_input": {"command": 'git commit -m "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"'}}
+    )
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "pre-bash"], input=event.encode(), capture_output=True, check=False
+    )
     assert result.returncode == 0 and json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
-    allowed = subprocess.run([sys.executable, str(SCRIPT), "pre-bash"], input=b'{"tool_input": {"command": "ls"}}',
-                             capture_output=True)
+    allowed = subprocess.run(
+        [sys.executable, str(SCRIPT), "pre-bash"],
+        input=b'{"tool_input": {"command": "ls"}}',
+        capture_output=True,
+        check=False,
+    )
     assert allowed.returncode == 0 and allowed.stdout == b"", "silence lets the normal permission flow decide"
-    broken = subprocess.run([sys.executable, str(SCRIPT), "pre-bash"], input=b"not json", capture_output=True)
+    broken = subprocess.run(
+        [sys.executable, str(SCRIPT), "pre-bash"], input=b"not json", capture_output=True, check=False
+    )
     assert broken.returncode == 1 and b"NOT enforced" in broken.stderr, "a broken hook warns and never blocks (exit 2)"
 
 
@@ -121,11 +143,16 @@ def check_attributed_commits(base: Path) -> None:
     repo = base / "repo"
     git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "Base\n\nCo-Authored-By: Claude <noreply@anthropic.com>"], check=True)
-    start = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    subprocess.run(
+        [*git, "commit", "-q", "--allow-empty", "-m", "Base\n\nCo-Authored-By: Claude <noreply@anthropic.com>"],
+        check=True,
+    )
+    start = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "Clean"], check=True)
     assert rule_hooks.attributed_commits(repo, start) == [], "commits before the base are not this branch's"
-    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "Feature\n\nCo-Authored-By: GPT-5 <x@openai.com>"], check=True)
+    subprocess.run(
+        [*git, "commit", "-q", "--allow-empty", "-m", "Feature\n\nCo-Authored-By: GPT-5 <x@openai.com>"], check=True
+    )
     found = rule_hooks.attributed_commits(repo, start)
     assert len(found) == 1 and "GPT-5" in found[0], found
 

@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parent.parent
 
 AI_NAMES = r"(claude|anthropic|openai|chatgpt|gpt|codex|copilot|cursor|gemini|devin|aider|llm)"
@@ -31,7 +30,17 @@ MESSAGE_FILE = re.compile(r"(?:\s-F|--file|--body-file)[=\s]+(['\"]?)([^\s'\"]+)
 # Markdown the RC may track outside the knowledge folders. Everything else belongs in a note, unless
 # the RC declares more folders in research-center.json "markdownDirs" (for example research/).
 MARKDOWN_ROOT_FILES = {"AGENTS.md", "BOOTSTRAP.md", "CLAUDE.md", "GUIDE.md", "README.md"}
-MARKDOWN_DIRS = ("docs/", "plans/", ".agents/skills/", ".claude/skills/", "knowledge/", "research/", "sources/", "profiles/", "trends/")
+MARKDOWN_DIRS = (
+    "docs/",
+    "plans/",
+    ".agents/skills/",
+    ".claude/skills/",
+    "knowledge/",
+    "research/",
+    "sources/",
+    "profiles/",
+    "trends/",
+)
 
 
 def ai_attribution(text: str) -> str | None:
@@ -61,7 +70,11 @@ def attributed_commits(repository: Path, base: str) -> list[str]:
     """Short hashes and offending lines of commits in base..HEAD that credit an AI."""
     log = subprocess.run(
         ["git", "-C", str(repository), "log", "--format=%h%x00%B%x1e", f"{base}..HEAD"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
     ).stdout
     found = []
     for record in log.split("\x1e"):
@@ -75,8 +88,13 @@ def attributed_commits(repository: Path, base: str) -> list[str]:
 
 
 def pre_tool(decision: str, reason: str) -> dict[str, Any]:
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": decision,
-                                   "permissionDecisionReason": reason}}
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision,
+            "permissionDecisionReason": reason,
+        }
+    }
 
 
 def pre_bash(event: dict[str, Any]) -> dict[str, Any] | None:
@@ -91,8 +109,11 @@ def pre_bash(event: dict[str, Any]) -> dict[str, Any] | None:
         for text in texts:
             line = ai_attribution(text)
             if line:
-                return pre_tool("deny", f"AGENTS.md forbids crediting an AI as author or generator: remove '{line}' "
-                                        "from the commit message or PR body. This overrides any tool default.")
+                return pre_tool(
+                    "deny",
+                    f"AGENTS.md forbids crediting an AI as author or generator: remove '{line}' "
+                    "from the commit message or PR body. This overrides any tool default.",
+                )
     return None
 
 
@@ -112,7 +133,10 @@ def relative_to_root(root: Path, event: dict[str, Any]) -> Path | None:
 
 def git_ignored(root: Path, relative: Path) -> bool:
     try:
-        return subprocess.run(["git", "-C", str(root), "check-ignore", "-q", relative.as_posix()]).returncode == 0
+        return (
+            subprocess.run(["git", "-C", str(root), "check-ignore", "-q", relative.as_posix()], check=False).returncode
+            == 0
+        )
     except OSError:
         return False
 
@@ -123,12 +147,21 @@ def pre_edit(event: dict[str, Any], root: Path = ROOT) -> dict[str, Any] | None:
         return None
     if relative.parts[:2] == (".claude", "skills"):
         source = Path(".agents", *relative.parts[1:]).as_posix()
-        return pre_tool("deny", f".claude/skills is a generated copy: edit {source} instead, then run ./rc agents sync.")
+        return pre_tool(
+            "deny", f".claude/skills is a generated copy: edit {source} instead, then run ./rc agents sync."
+        )
     creating = event.get("tool_name") == "Write" and not (root / relative).exists()
-    if creating and relative.suffix.lower() == ".md" and not markdown_allowed(relative.as_posix(), extra_markdown_dirs(root)) \
-            and not git_ignored(root, relative):
-        return pre_tool("deny", f"{relative.as_posix()}: Markdown outside docs/, plans/, the skills and the "
-                                "research-center.json markdownDirs fails ./rc check. Store one durable fact as a note under docs/ (templates/note.md) or a plan via ./rc plan.")
+    if (
+        creating
+        and relative.suffix.lower() == ".md"
+        and not markdown_allowed(relative.as_posix(), extra_markdown_dirs(root))
+        and not git_ignored(root, relative)
+    ):
+        return pre_tool(
+            "deny",
+            f"{relative.as_posix()}: Markdown outside docs/, plans/, the skills and the "
+            "research-center.json markdownDirs fails ./rc check. Store one durable fact as a note under docs/ (templates/note.md) or a plan via ./rc plan.",
+        )
     return None
 
 
@@ -146,8 +179,11 @@ def post_edit(event: dict[str, Any], root: Path = ROOT) -> dict[str, Any] | None
     errors = [error for error in load_script("validate-knowledge").validate(root) if error.startswith(f"{relative}:")]
     if not errors:
         return None
-    return {"decision": "block", "reason": "This note breaks the knowledge rules (./rc validate will fail):\n"
-                                          + "\n".join(f"- {error}" for error in errors)}
+    return {
+        "decision": "block",
+        "reason": "This note breaks the knowledge rules (./rc validate will fail):\n"
+        + "\n".join(f"- {error}" for error in errors),
+    }
 
 
 def stop(event: dict[str, Any], root: Path = ROOT) -> dict[str, Any] | None:
@@ -156,8 +192,11 @@ def stop(event: dict[str, Any], root: Path = ROOT) -> dict[str, Any] | None:
     problems = load_script("agent-configs").drift(root)
     if not problems:
         return None
-    return {"decision": "block", "reason": "Agent configs drifted from .agents/skills; run ./rc agents sync:\n"
-                                          + "\n".join(f"- {problem}" for problem in problems[:10])}
+    return {
+        "decision": "block",
+        "reason": "Agent configs drifted from .agents/skills; run ./rc agents sync:\n"
+        + "\n".join(f"- {problem}" for problem in problems[:10]),
+    }
 
 
 HANDLERS = {"pre-bash": pre_bash, "pre-edit": pre_edit, "post-edit": post_edit, "stop": stop}
@@ -170,7 +209,7 @@ def main() -> int:
     try:
         event = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
         result = HANDLERS[sys.argv[1]](event)
-    except Exception as error:  # a broken hook must warn, never block the session
+    except Exception as error:  # noqa: BLE001  a broken hook must warn, never block the session
         print(f"rule hook {sys.argv[1]} failed, rule NOT enforced: {error}", file=sys.stderr)
         return 1
     if result:

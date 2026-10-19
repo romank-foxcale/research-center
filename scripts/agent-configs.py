@@ -10,7 +10,6 @@ import shutil
 import sys
 from pathlib import Path
 
-
 # Codex, Cursor and OpenCode read .agents/skills; Claude Code reads only
 # .claude/skills. Copies (not symlinks) survive clones on native Windows.
 SOURCE = Path(".agents/skills")

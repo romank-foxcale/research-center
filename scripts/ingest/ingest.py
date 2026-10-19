@@ -27,14 +27,26 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "runner"))
 import extract  # noqa: E402
-import rc  # noqa: E402
 import secrets_scan  # noqa: E402
+
+import rc  # noqa: E402
 
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CONNECTOR_KINDS = {"notion": "notion", "gdrive": "gdrive"}
 ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 CITATION = re.compile(r"\[((?:sources|knowledge)/[^\]\s#]+)(?:#[^\]]*)?\]")
-PROFILE_KINDS = ("domain", "product", "stack", "problem", "constraint", "decision", "interest", "expertise", "gap", "preference")
+PROFILE_KINDS = (
+    "domain",
+    "product",
+    "stack",
+    "problem",
+    "constraint",
+    "decision",
+    "interest",
+    "expertise",
+    "gap",
+    "preference",
+)
 DEFAULT_EXCLUDES = ["node_modules/*", "vendor/*", "dist/*", "build/*", "target/*", ".venv/*", "__pycache__/*", "*.lock"]
 DOCUMENT = re.compile(r"^=== DOCUMENT: (?P<title>.*?) \| (?P<ref>\S+) ===$", re.MULTILINE)
 
@@ -72,10 +84,20 @@ def ensure_inbox(root: Path) -> dict[str, Any] | None:
     folder = root / INBOX
     if source_path(root, INBOX).exists() or not folder.is_dir() or not folder_files(folder):
         return None
-    descriptor = {"schemaVersion": 1, "id": INBOX, "kind": "folder", "locators": [INBOX], "include": [], "exclude": [],
-                  "depth": 1, "maxDocuments": 20, "origin": "user", "addedAt": rc.today(),
-                  "note": "Material the user dropped into this profile's inbox: read it for who they are, what they make "
-                          "or want, and what interests them."}
+    descriptor = {
+        "schemaVersion": 1,
+        "id": INBOX,
+        "kind": "folder",
+        "locators": [INBOX],
+        "include": [],
+        "exclude": [],
+        "depth": 1,
+        "maxDocuments": 20,
+        "origin": "user",
+        "addedAt": rc.today(),
+        "note": "Material the user dropped into this profile's inbox: read it for who they are, what they make "
+        "or want, and what interests them.",
+    }
     rc.write_json(source_path(root, INBOX), descriptor)
     return descriptor
 
@@ -124,21 +146,32 @@ def command_list(root: Path, _: argparse.Namespace) -> None:
         files = len(manifest.get("files", {}))
         fetched = manifest.get("fetchedAt", "never")
         digest = "fresh" if digest_fresh(root, descriptor["id"], manifest) else "stale"
-        print(f"{descriptor['id']:<36} {descriptor['kind']:<7} files {files:<5} fetched {fetched:<20} digest {digest}  {' '.join(descriptor['locators'])}")
+        print(
+            f"{descriptor['id']:<36} {descriptor['kind']:<7} files {files:<5} fetched {fetched:<20} digest {digest}  {' '.join(descriptor['locators'])}"
+        )
 
 
 # Guard ----------------------------------------------------------------------------------------------------
 
 
 def github_slug(remote: str) -> str | None:
-    match = re.match(r"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$", remote)
+    match = re.match(
+        r"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$", remote
+    )
     return match.group(1) if match else None
 
 
 def visibility(slug: str) -> str | None:
     try:
-        result = subprocess.run(["gh", "repo", "view", slug, "--json", "visibility", "--jq", ".visibility"],
-                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        result = subprocess.run(
+            ["gh", "repo", "view", slug, "--json", "visibility", "--jq", ".visibility"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=False,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     return result.stdout.strip().upper() if result.returncode == 0 else None
@@ -147,7 +180,14 @@ def visibility(slug: str) -> str | None:
 def guard(root: Path, lookup=visibility) -> None:
     """Refuse to commit sources into the template or into a repo that is, or may be, public."""
     config = rc.settings(root)
-    result = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    result = subprocess.run(
+        ["git", "-C", str(root), "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
     remote = result.stdout.strip() if result.returncode == 0 else ""
     if not remote:
         return  # nothing is published from a repo without a remote
@@ -156,12 +196,16 @@ def guard(root: Path, lookup=visibility) -> None:
         seen = lookup(slug)
         if seen in ("PRIVATE", "INTERNAL"):
             return
-        raise rc.RcError(f"origin {slug} is {seen or 'of unknown visibility (gh failed)'}: ingest commits source text, "
-                         "so the instance repo must be private")
+        raise rc.RcError(
+            f"origin {slug} is {seen or 'of unknown visibility (gh failed)'}: ingest commits source text, "
+            "so the instance repo must be private"
+        )
     if config.get("privateRemoteConfirmed") is True:
         return
-    raise rc.RcError(f"origin {remote} is not on GitHub, so its visibility cannot be checked; set "
-                     f"\"privateRemoteConfirmed\": true in {rc.SETTINGS} once you have made sure it is private")
+    raise rc.RcError(
+        f"origin {remote} is not on GitHub, so its visibility cannot be checked; set "
+        f'"privateRemoteConfirmed": true in {rc.SETTINGS} once you have made sure it is private'
+    )
 
 
 # Fetching -------------------------------------------------------------------------------------------------
@@ -189,7 +233,14 @@ def folder_files(folder: Path) -> list[str]:
 
 def git_remote(checkout: Path, locator: str) -> str:
     """The repo's portable name for handoffs: its origin URL, else the locator when that is a URL."""
-    result = subprocess.run(["git", "-C", str(checkout), "remote", "get-url", "origin"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    result = subprocess.run(
+        ["git", "-C", str(checkout), "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
     if result.returncode == 0 and result.stdout.strip():
         return result.stdout.strip()
     return locator if "://" in locator or locator.startswith("git@") else ""
@@ -204,17 +255,37 @@ def git_checkout(root: Path, descriptor: dict[str, Any]) -> tuple[Path, str]:
     else:
         checkout = root / ".rc-local" / "cache" / "git" / descriptor["id"]
         if (checkout / ".git").is_dir():
-            subprocess.run(["git", "-C", str(checkout), "fetch", "--depth", "1", "origin", "HEAD"], check=True, capture_output=True)
-            subprocess.run(["git", "-C", str(checkout), "reset", "--hard", "FETCH_HEAD"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "-C", str(checkout), "fetch", "--depth", "1", "origin", "HEAD"], check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "-C", str(checkout), "reset", "--hard", "FETCH_HEAD"], check=True, capture_output=True
+            )
         else:
             checkout.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "clone", "--depth", "1", "--", locator, str(checkout)], check=True, capture_output=True)
-    revision = subprocess.run(["git", "-C", str(checkout), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout.strip()
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--", locator, str(checkout)], check=True, capture_output=True
+            )
+    revision = subprocess.run(
+        ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    ).stdout.strip()
     return checkout, revision
 
 
 def git_files(checkout: Path) -> list[str]:
-    listed = subprocess.run(["git", "-C", str(checkout), "ls-files", "-z"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
+    listed = subprocess.run(
+        ["git", "-C", str(checkout), "ls-files", "-z"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
     return sorted(name for name in listed.stdout.split("\0") if name)
 
 
@@ -224,7 +295,9 @@ def url_slug(url: str) -> str:
 
 
 def fetch_url(url: str, limit: int = 15 * 1024 * 1024) -> tuple[bytes, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "research-center/1 (+https://github.com/romank-foxcale/research-center)"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "research-center/1 (+https://github.com/romank-foxcale/research-center)"}
+    )
     with urllib.request.urlopen(request, timeout=45) as response:
         data = response.read(limit + 1)
         kind = response.headers.get_content_type()
@@ -273,7 +346,9 @@ def connector_documents(session: rc.Session, root: Path, descriptor: dict[str, A
     return session.call_checked(role_id, body, f"connector-{descriptor['id']}", check)
 
 
-def collect(session: rc.Session | None, root: Path, descriptor: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, str], list[dict[str, str]], dict[str, str]]:
+def collect(
+    session: rc.Session | None, root: Path, descriptor: dict[str, Any]
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], list[dict[str, str]], dict[str, str]]:
     """Fetch one source: ({stored: entry}, {stored: text}, skipped, git revision and remote)."""
     config = rc.settings(root)["ingest"]
     max_file, max_source = config["maxFileBytes"], config["maxSourceBytes"]
@@ -291,8 +366,10 @@ def collect(session: rc.Session | None, root: Path, descriptor: dict[str, Any]) 
             return
         total += size
         if total > max_source:
-            raise rc.RcError(f"source {descriptor['id']} exceeds maxSourceBytes {max_source}; narrow it with --include/--exclude "
-                             f"or raise ingest.maxSourceBytes in {rc.SETTINGS}")
+            raise rc.RcError(
+                f"source {descriptor['id']} exceeds maxSourceBytes {max_source}; narrow it with --include/--exclude "
+                f"or raise ingest.maxSourceBytes in {rc.SETTINGS}"
+            )
         texts[stored] = text
         entries[stored] = {"origin": origin, "sha256": hashlib.sha256(original).hexdigest(), "extractor": extractor}
 
@@ -343,11 +420,19 @@ def read_manifest(root: Path, identifier: str) -> dict[str, Any]:
 
 def fingerprint(manifest: dict[str, Any]) -> str:
     files = manifest.get("files", {})
-    return hashlib.sha256(json.dumps(sorted((name, entry["sha256"]) for name, entry in files.items())).encode()).hexdigest()[:16]
+    return hashlib.sha256(
+        json.dumps(sorted((name, entry["sha256"]) for name, entry in files.items())).encode()
+    ).hexdigest()[:16]
 
 
-def store(root: Path, descriptor: dict[str, Any], entries: dict[str, dict[str, Any]], texts: dict[str, str],
-          skipped: list[dict[str, str]], revision: dict[str, str]) -> tuple[int, int]:
+def store(
+    root: Path,
+    descriptor: dict[str, Any],
+    entries: dict[str, dict[str, Any]],
+    texts: dict[str, str],
+    skipped: list[dict[str, str]],
+    revision: dict[str, str],
+) -> tuple[int, int]:
     """Write a fetched source: redacted text, manifest, redaction report. Returns (changed files, redactions).
     revision: a git source's {"revision": sha, "remote": url}; empty for other kinds."""
     directory = root / "sources" / descriptor["id"]
@@ -388,7 +473,11 @@ def store(root: Path, descriptor: dict[str, Any], entries: dict[str, dict[str, A
         report.write_text(
             f"# Redactions in {descriptor['id']}\n\nValues were replaced with [REDACTED:<kind>] before commit. "
             "Rotate any real credential listed here: it existed in the original.\n\n| File | Line | Kind |\n| --- | --- | --- |\n"
-            + "\n".join(redactions) + "\n", encoding="utf-8", newline="\n")
+            + "\n".join(redactions)
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
     else:
         report.unlink(missing_ok=True)
     return changed, len(redactions)
@@ -406,7 +495,11 @@ def frontmatter(text: str) -> dict[str, str]:
 
 def digest_fresh(root: Path, identifier: str, manifest: dict[str, Any]) -> bool:
     path = root / "knowledge" / "digests" / f"{identifier}.md"
-    return bool(manifest) and path.is_file() and frontmatter(path.read_text(encoding="utf-8")).get("fingerprint") == fingerprint(manifest)
+    return (
+        bool(manifest)
+        and path.is_file()
+        and frontmatter(path.read_text(encoding="utf-8")).get("fingerprint") == fingerprint(manifest)
+    )
 
 
 def chunks(root: Path, identifier: str, manifest: dict[str, Any], size: int) -> list[list[str]]:
@@ -457,14 +550,23 @@ def digest(session: rc.Session, root: Path, descriptor: dict[str, Any], manifest
         def check(reply: str) -> tuple[str, int]:
             kept, dropped = checked_citations(root, re.sub(r"\A---\n.*?\n---\n", "", reply.strip(), flags=re.DOTALL))
             if "## Key facts" not in kept or not CITATION.search(kept):
-                raise ValueError("the digest needs a '## Key facts' section whose bullets cite [sources/...] paths that exist")
+                raise ValueError(
+                    "the digest needs a '## Key facts' section whose bullets cite [sources/...] paths that exist"
+                )
             return kept, dropped
 
         kept, dropped = session.call_checked(role_id, body, f"digest-{descriptor['id']}-{number}", check)
         dropped_total += dropped
         parts.append(kept if len(groups) == 1 else f"# Part {number}\n\n{kept}")
-    summary = next((line.strip() for text in parts for line in text.splitlines()
-                    if line.strip() and not line.startswith(("#", "-", "*", "|"))), descriptor["id"])
+    summary = next(
+        (
+            line.strip()
+            for text in parts
+            for line in text.splitlines()
+            if line.strip() and not line.startswith(("#", "-", "*", "|"))
+        ),
+        descriptor["id"],
+    )
     header = (
         f"---\nid: digest.{descriptor['id']}\ntitle: Digest of {descriptor['id']}\nstatus: active\n"
         f"summary: {summary[:300]}\nverified_at: {rc.today()}\nfingerprint: {fingerprint(manifest)}\n"
@@ -490,7 +592,7 @@ def profile(session: rc.Session, root: Path) -> None:
         data = rc.extract_json(reply)
         notes = data.get("notes") if isinstance(data, dict) else None
         if not notes:
-            raise ValueError("expected JSON {\"summary\": ..., \"notes\": [...]} with at least one note")
+            raise ValueError('expected JSON {"summary": ..., "notes": [...]} with at least one note')
         problems, slugs = [], set()
         for note in notes:
             slug = note.get("slug", "")
@@ -519,25 +621,33 @@ def profile(session: rc.Session, root: Path) -> None:
     one_line = lambda value: " ".join(str(value).split())  # noqa: E731
     for note in data["notes"]:
         evidence = "".join(f"  - {path}\n" for path in dict.fromkeys(note["evidence"]))
-        rc.write_text(directory / f"{note['slug']}.md", (
-            f"---\nid: profile.{note['slug']}\ntitle: {one_line(note['title'])}\nstatus: active\nkind: {note['kind']}\n"
-            f"summary: {one_line(note['summary'])}\nverified_at: {rc.today()}\nevidence:\n{evidence}"
-            f"relations:\n  - knowledge/profile/index.md\n---\n\n# {one_line(note['title'])}\n\n{note['body'].strip()}\n"
-        ))
+        rc.write_text(
+            directory / f"{note['slug']}.md",
+            (
+                f"---\nid: profile.{note['slug']}\ntitle: {one_line(note['title'])}\nstatus: active\nkind: {note['kind']}\n"
+                f"summary: {one_line(note['summary'])}\nverified_at: {rc.today()}\nevidence:\n{evidence}"
+                f"relations:\n  - knowledge/profile/index.md\n---\n\n# {one_line(note['title'])}\n\n{note['body'].strip()}\n"
+            ),
+        )
     lines = []
     for kind in PROFILE_KINDS:
         members = [note for note in data["notes"] if note["kind"] == kind]
         if members:
             lines.append(f"\n## {kind.capitalize()}\n")
-            lines += [f"- [{one_line(note['title'])}]({note['slug']}.md): {one_line(note['summary'])}" for note in members]
+            lines += [
+                f"- [{one_line(note['title'])}]({note['slug']}.md): {one_line(note['summary'])}" for note in members
+            ]
     digest_list = "".join(f"  - {path.relative_to(root).as_posix()}\n" for path in digests)
     # A profile's notes belong to the profile; the settings file lives at the instance root, not beside it.
     anchor = "profile.json" if (root / "profile.json").is_file() else rc.SETTINGS
-    rc.write_text(directory / "index.md", (
-        f"---\nid: profile.index\ntitle: Profile\nstatus: active\nsummary: {one_line(data.get('summary', 'What the ingested sources say about the user or company.'))}\n"
-        f"verified_at: {rc.today()}\nevidence:\n{digest_list}relations:\n  - {anchor}\n---\n\n"
-        f"# Profile\n\n{data.get('summary', '').strip()}\n" + "\n".join(lines) + "\n"
-    ))
+    rc.write_text(
+        directory / "index.md",
+        (
+            f"---\nid: profile.index\ntitle: Profile\nstatus: active\nsummary: {one_line(data.get('summary', 'What the ingested sources say about the user or company.'))}\n"
+            f"verified_at: {rc.today()}\nevidence:\n{digest_list}relations:\n  - {anchor}\n---\n\n"
+            f"# Profile\n\n{data.get('summary', '').strip()}\n" + "\n".join(lines) + "\n"
+        ),
+    )
     session.say(f"profile: {len(data['notes'])} notes in knowledge/profile")
 
 
@@ -564,9 +674,14 @@ def run_ingest(root: Path, wanted: list[str], budget: int | None, profile_mode: 
                 session.say(f"fetch {descriptor['id']} ({descriptor['kind']})")
                 entries, texts, skipped, revision = collect(session, root, descriptor)
                 changed, redacted = store(root, descriptor, entries, texts, skipped, revision)
-                session.say(f"fetch {descriptor['id']}: {len(entries)} files, {changed} changed, {len(skipped)} skipped, {redacted} redactions")
+                session.say(
+                    f"fetch {descriptor['id']}: {len(entries)} files, {changed} changed, {len(skipped)} skipped, {redacted} redactions"
+                )
                 if redacted:
-                    session.say(f"{descriptor['id']}: {redacted} secrets redacted; see sources/{descriptor['id']}/redactions.md", "warn")
+                    session.say(
+                        f"{descriptor['id']}: {redacted} secrets redacted; see sources/{descriptor['id']}/redactions.md",
+                        "warn",
+                    )
                 manifest = read_manifest(root, descriptor["id"])
                 if not manifest.get("files"):
                     session.say(f"{descriptor['id']}: nothing to digest", "warn")
@@ -580,7 +695,9 @@ def run_ingest(root: Path, wanted: list[str], budget: int | None, profile_mode: 
         if profile_mode == "only" or (profile_mode == "auto" and (stale or profile_missing)):
             session.say("profile: reduce every digest into cited notes")
             profile(session, root)
-        session.say(f"ingest finished with {session.calls} agent calls; review, then commit sources/ and knowledge/", "gate")
+        session.say(
+            f"ingest finished with {session.calls} agent calls; review, then commit sources/ and knowledge/", "gate"
+        )
     return 0
 
 
@@ -590,7 +707,9 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add", help="register a source")
     add.add_argument("kind", choices=KINDS)
-    add.add_argument("locators", nargs="+", help="folder path, repo URL or path, URLs, Notion/Drive URLs or 'search:<query>'")
+    add.add_argument(
+        "locators", nargs="+", help="folder path, repo URL or path, URLs, Notion/Drive URLs or 'search:<query>'"
+    )
     add.add_argument("--id")
     add.add_argument("--include", action="append", help="glob of files to keep (folder, git); repeatable")
     add.add_argument("--exclude", action="append", help="glob of files to drop (folder, git); repeatable")
@@ -603,8 +722,14 @@ def main() -> int:
     run = commands.add_parser("run", help="fetch, digest and profile")
     run.add_argument("ids", nargs="*")
     run.add_argument("--budget", type=int)
-    run.add_argument("--profile", dest="profile_mode", action="store_const", const="only", default="auto",
-                     help="only rebuild the profile from the existing digests")
+    run.add_argument(
+        "--profile",
+        dest="profile_mode",
+        action="store_const",
+        const="only",
+        default="auto",
+        help="only rebuild the profile from the existing digests",
+    )
     run.add_argument("--no-profile", dest="profile_mode", action="store_const", const="never")
     args = parser.parse_args()
     root = args.root.resolve()

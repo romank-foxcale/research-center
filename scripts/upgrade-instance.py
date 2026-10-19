@@ -24,8 +24,21 @@ TEMPLATE = Path(__file__).resolve().parents[1]
 MIRRORED_DIRS = ("scripts", ".agents/skills", ".claude/skills", "templates", "install")
 # Replaced file by file; notes the instance added in docs/ stay.
 MERGED_DIRS = ("docs",)
-FILES = ("rc.py", "rc", "rc.cmd", "rc.ps1", "pyproject.toml", "uv.lock", "AGENTS.md", "CLAUDE.md", "GUIDE.md",
-         "BOOTSTRAP.md", ".gitattributes", ".gitignore", ".claude/settings.json")
+FILES = (
+    "rc.py",
+    "rc",
+    "rc.cmd",
+    "rc.ps1",
+    "pyproject.toml",
+    "uv.lock",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GUIDE.md",
+    "BOOTSTRAP.md",
+    ".gitattributes",
+    ".gitignore",
+    ".claude/settings.json",
+)
 OBSOLETE = ("flake.nix", "flake.lock", "nix")
 IGNORED = shutil.ignore_patterns("__pycache__", "*.pyc")
 
@@ -56,18 +69,29 @@ def upgrade_roles(instance: Path, settings: dict[str, Any], reset: bool) -> list
     notes = []
     catalog = instance / "catalog" / "agents"
     catalog.mkdir(parents=True, exist_ok=True)
-    seeds = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in (TEMPLATE / "templates" / "agents").glob("*.json")}
+    seeds = {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))
+        for path in (TEMPLATE / "templates" / "agents").glob("*.json")
+    }
     for name, seed in seeds.items():
         if not (catalog / f"{name}.json").is_file():
-            (catalog / f"{name}.json").write_text(json.dumps(seed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+            (catalog / f"{name}.json").write_text(
+                json.dumps(seed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
+            )
             notes.append(f"added role {name}")
     for path in sorted(catalog.glob("*.json")):
         role = json.loads(path.read_text(encoding="utf-8"))
         if role.get("provider") not in providers.PROVIDERS:
             replacement = seeds.get(path.stem) or {**role, "provider": "claude", "model": "opus"}
-            path.write_text(json.dumps(replacement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-            notes.append(f"role {path.stem}: {role.get('provider')} is no longer supported, now {replacement['provider']} {replacement['model']}")
-    seed_pipeline = json.loads((TEMPLATE / "templates" / "research-center.json").read_text(encoding="utf-8"))["pipeline"]
+            path.write_text(
+                json.dumps(replacement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
+            )
+            notes.append(
+                f"role {path.stem}: {role.get('provider')} is no longer supported, now {replacement['provider']} {replacement['model']}"
+            )
+    seed_pipeline = json.loads((TEMPLATE / "templates" / "research-center.json").read_text(encoding="utf-8"))[
+        "pipeline"
+    ]
     pipeline = settings.setdefault("pipeline", {})
     for slot, value in seed_pipeline.items():
         current = pipeline.get(slot)
@@ -92,7 +116,11 @@ def migrate_profiles(instance: Path, settings: dict[str, Any]) -> list[str]:
             notes.append(f"usecases/{old.name} not moved: profiles/{old.name} already exists")
             continue
         new.parent.mkdir(parents=True, exist_ok=True)
-        moved = subprocess.run(["git", "-C", str(instance), "mv", f"usecases/{old.name}", f"profiles/{old.name}"], capture_output=True)
+        moved = subprocess.run(
+            ["git", "-C", str(instance), "mv", f"usecases/{old.name}", f"profiles/{old.name}"],
+            capture_output=True,
+            check=False,
+        )
         if moved.returncode != 0:
             shutil.move(str(old), str(new))
         meta = json.loads((new / "usecase.json").read_text(encoding="utf-8"))
@@ -101,15 +129,27 @@ def migrate_profiles(instance: Path, settings: dict[str, Any]) -> list[str]:
             text = (new / "scope.md").read_text(encoding="utf-8")
             who = re.split(r"^## ", text.split("## Who", 1)[1], flags=re.MULTILINE)[0] if "## Who" in text else ""
             description = " ".join(re.sub(r"\s*\[[^\]]*\]", "", who.strip().split("\n\n")[0]).split())[:600]
-            (new / "scope.md").write_text(re.sub(r"^Use case: ", "Profile: ", text, count=1, flags=re.MULTILINE),
-                                          encoding="utf-8", newline="\n")
-        profile = {"schemaVersion": 1, "id": old.name, "name": meta.get("title") or old.name, "description": description,
-                   "type": "company", "tags": [], "createdAt": meta.get("createdAt", "")}
-        (new / "profile.json").write_text(json.dumps(profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+            (new / "scope.md").write_text(
+                re.sub(r"^Use case: ", "Profile: ", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n"
+            )
+        profile = {
+            "schemaVersion": 1,
+            "id": old.name,
+            "name": meta.get("title") or old.name,
+            "description": description,
+            "type": "company",
+            "tags": [],
+            "createdAt": meta.get("createdAt", ""),
+        }
+        (new / "profile.json").write_text(
+            json.dumps(profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
+        )
         (new / "usecase.json").unlink()
         (new / "inbox").mkdir(exist_ok=True)
         (new / "inbox" / ".gitkeep").touch()
-        notes.append(f"use case {old.name} is now profile {old.name} (type company; change it with rc profile edit {old.name} --type personal)")
+        notes.append(
+            f"use case {old.name} is now profile {old.name} (type company; change it with rc profile edit {old.name} --type personal)"
+        )
     if old_root.is_dir() and not any(old_root.iterdir()):
         old_root.rmdir()
     if "defaultUseCase" in settings:
@@ -122,7 +162,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="rc upgrade")
     parser.add_argument("template", type=Path, help="the template root (passed by rc)")
     parser.add_argument("instance", type=Path)
-    parser.add_argument("--reset-roles", action="store_true", help="use the template's pipeline roles (Claude-only defaults)")
+    parser.add_argument(
+        "--reset-roles", action="store_true", help="use the template's pipeline roles (Claude-only defaults)"
+    )
     parser.add_argument("--force", action="store_true", help="upgrade although the instance has uncommitted changes")
     args = parser.parse_args()
     instance = args.instance.resolve()
@@ -130,7 +172,13 @@ def main() -> int:
         return fail(f"{instance} is not a Research Center instance (no research-center.json)")
     if instance == TEMPLATE:
         return fail("run rc upgrade from the template (the kit), with the instance's path")
-    status = subprocess.run(["git", "-C", str(instance), "status", "--porcelain"], capture_output=True, text=True, encoding="utf-8")
+    status = subprocess.run(
+        ["git", "-C", str(instance), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
     if status.returncode != 0:
         return fail(f"{instance} is not a git repository; commit it first so the upgrade can be reviewed and reverted")
     if status.stdout.strip() and not args.force:
@@ -161,7 +209,10 @@ def main() -> int:
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
     seed = json.loads((TEMPLATE / "templates" / "research-center.json").read_text(encoding="utf-8"))
     seed.pop("name", None)
-    notes = [f"setting {key} added" for key in merge_missing(settings, {key: value for key, value in seed.items() if key != "pipeline"})]
+    notes = [
+        f"setting {key} added"
+        for key in merge_missing(settings, {key: value for key, value in seed.items() if key != "pipeline"})
+    ]
     notes += upgrade_roles(instance, settings, args.reset_roles)
     notes += migrate_profiles(instance, settings)
     settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
@@ -174,8 +225,13 @@ def main() -> int:
         notes.append("added catalog/adapters with the default adapters")
     # Enabled adapters whose code is the template's (core and pack adapters) take the template's descriptor, so new
     # filters reach the instance; an instance's own adapters (catalog/adapters/code/) are left alone.
-    shipped = {path.name: path for path in [*(TEMPLATE / "templates" / "adapters").glob("*.json"),
-                                            *(TEMPLATE / "templates" / "packs").glob("*/adapters/*.json")]}
+    shipped = {
+        path.name: path
+        for path in [
+            *(TEMPLATE / "templates" / "adapters").glob("*.json"),
+            *(TEMPLATE / "templates" / "packs").glob("*/adapters/*.json"),
+        ]
+    }
     for path in sorted((instance / "catalog" / "adapters").glob("*.json")):
         source = shipped.get(path.name)
         if source and path.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
@@ -185,8 +241,12 @@ def main() -> int:
     print(f"upgraded {instance} to the template at {TEMPLATE}")
     for line in notes + [f"removed {name}" for name in removed]:
         print(f"  {line}")
-    checks = [subprocess.run([sys.executable, "-B", str(TEMPLATE / "scripts" / script), str(instance)]).returncode
-              for script in ("validate-knowledge.py", "validate-research-center.py")]
+    checks = [
+        subprocess.run(
+            [sys.executable, "-B", str(TEMPLATE / "scripts" / script), str(instance)], check=False
+        ).returncode
+        for script in ("validate-knowledge.py", "validate-research-center.py")
+    ]
     print("\nreview the change with git diff in the instance, then commit it; run rc check there")
     return 1 if any(checks) else 0
 

@@ -17,3 +17,17 @@ dependencies = [
 [tool.uv]
 # A tool, not a package: uv only manages its environment.
 package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Rules are listed, not taken from ruff's defaults, so a ruff upgrade does not change the gate.
+# DTZ is left out: this is a desktop tool and local dates (is the weekly scout due today?) are intended.
+select = ["E", "F", "I", "UP", "B", "RUF", "PLW1510", "PIE", "ISC", "BLE", "PYI", "SIM"]
+# The formatter owns line length; what it cannot wrap is long prose in strings and comments.
+ignore = ["E501"]
+# TRY004 is left out: reply validators raise ValueError for a malformed agent reply, which the retry loop catches.
+# The report shows a real minus sign and en dash.
+allowed-confusables = ["−", "–"]

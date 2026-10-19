@@ -26,8 +26,15 @@ ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TYPES = ("company", "personal")
 FOLDER = "profiles"
 META = "profile.json"
-SECTIONS = ("Who", "Products and processes", "Hard constraints", "How value is measured", "Out of scope",
-            "Scouting lens", "Source preferences")
+SECTIONS = (
+    "Who",
+    "Products and processes",
+    "Hard constraints",
+    "How value is measured",
+    "Out of scope",
+    "Scouting lens",
+    "Source preferences",
+)
 DATA = ("inbox", "catalog/sources", "sources", "knowledge/digests", "knowledge/profile", "research")
 PLACEHOLDER = re.compile(r"<[^>\n]+>")
 
@@ -49,7 +56,9 @@ def load(root: Path, identifier: str) -> dict[str, Any]:
 
 
 def save(root: Path, meta: dict[str, Any]) -> None:
-    (folder(root, meta["id"]) / META).write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (folder(root, meta["id"]) / META).write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
 
 
 def meta_problems(meta: Any, name: str) -> list[str]:
@@ -108,16 +117,34 @@ def command_new(root: Path, identifier: str, name: str, kind: str, description: 
     for data in DATA:
         (target / data).mkdir(parents=True, exist_ok=True)
         (target / data / ".gitkeep").touch()
-    save(root, {"schemaVersion": 1, "id": identifier, "name": one_line(name), "description": one_line(description),
-                "type": kind, "tags": [], "createdAt": datetime.date.today().isoformat()})
-    print(f"created {FOLDER}/{identifier}/ ({kind}); add interest tags, or drop material into {FOLDER}/{identifier}/inbox/")
+    save(
+        root,
+        {
+            "schemaVersion": 1,
+            "id": identifier,
+            "name": one_line(name),
+            "description": one_line(description),
+            "type": kind,
+            "tags": [],
+            "createdAt": datetime.date.today().isoformat(),
+        },
+    )
+    print(
+        f"created {FOLDER}/{identifier}/ ({kind}); add interest tags, or drop material into {FOLDER}/{identifier}/inbox/"
+    )
 
 
 def command_edit(root: Path, identifier: str, name: str | None, kind: str | None, description: str | None) -> None:
     meta = load(root, identifier)
     if kind is not None and kind not in TYPES:
         raise ValueError(f"type must be one of {', '.join(TYPES)}")
-    meta.update({key: one_line(value) for key, value in (("name", name), ("description", description), ("type", kind)) if value is not None})
+    meta.update(
+        {
+            key: one_line(value)
+            for key, value in (("name", name), ("description", description), ("type", kind))
+            if value is not None
+        }
+    )
     save(root, meta)
     print(f"updated {FOLDER}/{identifier}/{META}")
 
@@ -129,18 +156,25 @@ def command_scope(root: Path, identifier: str) -> None:
     if path.exists():
         raise ValueError(f"{FOLDER}/{identifier}/scope.md already exists")
     template = (root / "templates" / "scope.md").read_text(encoding="utf-8")
-    path.write_text(template.replace("<title>", meta["name"]).replace("<profile-id>", identifier), encoding="utf-8", newline="\n")
-    print(f"created {FOLDER}/{identifier}/scope.md; fill it with the grill-profile skill, then rc profile accept {identifier}")
+    path.write_text(
+        template.replace("<title>", meta["name"]).replace("<profile-id>", identifier), encoding="utf-8", newline="\n"
+    )
+    print(
+        f"created {FOLDER}/{identifier}/scope.md; fill it with the grill-profile skill, then rc profile accept {identifier}"
+    )
 
 
 def summary(root: Path, identifier: str) -> dict[str, Any]:
     target = folder(root, identifier)
     meta = load(root, identifier)
     scope = (target / "scope.md").read_text(encoding="utf-8") if (target / "scope.md").is_file() else None
-    return {**meta, "scope": status(scope) if scope is not None else "none",
-            "sources": len(list((target / "catalog" / "sources").glob("*.json"))),
-            "topics": sorted(path.parent.name for path in (target / "research").glob("*/brief.md")),
-            "problems": scope_problems(scope) if scope is not None else []}
+    return {
+        **meta,
+        "scope": status(scope) if scope is not None else "none",
+        "sources": len(list((target / "catalog" / "sources").glob("*.json"))),
+        "topics": sorted(path.parent.name for path in (target / "research").glob("*/brief.md")),
+        "problems": scope_problems(scope) if scope is not None else [],
+    }
 
 
 def command_accept(root: Path, identifier: str) -> None:
@@ -151,7 +185,9 @@ def command_accept(root: Path, identifier: str) -> None:
     problems = scope_problems(text)
     if problems:
         raise ValueError("scope is not ready:\n" + "\n".join(f"- {problem}" for problem in problems))
-    path.write_text(re.sub(r"^Status:\s*\S+", "Status: accepted", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n")
+    path.write_text(
+        re.sub(r"^Status:\s*\S+", "Status: accepted", text, count=1, flags=re.MULTILINE), encoding="utf-8", newline="\n"
+    )
     print(f"accepted {FOLDER}/{identifier}/scope.md")
 
 
@@ -184,13 +220,17 @@ def main() -> int:
                 print('No profiles yet. Create one with: rc profile new <id> --name "..." --type company|personal')
             for identifier in ids(root):
                 item = summary(root, identifier)
-                print(f"{identifier:<20} {item['type']:<9} {len(item['tags'])} tags, {item['sources']} sources, "
-                      f"{len(item['topics'])} topics  {item['name']}")
+                print(
+                    f"{identifier:<20} {item['type']:<9} {len(item['tags'])} tags, {item['sources']} sources, "
+                    f"{len(item['topics'])} topics  {item['name']}"
+                )
         elif args.command == "show":
             item = summary(root, args.id)
             print(f"{item['id']}: {item['name']} ({item['type']})")
             print(f"  description: {item['description'] or '(none yet)'}")
-            print(f"  tags: {', '.join(tag['tag'] if isinstance(tag, dict) else str(tag) for tag in item['tags']) or '(none yet)'}")
+            print(
+                f"  tags: {', '.join(tag['tag'] if isinstance(tag, dict) else str(tag) for tag in item['tags']) or '(none yet)'}"
+            )
             print(f"  sources: {item['sources']}\n  topics: {', '.join(item['topics']) or 'none'}")
             print(f"  scope.md: {item['scope']}")
             for problem in item["problems"]:

@@ -37,7 +37,9 @@ PATTERNS: list[tuple[str, re.Pattern[str], int]] = [
 
 MARKER = re.compile(r"\[REDACTED:[a-z-]+\]")
 # Values that name a placeholder rather than hold a secret.
-PLACEHOLDER = re.compile(r"(?i)^(?:\$\{?[A-Z_]+\}?|<[^>]+>|x{4,}|\*{4,}|changeme|example\w*|your[_-]?\w+|placeholder|redacted\w*|\[REDACTED.*|null|none|true|false|process\.env\.\w+|os\.environ.*|env\(.*)$")
+PLACEHOLDER = re.compile(
+    r"(?i)^(?:\$\{?[A-Z_]+\}?|<[^>]+>|x{4,}|\*{4,}|changeme|example\w*|your[_-]?\w+|placeholder|redacted\w*|\[REDACTED.*|null|none|true|false|process\.env\.\w+|os\.environ.*|env\(.*)$"
+)
 
 
 def looks_secret(kind: str, value: str) -> bool:
@@ -72,7 +74,7 @@ def redact(text: str) -> tuple[str, list[dict[str, Any]]]:
     """The text with every secret replaced, and what was replaced (kind and line only)."""
     found = find(text)
     for item in reversed(found):
-        text = text[: item["start"]] + f"[REDACTED:{item['kind']}]" + text[item["end"]:]
+        text = text[: item["start"]] + f"[REDACTED:{item['kind']}]" + text[item["end"] :]
     return text, [{"kind": item["kind"], "line": item["line"]} for item in found]
 
 

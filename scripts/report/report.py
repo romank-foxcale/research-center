@@ -24,11 +24,16 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE.parent / "research"), str(HERE.parent / "runner"), str(HERE.parent / "ingest"), str(HERE.parent / "sources")]
+sys.path[:0] = [
+    str(HERE.parent / "research"),
+    str(HERE.parent / "runner"),
+    str(HERE.parent / "ingest"),
+    str(HERE.parent / "sources"),
+]
+import research  # noqa: E402
 from markdown_it import MarkdownIt  # noqa: E402
 
 import rc  # noqa: E402
-import research  # noqa: E402
 
 RING_ORDER = {ring: index for index, ring in enumerate(research.RINGS)}
 VERDICT_ORDER = {verdict: index for index, verdict in enumerate(research.IDEA_VERDICTS)}
@@ -99,7 +104,9 @@ class Topic:
         head, *_ = self.report.split("\n## ", 1)
         meta = next((line for line in head.splitlines()[1:] if line.strip()), "")
         parts = re.split(r"^## (.+)$", self.report, flags=re.MULTILINE)
-        return meta.strip(), {heading.strip(): body.strip() for heading, body in zip(parts[1::2], parts[2::2])}
+        return meta.strip(), {
+            heading.strip(): body.strip() for heading, body in zip(parts[1::2], parts[2::2], strict=True)
+        }
 
 
 # Pieces ---------------------------------------------------------------------------------------------------
@@ -115,13 +122,17 @@ def claim_title(topic: Topic, claim_id: str) -> str:
 
 def linked_refs(topic: Topic, rendered: str) -> str:
     """[C1, C2] in rendered HTML becomes links to the claims appendix, each with the claim as its tooltip."""
+
     def one(claim_id: str) -> str:
         verdict = topic.verdicts.get(claim_id, {}).get("verdict", "")
-        return (f'<a class="cref cv-{esc(verdict.lower() or "none")}" href="#{esc(claim_id)}" '
-                f'title="{esc(claim_title(topic, claim_id))}">{esc(claim_id)}</a>')
+        return (
+            f'<a class="cref cv-{esc(verdict.lower() or "none")}" href="#{esc(claim_id)}" '
+            f'title="{esc(claim_title(topic, claim_id))}">{esc(claim_id)}</a>'
+        )
 
     def group(match: re.Match[str]) -> str:
         return "[" + ", ".join(one(claim_id) for claim_id in re.split(r"\s*[,;]\s*", match.group(1))) + "]"
+
     return REF_GROUP.sub(group, rendered)
 
 
@@ -145,17 +156,27 @@ def missing(stage: str) -> str:
 def bars(rows: list[tuple[str, int, str]], total: int | None = None) -> str:
     """Horizontal bars: (label, count, css class); widths relative to the largest count or the total."""
     top = total or max((count for _, count, _ in rows), default=0) or 1
-    items = "".join(f'<div class="bar-row"><span class="bar-label">{label}</span>'
-                    f'<span class="bar-track"><span class="bar {css}" style="width:{max(count / top * 100, 0.5 if count else 0):.1f}%"></span></span>'
-                    f'<span class="bar-count">{count}</span></div>' for label, count, css in rows)
+    items = "".join(
+        f'<div class="bar-row"><span class="bar-label">{label}</span>'
+        f'<span class="bar-track"><span class="bar {css}" style="width:{max(count / top * 100, 0.5 if count else 0):.1f}%"></span></span>'
+        f'<span class="bar-count">{count}</span></div>'
+        for label, count, css in rows
+    )
     return f'<div class="bars">{items}</div>'
 
 
 def stacked(parts: list[tuple[str, int, str]]) -> str:
     total = sum(count for _, count, _ in parts) or 1
-    segments = "".join(f'<span class="seg {css}" style="width:{count / total * 100:.2f}%" title="{esc(label)}: {count}"></span>'
-                       for label, count, css in parts if count)
-    legend = "".join(f'<span class="key"><span class="dot {css}"></span>{esc(label)} {count}</span>' for label, count, css in parts if count)
+    segments = "".join(
+        f'<span class="seg {css}" style="width:{count / total * 100:.2f}%" title="{esc(label)}: {count}"></span>'
+        for label, count, css in parts
+        if count
+    )
+    legend = "".join(
+        f'<span class="key"><span class="dot {css}"></span>{esc(label)} {count}</span>'
+        for label, count, css in parts
+        if count
+    )
     return f'<div class="stack">{segments}</div><div class="legend">{legend}</div>'
 
 
@@ -173,16 +194,23 @@ def section_header(topic: Topic) -> str:
         flow = topic.screening.get("flow", {})
         counts.append(f"{flow.get('included', 0)} of {flow.get('screened', 0)} screened records included")
     line = esc(meta) if meta else f"Topic: {esc(topic.id)}"
-    return (f'<header class="top"><p class="crumbs">{crumbs}</p><h1>{esc(topic.title)}</h1>'
-            f'<p class="meta">{line} {badge("status", topic.status)}</p>'
-            + (f'<p class="meta">{esc(" · ".join(counts))}</p>' if counts else "") + "</header>")
+    return (
+        f'<header class="top"><p class="crumbs">{crumbs}</p><h1>{esc(topic.title)}</h1>'
+        f'<p class="meta">{line} {badge("status", topic.status)}</p>'
+        + (f'<p class="meta">{esc(" · ".join(counts))}</p>' if counts else "")
+        + "</header>"
+    )
 
 
 def section_plain(topic: Topic) -> str:
     """The report's plain summary, for a reader who reads nothing else; reports written before it existed have none."""
     _, parts = topic.report_parts()
     body = parts.get(research.PLAIN)
-    return f'<section id="plain" class="lead plain"><h2>{research.PLAIN}</h2>{markdown(topic, body)}</section>' if body else ""
+    return (
+        f'<section id="plain" class="lead plain"><h2>{research.PLAIN}</h2>{markdown(topic, body)}</section>'
+        if body
+        else ""
+    )
 
 
 def section_bottom_line(topic: Topic) -> str:
@@ -197,15 +225,28 @@ def section_bottom_line(topic: Topic) -> str:
 def idea_rows(topic: Topic) -> list[dict[str, Any]]:
     judged = {item["idea"]: item for item in (topic.judgement or {}).get("ideas", [])}
     fits = {item["idea"]: item for item in (topic.fit or {}).get("fits", [])}
-    rows = [{**idea, "judged": judged.get(idea["id"], {}), "fit": fits.get(idea["id"], {})} for idea in (topic.ideas or {}).get("ideas", [])]
-    return sorted(rows, key=lambda row: (RING_ORDER.get(row["fit"].get("ring"), len(RING_ORDER)),
-                                         VERDICT_ORDER.get(row["judged"].get("verdict"), len(VERDICT_ORDER)), int(row["id"][1:])))
+    rows = [
+        {**idea, "judged": judged.get(idea["id"], {}), "fit": fits.get(idea["id"], {})}
+        for idea in (topic.ideas or {}).get("ideas", [])
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            RING_ORDER.get(row["fit"].get("ring"), len(RING_ORDER)),
+            VERDICT_ORDER.get(row["judged"].get("verdict"), len(VERDICT_ORDER)),
+            int(row["id"][1:]),
+        ),
+    )
 
 
 def trail(history: list[dict[str, Any]], field: str) -> str:
     if len(history) < 2:
         return ""
-    return '<p class="trail">History: ' + " → ".join(f"{esc(item[field])} ({esc(item['date'])})" for item in history) + "</p>"
+    return (
+        '<p class="trail">History: '
+        + " → ".join(f"{esc(item[field])} ({esc(item['date'])})" for item in history)
+        + "</p>"
+    )
 
 
 def section_ideas(topic: Topic) -> str:
@@ -214,10 +255,13 @@ def section_ideas(topic: Topic) -> str:
     cards = []
     for row in idea_rows(topic):
         fit, judged = row["fit"], row["judged"]
-        head = (f'<div class="card-head"><span class="idea-id">{esc(row["id"])}</span><h3>{esc(row["name"])}</h3>'
-                + (badge("ring", fit["ring"]) if fit.get("ring") else badge("ring", "not applied"))
-                + (badge("verdict", judged["verdict"]) if judged.get("verdict") else "")
-                + (badge("effort", f"effort {fit['effort']}") if fit.get("effort") else "") + "</div>")
+        head = (
+            f'<div class="card-head"><span class="idea-id">{esc(row["id"])}</span><h3>{esc(row["name"])}</h3>'
+            + (badge("ring", fit["ring"]) if fit.get("ring") else badge("ring", "not applied"))
+            + (badge("verdict", judged["verdict"]) if judged.get("verdict") else "")
+            + (badge("effort", f"effort {fit['effort']}") if fit.get("effort") else "")
+            + "</div>"
+        )
         facts = [("What it is", esc(row.get("summary", "")) + " " + refs(topic, row.get("claims", [])))]
         if fit.get("replaces"):
             facts.append(("Replaces", esc(fit["replaces"])))
@@ -228,10 +272,15 @@ def section_ideas(topic: Topic) -> str:
         if judged.get("reason"):
             facts.append(("Judge", linked_refs(topic, esc(judged["reason"]))))
         detail = "".join(f"<dt>{name}</dt><dd>{value}</dd>" for name, value in facts)
-        why = (f'<details><summary>Why this ring</summary><div class="md">{markdown(topic, fit["rationale"])}</div></details>'
-               if fit.get("rationale") else "")
+        why = (
+            f'<details><summary>Why this ring</summary><div class="md">{markdown(topic, fit["rationale"])}</div></details>'
+            if fit.get("rationale")
+            else ""
+        )
         history = trail(fit.get("history", []), "ring") + trail(judged.get("history", []), "verdict")
-        cards.append(f'<article class="card ring-{esc((fit.get("ring") or "none").lower())}">{head}<dl>{detail}</dl>{why}{history}</article>')
+        cards.append(
+            f'<article class="card ring-{esc((fit.get("ring") or "none").lower())}">{head}<dl>{detail}</dl>{why}{history}</article>'
+        )
     note = "" if topic.fit else '<p class="missing">Rings come from the apply stage, which has not run yet.</p>'
     return f'<section id="ideas"><h2>Ideas</h2>{note}<div class="cards">{"".join(cards)}</div></section>'
 
@@ -244,14 +293,24 @@ def section_answers(topic: Topic) -> str:
     for question, text in topic.questions.items():
         answer = answers.get(question)
         if not answer:
-            rows.append(f'<div class="answer"><p class="q"><b>{esc(question)}</b> {esc(text)}</p><p class="missing">Not judged yet.</p></div>')
+            rows.append(
+                f'<div class="answer"><p class="q"><b>{esc(question)}</b> {esc(text)}</p><p class="missing">Not judged yet.</p></div>'
+            )
             continue
-        reasons = "".join(f'<li><span class="down">−{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
-                          for item in answer.get("downgrades", []))
-        reasons += "".join(f'<li><span class="up">+{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
-                           for item in answer.get("upgrades", []))
-        rows.append(f'<div class="answer"><p class="q"><b>{esc(question)}</b> {esc(text)}</p>'
-                    f'<p>Certainty {badge("certainty", answer["certainty"])}</p>' + (f"<ul>{reasons}</ul>" if reasons else "") + "</div>")
+        reasons = "".join(
+            f'<li><span class="down">−{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
+            for item in answer.get("downgrades", [])
+        )
+        reasons += "".join(
+            f'<li><span class="up">+{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
+            for item in answer.get("upgrades", [])
+        )
+        rows.append(
+            f'<div class="answer"><p class="q"><b>{esc(question)}</b> {esc(text)}</p>'
+            f"<p>Certainty {badge('certainty', answer['certainty'])}</p>"
+            + (f"<ul>{reasons}</ul>" if reasons else "")
+            + "</div>"
+        )
     notes = (topic.judgement or {}).get("notes")
     notes_html = f'<p class="note"><b>Judge\'s note:</b> {linked_refs(topic, esc(notes))}</p>' if notes else ""
     return f'<section id="answers"><h2>How sure we are</h2>{"".join(rows)}{notes_html}</section>'
@@ -262,32 +321,53 @@ def section_evidence(topic: Topic) -> str:
     if topic.screening:
         flow = topic.screening.get("flow", {})
         criteria = {item["id"]: item for item in topic.screening.get("criteria", [])}
-        funnel = [("Found by searches", flow.get("identified", 0), "b-found"),
-                  ("Found by following citations", flow.get("citationIdentified", 0), "b-found"),
-                  ("Duplicates removed", flow.get("duplicates", 0) + flow.get("citationDuplicates", 0), "b-muted"),
-                  ("Screened", flow.get("screened", 0), "b-screen"),
-                  ("Excluded", flow.get("excluded", 0), "b-out"),
-                  ("Included", flow.get("included", 0), "b-in")]
+        funnel = [
+            ("Found by searches", flow.get("identified", 0), "b-found"),
+            ("Found by following citations", flow.get("citationIdentified", 0), "b-found"),
+            ("Duplicates removed", flow.get("duplicates", 0) + flow.get("citationDuplicates", 0), "b-muted"),
+            ("Screened", flow.get("screened", 0), "b-screen"),
+            ("Excluded", flow.get("excluded", 0), "b-out"),
+            ("Included", flow.get("included", 0), "b-in"),
+        ]
         reasons = sorted(flow.get("excludedBy", {}).items(), key=lambda item: -item[1])
-        reason_rows = [(f"{esc(key)} {esc(criteria.get(key, {}).get('text', key))}", count, "b-out") for key, count in reasons]
-        blocks.append('<div class="panel"><h3>Screening</h3>' + bars(funnel)
-                      + ('<h4>Why records were excluded</h4>' + bars(reason_rows) if reason_rows else "") + "</div>")
+        reason_rows = [
+            (f"{esc(key)} {esc(criteria.get(key, {}).get('text', key))}", count, "b-out") for key, count in reasons
+        ]
+        blocks.append(
+            '<div class="panel"><h3>Screening</h3>'
+            + bars(funnel)
+            + ("<h4>Why records were excluded</h4>" + bars(reason_rows) if reason_rows else "")
+            + "</div>"
+        )
     else:
         blocks.append(f'<div class="panel"><h3>Screening</h3>{missing("screen")}</div>')
     if topic.ledger:
         counts = {verdict: 0 for verdict in (*research.CLAIM_VERDICTS, "not judged")}
         for claim_id in topic.claims:
             counts[topic.verdicts.get(claim_id, {}).get("verdict", "not judged")] += 1
-        verdicts = stacked([(verdict, count, f"v-{verdict.lower().replace(' ', '-')}") for verdict, count in counts.items()])
-        grades = [(grade, sum(source.get("reliability") == grade for source in topic.sources.values()), f"g-{grade.lower()}") for grade in research.GRADES]
+        verdicts = stacked(
+            [(verdict, count, f"v-{verdict.lower().replace(' ', '-')}") for verdict, count in counts.items()]
+        )
+        grades = [
+            (grade, sum(source.get("reliability") == grade for source in topic.sources.values()), f"g-{grade.lower()}")
+            for grade in research.GRADES
+        ]
         types: dict[str, int] = {}
         for source in topic.sources.values():
             types[source.get("evidenceType", "unknown")] = types.get(source.get("evidenceType", "unknown"), 0) + 1
-        type_rows = [(esc(name), count, "b-found") for name, count in sorted(types.items(), key=lambda item: (-item[1], item[0]))]
-        blocks.append('<div class="panel"><h3>Claims</h3><p class="hint">Verdicts after the sceptics and the judge. Claims the answer '
-                      'does not rely on are not judged.</p>' + verdicts
-                      + '<h3>Sources</h3><p class="hint">Reliability A (best) to F, capped by evidence type.</p>' + bars(grades)
-                      + "<h4>Evidence types</h4>" + bars(type_rows) + "</div>")
+        type_rows = [
+            (esc(name), count, "b-found") for name, count in sorted(types.items(), key=lambda item: (-item[1], item[0]))
+        ]
+        blocks.append(
+            '<div class="panel"><h3>Claims</h3><p class="hint">Verdicts after the sceptics and the judge. Claims the answer '
+            "does not rely on are not judged.</p>"
+            + verdicts
+            + '<h3>Sources</h3><p class="hint">Reliability A (best) to F, capped by evidence type.</p>'
+            + bars(grades)
+            + "<h4>Evidence types</h4>"
+            + bars(type_rows)
+            + "</div>"
+        )
     else:
         blocks.append(f'<div class="panel"><h3>Claims</h3>{missing("collect")}</div>')
     return f'<section id="evidence"><h2>Evidence at a glance</h2><div class="panels">{"".join(blocks)}</div></section>'
@@ -303,38 +383,73 @@ def section_hypotheses(topic: Topic) -> str:
     parts = []
     for question in topic.questions or entries:
         entry = entries.get(question, {})
-        body = [f'<h3>{esc(question)} {esc(topic.questions.get(question, ""))}</h3>']
+        body = [f"<h3>{esc(question)} {esc(topic.questions.get(question, ''))}</h3>"]
         ach = entry.get("ach")
         if ach:
             ranking, diagnostic = research.ach_ranking(ach, verdicts)
-            body.append("<ol class=\"ranking\">" + "".join(
-                f'<li><b>{esc(hypothesis)}</b> {esc(statements.get(hypothesis, ""))} '
-                f'<span class="hint">{score} inconsistent claim{"s" if score != 1 else ""}</span></li>' for hypothesis, score in ranking) + "</ol>")
-            body.append('<p class="hint">Ranked by how much surviving evidence is inconsistent with each hypothesis (fewest first). '
-                        'Struck-out claims were refuted or unsupported and do not count.</p>')
-            header = "".join(f'<th title="{esc(statements.get(hypothesis, ""))}">{esc(hypothesis)}</th>' for hypothesis in ach["hypotheses"])
+            body.append(
+                '<ol class="ranking">'
+                + "".join(
+                    f"<li><b>{esc(hypothesis)}</b> {esc(statements.get(hypothesis, ''))} "
+                    f'<span class="hint">{score} inconsistent claim{"s" if score != 1 else ""}</span></li>'
+                    for hypothesis, score in ranking
+                )
+                + "</ol>"
+            )
+            body.append(
+                '<p class="hint">Ranked by how much surviving evidence is inconsistent with each hypothesis (fewest first). '
+                "Struck-out claims were refuted or unsupported and do not count.</p>"
+            )
+            header = "".join(
+                f'<th title="{esc(statements.get(hypothesis, ""))}">{esc(hypothesis)}</th>'
+                for hypothesis in ach["hypotheses"]
+            )
             rows = []
             for row in ach["matrix"]:
                 out = verdicts.get(row["claim"]) in ("REFUTED", "UNSUPPORTED")
-                cells = "".join(f'<td class="r-{esc(row["ratings"].get(hypothesis, "").lower())}" title="{esc(RATING_NAMES.get(row["ratings"].get(hypothesis), ""))}">'
-                                f'{esc(row["ratings"].get(hypothesis, ""))}</td>' for hypothesis in ach["hypotheses"])
+                cells = "".join(
+                    f'<td class="r-{esc(row["ratings"].get(hypothesis, "").lower())}" title="{esc(RATING_NAMES.get(row["ratings"].get(hypothesis), ""))}">'
+                    f"{esc(row['ratings'].get(hypothesis, ''))}</td>"
+                    for hypothesis in ach["hypotheses"]
+                )
                 mark = ' <span class="hint">diagnostic</span>' if row["claim"] in diagnostic else ""
-                rows.append(f'<tr class="{"out" if out else ""}"><th scope="row">{refs(topic, [row["claim"]])}{mark}'
-                            f'<span class="claim-text">{esc(topic.claims.get(row["claim"], {}).get("text", ""))}</span></th>{cells}</tr>')
-            body.append(f'<div class="scroll"><table class="ach"><thead><tr><th>Claim</th>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
-            body.append('<p class="legend"><span class="key"><span class="dot r-c"></span>C consistent</span>'
-                        '<span class="key"><span class="dot r-i"></span>I inconsistent</span><span class="key"><span class="dot r-n"></span>N neutral</span></p>')
-            body += [f'<p class="note">Untested alternative (no search looked for evidence against it): {esc(item)}</p>' for item in ach.get("untested", [])]
+                rows.append(
+                    f'<tr class="{"out" if out else ""}"><th scope="row">{refs(topic, [row["claim"]])}{mark}'
+                    f'<span class="claim-text">{esc(topic.claims.get(row["claim"], {}).get("text", ""))}</span></th>{cells}</tr>'
+                )
+            body.append(
+                f'<div class="scroll"><table class="ach"><thead><tr><th>Claim</th>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+            )
+            body.append(
+                '<p class="legend"><span class="key"><span class="dot r-c"></span>C consistent</span>'
+                '<span class="key"><span class="dot r-i"></span>I inconsistent</span><span class="key"><span class="dot r-n"></span>N neutral</span></p>'
+            )
+            body += [
+                f'<p class="note">Untested alternative (no search looked for evidence against it): {esc(item)}</p>'
+                for item in ach.get("untested", [])
+            ]
         else:
-            no_alternative = next((item for item in topic.plan.get("noAlternatives", []) if item.get("question") == question), None)
-            body.append(f'<p class="hint">No competing hypotheses: {esc(no_alternative["why"])}</p>' if no_alternative
-                        else '<p class="hint">This question has no hypothesis matrix (the topic ran before matrices were required).</p>')
+            no_alternative = next(
+                (item for item in topic.plan.get("noAlternatives", []) if item.get("question") == question), None
+            )
+            body.append(
+                f'<p class="hint">No competing hypotheses: {esc(no_alternative["why"])}</p>'
+                if no_alternative
+                else '<p class="hint">This question has no hypothesis matrix (the topic ran before matrices were required).</p>'
+            )
         assumptions = entry.get("assumptions", [])
         if assumptions:
-            items = "".join(f'<li>{badge("verdict", assumption_verdicts[item["id"]]["verdict"]) if item["id"] in assumption_verdicts else ""} '
-                            f'<b>{esc(item["id"])}</b> {esc(item["text"])} {refs(topic, item.get("claims", []))}'
-                            + (f'<br><span class="hint">{linked_refs(topic, esc(assumption_verdicts[item["id"]]["reason"]))}</span>' if item["id"] in assumption_verdicts else "")
-                            + "</li>" for item in assumptions)
+            items = "".join(
+                f"<li>{badge('verdict', assumption_verdicts[item['id']]['verdict']) if item['id'] in assumption_verdicts else ''} "
+                f"<b>{esc(item['id'])}</b> {esc(item['text'])} {refs(topic, item.get('claims', []))}"
+                + (
+                    f'<br><span class="hint">{linked_refs(topic, esc(assumption_verdicts[item["id"]]["reason"]))}</span>'
+                    if item["id"] in assumption_verdicts
+                    else ""
+                )
+                + "</li>"
+                for item in assumptions
+            )
             body.append(f'<h4>Key assumptions</h4><ul class="assumptions">{items}</ul>')
         parts.append(f'<div class="question">{"".join(body)}</div>')
     return f'<section id="hypotheses"><h2>Competing hypotheses and assumptions</h2>{"".join(parts)}</section>'
@@ -358,24 +473,39 @@ def section_claims(topic: Topic) -> str:
         judged = topic.verdicts.get(claim_id, {})
         verdict = judged.get("verdict", "not judged")
         source = topic.sources.get(claim.get("source"), {})
-        quote = f'<blockquote>{esc(claim.get("quote", ""))}</blockquote>' if claim.get("quote") else ""
+        quote = f"<blockquote>{esc(claim.get('quote', ''))}</blockquote>" if claim.get("quote") else ""
         checked = "" if claim.get("quoteVerified") else ' <span class="hint">quote not found on the stored page</span>'
         reason = f'<p class="hint">{linked_refs(topic, esc(judged["reason"]))}</p>' if judged.get("reason") else ""
         flag = ' <span class="badge verdict-weakened">contested</span>' if claim_id in contested else ""
-        source_html = (f'{esc(source.get("id", ""))} {link(source.get("url"), source.get("title") or source.get("url") or "")} '
-                       f'<span class="hint">{esc(source.get("evidenceType", ""))}, reliability {esc(source.get("reliability", "?"))}'
-                       + (f', {esc(source["published"])}' if source.get("published") else "") + "</span>")
-        rows.append(f'<tr id="{esc(claim_id)}" data-verdict="{esc(verdict)}"><td class="cid">{esc(claim_id)}</td>'
-                    f'<td>{esc(claim["text"])}{flag}<details><summary>Quote and source</summary>{quote}{checked}<p>{source_html}</p>{reason}</details></td>'
-                    f'<td>{badge("verdict", verdict)}' + (f'<br><span class="hint">credibility {esc(judged["credibility"])}</span>' if judged.get("credibility") else "")
-                    + f'</td><td>{esc(", ".join(claim.get("questions", [])))}</td></tr>')
-    options = "".join(f'<option value="{esc(verdict)}">{esc(verdict)}</option>' for verdict in (*research.CLAIM_VERDICTS, "not judged"))
-    return (f'<section id="claims"><h2>Claims</h2><p class="hint">Every claim quotes a stored page. Credibility runs from 1 '
-            f'(confirmed by other sources) to 6 (cannot be judged).</p>'
-            f'<div class="filters"><input type="search" id="claim-filter" placeholder="Filter claims" aria-label="Filter claims">'
-            f'<select id="verdict-filter" aria-label="Verdict"><option value="">All verdicts</option>{options}</select></div>'
-            f'<div class="scroll"><table class="claims"><thead><tr><th>ID</th><th>Claim</th><th>Verdict</th><th>Q</th></tr></thead>'
-            f'<tbody>{"".join(rows)}</tbody></table></div></section>')
+        source_html = (
+            f"{esc(source.get('id', ''))} {link(source.get('url'), source.get('title') or source.get('url') or '')} "
+            f'<span class="hint">{esc(source.get("evidenceType", ""))}, reliability {esc(source.get("reliability", "?"))}'
+            + (f", {esc(source['published'])}" if source.get("published") else "")
+            + "</span>"
+        )
+        rows.append(
+            f'<tr id="{esc(claim_id)}" data-verdict="{esc(verdict)}"><td class="cid">{esc(claim_id)}</td>'
+            f"<td>{esc(claim['text'])}{flag}<details><summary>Quote and source</summary>{quote}{checked}<p>{source_html}</p>{reason}</details></td>"
+            f"<td>{badge('verdict', verdict)}"
+            + (
+                f'<br><span class="hint">credibility {esc(judged["credibility"])}</span>'
+                if judged.get("credibility")
+                else ""
+            )
+            + f"</td><td>{esc(', '.join(claim.get('questions', [])))}</td></tr>"
+        )
+    options = "".join(
+        f'<option value="{esc(verdict)}">{esc(verdict)}</option>'
+        for verdict in (*research.CLAIM_VERDICTS, "not judged")
+    )
+    return (
+        f'<section id="claims"><h2>Claims</h2><p class="hint">Every claim quotes a stored page. Credibility runs from 1 '
+        f"(confirmed by other sources) to 6 (cannot be judged).</p>"
+        f'<div class="filters"><input type="search" id="claim-filter" placeholder="Filter claims" aria-label="Filter claims">'
+        f'<select id="verdict-filter" aria-label="Verdict"><option value="">All verdicts</option>{options}</select></div>'
+        f'<div class="scroll"><table class="claims"><thead><tr><th>ID</th><th>Claim</th><th>Verdict</th><th>Q</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div></section>"
+    )
 
 
 def section_sources(topic: Topic) -> str:
@@ -384,11 +514,13 @@ def section_sources(topic: Topic) -> str:
     used: dict[str, int] = {}
     for claim in topic.claims.values():
         used[claim.get("source", "")] = used.get(claim.get("source", ""), 0) + 1
-    items = "".join(f'<li id="{esc(source_id)}"><b>{esc(source_id)}</b> {link(source.get("url"), source.get("title") or source.get("url") or "")} '
-                    f'<span class="hint">{esc(source.get("evidenceType", ""))}, reliability {esc(source.get("reliability", "?"))}'
-                    + (f', {esc(source["published"])}' if source.get("published") else "")
-                    + f', {used.get(source_id, 0)} claim{"s" if used.get(source_id, 0) != 1 else ""}</span></li>'
-                    for source_id, source in sorted(topic.sources.items(), key=lambda item: int(re.sub(r"\D", "", item[0]) or 0)))
+    items = "".join(
+        f'<li id="{esc(source_id)}"><b>{esc(source_id)}</b> {link(source.get("url"), source.get("title") or source.get("url") or "")} '
+        f'<span class="hint">{esc(source.get("evidenceType", ""))}, reliability {esc(source.get("reliability", "?"))}'
+        + (f", {esc(source['published'])}" if source.get("published") else "")
+        + f", {used.get(source_id, 0)} claim{'s' if used.get(source_id, 0) != 1 else ''}</span></li>"
+        for source_id, source in sorted(topic.sources.items(), key=lambda item: int(re.sub(r"\D", "", item[0]) or 0))
+    )
     return f'<section id="sources"><details><summary><h2>Sources ({len(topic.sources)})</h2></summary><ol class="sources">{items}</ol></details></section>'
 
 
@@ -396,20 +528,29 @@ def section_history(topic: Topic) -> str:
     if not topic.watch:
         return ""
     watch = topic.watch
-    facts = (f'<p>Checked {esc(watch.get("cadence", ""))} (every {esc(watch.get("cadenceDays", ""))} days). Last checked '
-             f'{esc(watch.get("lastChecked", ""))}, last changed {esc(watch.get("lastChanged", ""))}. '
-             f'Retire when: {esc(watch.get("retireWhen", ""))}</p>')
+    facts = (
+        f"<p>Checked {esc(watch.get('cadence', ''))} (every {esc(watch.get('cadenceDays', ''))} days). Last checked "
+        f"{esc(watch.get('lastChecked', ''))}, last changed {esc(watch.get('lastChanged', ''))}. "
+        f"Retire when: {esc(watch.get('retireWhen', ''))}</p>"
+    )
     deltas = []
     for path in sorted((topic.dir / "delta").glob("*.json"), reverse=True):
         if path.stem.endswith("-searches"):
             continue
         delta = json.loads(path.read_text(encoding="utf-8"))
-        deltas.append(f'<li><b>{esc(delta.get("stamp", path.stem))}</b> {badge("change", "material" if delta.get("material") else "no material change")} '
-                      f'{esc(delta.get("summary", ""))}</li>')
-    log = "".join(f'<li>{esc(item.get("date"))}: {esc(item.get("kind"))}, version {esc(item.get("version"))}</li>' for item in reversed(watch.get("log", [])))
-    return (f'<section id="history"><h2>Living topic</h2>{facts}'
-            + (f'<h3>Refreshes</h3><ul>{"".join(deltas)}</ul>' if deltas else "")
-            + f'<details><summary>Run log</summary><ul>{log}</ul></details></section>')
+        deltas.append(
+            f"<li><b>{esc(delta.get('stamp', path.stem))}</b> {badge('change', 'material' if delta.get('material') else 'no material change')} "
+            f"{esc(delta.get('summary', ''))}</li>"
+        )
+    log = "".join(
+        f"<li>{esc(item.get('date'))}: {esc(item.get('kind'))}, version {esc(item.get('version'))}</li>"
+        for item in reversed(watch.get("log", []))
+    )
+    return (
+        f'<section id="history"><h2>Living topic</h2>{facts}'
+        + (f"<h3>Refreshes</h3><ul>{''.join(deltas)}</ul>" if deltas else "")
+        + f"<details><summary>Run log</summary><ul>{log}</ul></details></section>"
+    )
 
 
 # The page -------------------------------------------------------------------------------------------------
@@ -505,28 +646,56 @@ if(r){q.value='';v.value='';f();var d=r.querySelector('details');if(d)d.open=tru
 def page(title: str, body: str, script: bool = True, fragment: bool = False) -> str:
     """A whole document, or with fragment the page's content only: an artifact wraps the page it publishes in its
     own document, while the pages published beside it are served as they are."""
-    head = (f'<title>{esc(title)}</title><meta name="claude:viewport-fit-sides" content="cover"><style>{STYLE}</style>')
+    head = f'<title>{esc(title)}</title><meta name="claude:viewport-fit-sides" content="cover"><style>{STYLE}</style>'
     content = f"<main>{body}</main>" + (f"<script>{SCRIPT}</script>" if script else "")
     if fragment:
         return head + content + "\n"
-    return ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
-            f"{head}</head><body>{content}</body></html>\n")
+    return (
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+        f"{head}</head><body>{content}</body></html>\n"
+    )
 
 
 def render_topic(root: Path, topic_id: str, dashboard: bool = False, fragment: bool = False) -> str:
     """A topic's page; with dashboard, it links back to the profile's dashboard (index.html) beside it."""
     topic = Topic(root, topic_id)
-    toc = [("plain", "In plain words"), ("bottom-line", "Bottom line"), ("ideas", "Ideas"), ("answers", "Certainty"), ("evidence", "Evidence"),
-           ("hypotheses", "Hypotheses"), ("report", "Full report"), ("claims", "Claims"), ("sources", "Sources"), ("history", "History")]
-    body = [section_plain(topic), section_bottom_line(topic), section_ideas(topic), section_answers(topic), section_evidence(topic),
-            section_hypotheses(topic), section_report(topic), section_claims(topic), section_sources(topic), section_history(topic)]
+    toc = [
+        ("plain", "In plain words"),
+        ("bottom-line", "Bottom line"),
+        ("ideas", "Ideas"),
+        ("answers", "Certainty"),
+        ("evidence", "Evidence"),
+        ("hypotheses", "Hypotheses"),
+        ("report", "Full report"),
+        ("claims", "Claims"),
+        ("sources", "Sources"),
+        ("history", "History"),
+    ]
+    body = [
+        section_plain(topic),
+        section_bottom_line(topic),
+        section_ideas(topic),
+        section_answers(topic),
+        section_evidence(topic),
+        section_hypotheses(topic),
+        section_report(topic),
+        section_claims(topic),
+        section_sources(topic),
+        section_history(topic),
+    ]
     present = [(anchor, name) for anchor, name in toc if any(f'id="{anchor}"' in part for part in body)]
     back = '<a href="index.html">&larr; All topics</a>' if dashboard else ""
     nav = '<nav class="toc">' + back + "".join(f'<a href="#{anchor}">{name}</a>' for anchor, name in present) + "</nav>"
-    return page(topic.title, section_header(topic) + nav + "".join(body)
-                + f"<footer>Research Center report for topic {esc(topic.id)}. Built from the topic's committed outputs; "
-                  "every statement traces to a claim and its stored source.</footer>", fragment=fragment)
+    return page(
+        topic.title,
+        section_header(topic)
+        + nav
+        + "".join(body)
+        + f"<footer>Research Center report for topic {esc(topic.id)}. Built from the topic's committed outputs; "
+        "every statement traces to a claim and its stored source.</footer>",
+        fragment=fragment,
+    )
 
 
 # The dashboard --------------------------------------------------------------------------------------------
@@ -550,14 +719,26 @@ def progress(topic: Topic) -> str:
 def topic_card(topic: Topic) -> str:
     rows = idea_rows(topic)
     rings = {ring: sum(row["fit"].get("ring") == ring for row in rows) for ring in research.RINGS}
-    ring_html = "".join(f'<span class="badge ring-{ring.lower()}">{count} {ring}</span>' for ring, count in rings.items() if count)
+    ring_html = "".join(
+        f'<span class="badge ring-{ring.lower()}">{count} {ring}</span>' for ring, count in rings.items() if count
+    )
     leading = [row for row in rows if row["fit"].get("ring") in ("ADOPT", "TRIAL")][:3]
-    leading_html = "".join(f'<li>{badge("ring", row["fit"]["ring"])} {esc(row["name"])}'
-                           + (f' <span class="hint">{esc(row["judged"]["verdict"].lower())}</span>' if row["judged"].get("verdict") else "")
-                           + "</li>" for row in leading)
+    leading_html = "".join(
+        f"<li>{badge('ring', row['fit']['ring'])} {esc(row['name'])}"
+        + (
+            f' <span class="hint">{esc(row["judged"]["verdict"].lower())}</span>'
+            if row["judged"].get("verdict")
+            else ""
+        )
+        + "</li>"
+        for row in leading
+    )
     answers = {item["question"]: item["certainty"] for item in (topic.judgement or {}).get("answers", [])}
-    certainty = "".join(f'<span class="key"><b>{esc(question)}</b> {badge("certainty", answers[question])}</span>'
-                        for question in topic.questions if question in answers)
+    certainty = "".join(
+        f'<span class="key"><b>{esc(question)}</b> {badge("certainty", answers[question])}</span>'
+        for question in topic.questions
+        if question in answers
+    )
     watch = topic.watch or {}
     facts = [f"{len(topic.questions)} question{'s' if len(topic.questions) != 1 else ''}"]
     if topic.ledger:
@@ -566,13 +747,17 @@ def topic_card(topic: Topic) -> str:
         facts.append(f"checked {watch['lastChecked']}, changed {watch.get('lastChanged', '?')}")
     state = progress(topic)
     ring = leading[0]["fit"]["ring"] if leading else "none"
-    return (f'<article class="card ring-{esc(ring.lower())}">'
-            f'<div class="card-head"><h3><a href="{esc(topic.id)}.html">{esc(topic.title)}</a></h3>{badge("status", topic.status)}'
-            + (badge("change", state) if state != "done" else "") + "</div>"
-            + f'<p class="hint">{esc(topic.id)} · {esc(" · ".join(facts))}</p>'
-            + (f'<div class="legend">{ring_html}</div>' if ring_html else "")
-            + (f'<ul class="leading">{leading_html}</ul>' if leading_html else "")
-            + (f'<div class="legend">Certainty {certainty}</div>' if certainty else "") + "</article>")
+    return (
+        f'<article class="card ring-{esc(ring.lower())}">'
+        f'<div class="card-head"><h3><a href="{esc(topic.id)}.html">{esc(topic.title)}</a></h3>{badge("status", topic.status)}'
+        + (badge("change", state) if state != "done" else "")
+        + "</div>"
+        + f'<p class="hint">{esc(topic.id)} · {esc(" · ".join(facts))}</p>'
+        + (f'<div class="legend">{ring_html}</div>' if ring_html else "")
+        + (f'<ul class="leading">{leading_html}</ul>' if leading_html else "")
+        + (f'<div class="legend">Certainty {certainty}</div>' if certainty else "")
+        + "</article>"
+    )
 
 
 def tag_names(meta: dict[str, Any]) -> list[str]:
@@ -588,9 +773,11 @@ def profile_line(root: Path) -> str:
     if not about and scope:
         about = re.sub(r"\s*\[[^\]]*\]", "", research.sections(scope).get("Who", "").strip().split("\n\n")[0])
     tags = "".join(f'<span class="badge tag">{esc(name)}</span>' for name in tag_names(meta) if name)
-    return ((f'<p class="meta">{badge("status", meta["type"])}</p>' if meta.get("type") else "")
-            + (f'<div class="md">{MARKDOWN.render(about)}</div>' if about else "")
-            + (f'<div class="legend tags">{tags}</div>' if tags else ""))
+    return (
+        (f'<p class="meta">{badge("status", meta["type"])}</p>' if meta.get("type") else "")
+        + (f'<div class="md">{MARKDOWN.render(about)}</div>' if about else "")
+        + (f'<div class="legend tags">{tags}</div>' if tags else "")
+    )
 
 
 def render_dashboard(root: Path, fragment: bool = False, up: str = "") -> str:
@@ -602,10 +789,15 @@ def render_dashboard(root: Path, fragment: bool = False, up: str = "") -> str:
     living = sum(topic.status == "living" for topic in topics)
     summary = f"{len(topics)} topic{'s' if len(topics) != 1 else ''}, {living} living"
     crumbs = f'<a href="{esc(up)}">&larr; Main screen</a>' if up else "Research Center"
-    return page(title, f'<header class="top"><p class="crumbs">{crumbs}</p><h1>{esc(title)}</h1>'
-                f'<p class="meta">{esc(summary)}</p>{profile_line(root)}</header>'
-                f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
-                "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>", script=False, fragment=fragment)
+    return page(
+        title,
+        f'<header class="top"><p class="crumbs">{crumbs}</p><h1>{esc(title)}</h1>'
+        f'<p class="meta">{esc(summary)}</p>{profile_line(root)}</header>'
+        f'<section id="topics"><h2>Topics</h2><div class="cards">{cards}</div></section>'
+        "<footer>Built from the committed research outputs. Open a topic for its evidence.</footer>",
+        script=False,
+        fragment=fragment,
+    )
 
 
 def output_path(root: Path, name: str) -> Path:
@@ -644,7 +836,11 @@ def manifest(root: Path, topic: str | None, page_path: Path) -> dict[str, Any]:
     content = render_topic(root, topic, fragment=True) if topic else render_dashboard(root, fragment=True)
     shared = write_page(folder / "share" / f"{name}.html", content)
     beside = {} if topic else {f"{other}.html": str(folder / f"{other}.html") for other in topic_ids(root)}
-    title = Topic(root, topic).title if topic else (load(root, "profile.json") or {}).get("name") or rc.settings(root).get("name")
+    title = (
+        Topic(root, topic).title
+        if topic
+        else (load(root, "profile.json") or {}).get("name") or rc.settings(root).get("name")
+    )
     return {"page": str(shared), "files": beside, "title": title, "sharedAt": shares(folder).get(name)}
 
 
@@ -663,14 +859,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="./rc report", description="Render research as self-contained HTML pages")
     parser.add_argument("root", type=Path)
     parser.add_argument("topic", nargs="?", help="one topic's page; without it, the dashboard and every topic's page")
-    parser.add_argument("--output", type=Path, help="the page (with a topic) or the folder (without); default .rc-local/reports/")
+    parser.add_argument(
+        "--output", type=Path, help="the page (with a topic) or the folder (without); default .rc-local/reports/"
+    )
     parser.add_argument("--manifest", action="store_true", help="after writing, print what a share publishes, as JSON")
-    parser.add_argument("--shared-at", metavar="URL", help="record the artifact link the page was shared at; writes no page")
+    parser.add_argument(
+        "--shared-at", metavar="URL", help="record the artifact link the page was shared at; writes no page"
+    )
     args = parser.parse_args()
     root = args.root.resolve()
     try:
         if args.shared_at:
-            folder = (args.output.parent if args.topic else args.output) if args.output else output_path(root, DASHBOARD).parent
+            folder = (
+                (args.output.parent if args.topic else args.output)
+                if args.output
+                else output_path(root, DASHBOARD).parent
+            )
             remember_share(folder, args.topic or DASHBOARD, args.shared_at)
             print(f"recorded: {args.topic or 'the dashboard'} is shared at {args.shared_at}")
             return 0

@@ -13,14 +13,26 @@ import os
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # Silence longer than this is reported as a stall, and again after each further period of silence.
 STALL_SECONDS = 180
 # Ends the stream; a nested process writing to its parent's stream never emits it.
 END = "end"
-MARKS = {"start": "▶", "step": "→", "handoff": "⇄", "say": "💬", "agent": "·", "stall": "⚠", "error": "✖", "warn": "!", "gate": "✓", END: "■"}
+MARKS = {
+    "start": "▶",
+    "step": "→",
+    "handoff": "⇄",
+    "say": "💬",
+    "agent": "·",
+    "stall": "⚠",
+    "error": "✖",
+    "warn": "!",
+    "gate": "✓",
+    END: "■",
+}
 
 
 def now() -> str:
@@ -55,7 +67,11 @@ class Watchdog(threading.Thread):
     """
 
     def __init__(
-        self, events: Events, sources: Callable[[], dict[str, tuple[float, str]]], limit: float = STALL_SECONDS, every: float = 5
+        self,
+        events: Events,
+        sources: Callable[[], dict[str, tuple[float, str]]],
+        limit: float = STALL_SECONDS,
+        every: float = 5,
     ):
         super().__init__(daemon=True)
         self.events, self.sources, self.limit, self.every = events, sources, limit, every
@@ -69,7 +85,9 @@ class Watchdog(threading.Thread):
                 silent = current - max(last, self.warned.get(who, 0))
                 if silent >= self.limit:
                     quiet = clock(int(current - last))
-                    self.events.emit("stall", f"{who} silent for {quiet}" + (f"; last: {doing}" if doing else ""), who=who)
+                    self.events.emit(
+                        "stall", f"{who} silent for {quiet}" + (f"; last: {doing}" if doing else ""), who=who
+                    )
                     self.warned[who] = current
 
 
@@ -121,6 +139,7 @@ def alive(pid: int | None) -> bool:
         return True
     if os.name == "nt":
         import ctypes
+
         kernel = ctypes.windll.kernel32
         handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
@@ -154,7 +173,11 @@ def follow(path: Path, out=sys.stdout, poll: float = 1.0) -> int:
         seen = len(events)
         # A crash or kill leaves no end event: notice the dead writer instead of waiting forever.
         if not alive(owner):
-            print(render({"at": now(), "kind": "error", "text": f"process {owner} exited without finishing the run"}), file=out, flush=True)
+            print(
+                render({"at": now(), "kind": "error", "text": f"process {owner} exited without finishing the run"}),
+                file=out,
+                flush=True,
+            )
             return 1
         time.sleep(poll)
 

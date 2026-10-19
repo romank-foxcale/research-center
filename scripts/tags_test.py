@@ -18,8 +18,9 @@ import ingest  # noqa: E402
 import profiles  # noqa: E402
 import profiles_test  # noqa: E402  (its instance builder)
 import providers  # noqa: E402
-import rc  # noqa: E402
 import tags  # noqa: E402
+
+import rc  # noqa: E402
 
 PROMPTS: list[str] = []
 
@@ -33,9 +34,11 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
     PROMPTS.append(prompt)
     retry = "previous reply was rejected" in prompt
     evidence = "knowledge/profile/ocr.md" if retry or len(PROMPTS) > 2 else "knowledge/profile/missing.md"
-    proposals = [{"tag": "Japanese OCR", "why": "scanned Japanese documents are read with Tesseract", "evidence": [evidence]},
-                 {"tag": "cross-encoder reranking", "why": "the reranker is a placeholder", "evidence": ["profile.json"]},
-                 {"tag": "blockchain", "why": "adjacent", "evidence": ["profile.json"]}]
+    proposals = [
+        {"tag": "Japanese OCR", "why": "scanned Japanese documents are read with Tesseract", "evidence": [evidence]},
+        {"tag": "cross-encoder reranking", "why": "the reranker is a placeholder", "evidence": ["profile.json"]},
+        {"tag": "blockchain", "why": "adjacent", "evidence": ["profile.json"]},
+    ]
     if len(PROMPTS) > 2:  # a later run must leave out what was taken or rejected
         assert "Rejected before, never propose again: blockchain" in prompt and "Current tags:" in prompt, prompt
         proposals = [{"tag": "near-duplicate detection", "why": "review sets hold many copies", "evidence": [evidence]}]
@@ -71,7 +74,11 @@ def main() -> int:
         quiet(tags.command_add, alpha, "e-discovery")
         quiet(tags.command_remove, alpha, "E-Discovery")
         meta = tags.load(alpha)
-        assert tags.names(meta["tags"]) == ["Digital forensics"] and meta["tags"][0]["source"] == "user" and meta["tags"][0]["why"] == "our domain"
+        assert (
+            tags.names(meta["tags"]) == ["Digital forensics"]
+            and meta["tags"][0]["source"] == "user"
+            and meta["tags"][0]["why"] == "our domain"
+        )
         assert "no tag" in raises(tags.command_remove, alpha, "nothing")
 
         # Proposals rest on files of the profile: a reply citing a missing file is retried once.
@@ -81,9 +88,21 @@ def main() -> int:
         assert "Read profile.json" in PROMPTS[0] and "Current tags: Digital forensics" in PROMPTS[0]
         assert [item["tag"] for item in proposals] == ["Japanese OCR", "cross-encoder reranking", "blockchain"]
         assert tags.load(alpha)["tags"] == meta["tags"], "proposals wait until accepted"
-        problems = tags.suggestion_problems({"tags": [{"tag": "digital forensics", "why": "x", "evidence": ["profile.json"]},
-                                                      {"tag": "a", "why": "", "evidence": []}]}, alpha, {"digital forensics"})
-        assert "already a tag or was rejected" in problems[0] and "needs a why" in problems[1] and "needs evidence" in problems[2], problems
+        problems = tags.suggestion_problems(
+            {
+                "tags": [
+                    {"tag": "digital forensics", "why": "x", "evidence": ["profile.json"]},
+                    {"tag": "a", "why": "", "evidence": []},
+                ]
+            },
+            alpha,
+            {"digital forensics"},
+        )
+        assert (
+            "already a tag or was rejected" in problems[0]
+            and "needs a why" in problems[1]
+            and "needs evidence" in problems[2]
+        ), problems
 
         # Accept some, reject one; a rejected tag is never proposed again, and adding it by hand un-rejects it.
         quiet(tags.command_accept, alpha, ["japanese ocr", "Cross-encoder reranking"])
@@ -104,7 +123,9 @@ def main() -> int:
         descriptor = ingest.ensure_inbox(alpha)
         assert descriptor["locators"] == ["inbox"] and (alpha / "catalog" / "sources" / "inbox.json").is_file()
         assert ingest.ensure_inbox(alpha) is None, "registered once"
-        assert ingest.local_folder(alpha, "inbox") == alpha / "inbox" and ingest.folder_files(ingest.local_folder(alpha, "inbox")) == ["about-us.md"]
+        assert ingest.local_folder(alpha, "inbox") == alpha / "inbox" and ingest.folder_files(
+            ingest.local_folder(alpha, "inbox")
+        ) == ["about-us.md"]
     print("tags test passed")
     return 0
 
