@@ -249,6 +249,8 @@ def check_folder_ingest(base: Path) -> None:
 
 
 def test_ingest(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    CALLS.clear()
     monkeypatch.setattr(providers, "run", fake_run)
     check_extract()
     with tempfile.TemporaryDirectory() as directory:

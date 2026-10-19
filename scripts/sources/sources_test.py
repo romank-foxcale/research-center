@@ -357,6 +357,7 @@ def check_packs_and_own_adapters() -> None:
 
 def check_rate_limit() -> None:
     slept: list[float] = []
+    kit._last_request.clear()
     clock, sleep = kit.time.monotonic, kit.time.sleep
     kit.time.monotonic, kit.time.sleep = (lambda: 1000.0), slept.append
     try:
@@ -369,6 +370,9 @@ def check_rate_limit() -> None:
 
 
 def test_sources(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    REQUESTS.clear()
+    PAGES.clear()
     global ROOT
     monkeypatch.setattr(kit, "TRANSPORT", transport)
     isolated = tempfile.TemporaryDirectory()

@@ -76,6 +76,8 @@ def quiet(function, *args, **kwargs):
 
 
 def test_scout() -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    CALLS.clear()
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))
         shutil.copyfile(

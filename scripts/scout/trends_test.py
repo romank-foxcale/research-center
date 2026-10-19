@@ -118,6 +118,8 @@ def quiet(function, *args, **kwargs):
 
 
 def test_trends(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    PROMPTS.clear()
     monkeypatch.setattr(providers, "run", fake_run)
     monkeypatch.setattr(kit, "TRANSPORT", transport)
     with tempfile.TemporaryDirectory() as directory:

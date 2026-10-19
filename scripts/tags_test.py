@@ -59,6 +59,8 @@ def raises(function, *args) -> str:
 
 
 def test_tags(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    PROMPTS.clear()
     monkeypatch.setattr(providers, "run", fake_run)
     with tempfile.TemporaryDirectory() as directory:
         root = profiles_test.instance(Path(directory))

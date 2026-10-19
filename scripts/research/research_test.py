@@ -569,6 +569,9 @@ def raises(error: type[BaseException], function, *args) -> str:
 
 
 def test_research(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    CALLS.clear()
+    SEEN_PROMPTS.clear()
     monkeypatch.setattr(providers, "run", fake_run)
     monkeypatch.setattr(ingest, "url_document", fake_page)
     monkeypatch.setattr(ingest, "guard", lambda root, lookup=None: None)
