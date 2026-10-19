@@ -55,7 +55,23 @@ def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    temporary.replace(path)
+    replace(temporary, path)
+
+
+# On Windows a rename onto a file fails with "Access is denied" while any other process has that file open, even
+# one that shares delete as an antivirus scan or the search indexer does right after a write. Such holds last
+# milliseconds, so the rename is retried for a few seconds before the error counts.
+REPLACE_WAITS = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0) if os.name == "nt" else ()
+
+
+def replace(source: Path, target: Path) -> None:
+    for wait in REPLACE_WAITS:
+        try:
+            source.replace(target)
+            return
+        except PermissionError:
+            time.sleep(wait)
+    source.replace(target)
 
 
 def write_text(path: Path, text: str) -> list[dict[str, Any]]:
