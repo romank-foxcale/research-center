@@ -326,7 +326,23 @@ def raises(error: type[BaseException], function, *args) -> str:
     raise AssertionError(f"{function.__name__} did not raise {error.__name__}")
 
 
+def test_profile_paths() -> None:
+    """In a profile, agents run in profiles/<id>/ and resolved research/<topic>/ against the repository root, so
+    the shared context names the brief, the topic folder and sources/ by absolute path."""
+    with tempfile.TemporaryDirectory() as temp:
+        profile = Path(temp) / "profiles" / "alpha"
+        (profile / "research" / "ocr").mkdir(parents=True)
+        (profile / "research" / "ocr" / "brief.md").write_text("# OCR\n", encoding="utf-8")
+        (profile / "profile.json").write_text(json.dumps({"name": "Alpha", "type": "personal"}), encoding="utf-8")
+        shown = research.context(profile, "ocr")
+        folder = (profile / "research" / "ocr").resolve()
+        assert f"Brief: {folder / 'brief.md'} (read it first)" in shown, shown
+        assert f"research/ocr/ in this task is the folder {folder}" in shown, shown
+        assert str((profile / "sources").resolve()) in shown and str((profile / "profile.json").resolve()) in shown, shown
+
+
 def main() -> int:
+    test_profile_paths()
     providers.run = fake_run
     ingest.url_document = fake_page
     ingest.guard = lambda root, lookup=None: None
