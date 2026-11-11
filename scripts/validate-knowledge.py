@@ -10,7 +10,6 @@ from pathlib import Path
 
 from rule_hooks import extra_markdown_dirs, markdown_allowed
 
-
 REQUIRED_FILES = ("README.md", "AGENTS.md", "rc.py", "pyproject.toml", "docs/index.md")
 REQUIRED_FIELDS = ("id", "title", "status", "summary", "verified_at")
 ALLOWED_STATUSES = {"active", "accepted", "draft", "superseded", "archived"}
@@ -60,7 +59,11 @@ def repository_files(root: Path) -> list[str]:
     if (root / ".git").exists():
         listed = subprocess.run(
             ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
         )
         if listed.returncode == 0:
             return listed.stdout.splitlines()
@@ -130,7 +133,9 @@ def validate(root: Path) -> list[str]:
                     errors.append(f"{relative}: broken {field} path '{value}'")
                 # docs/ is copied into every instance, the template's own plans are not: such a link breaks there.
                 if value.startswith("plans/") and not (root / "research-center.json").is_file():
-                    errors.append(f"{relative}: {field} path '{value}' points at a template plan, which instances do not get")
+                    errors.append(
+                        f"{relative}: {field} path '{value}' points at a template plan, which instances do not get"
+                    )
 
         for raw_link in MARKDOWN_LINK.findall(text):
             target = local_target(root, note, raw_link, from_root=False)

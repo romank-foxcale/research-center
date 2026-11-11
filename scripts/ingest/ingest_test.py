@@ -22,6 +22,7 @@ sys.path[:0] = [str(HERE), str(HERE.parent / "runner")]
 import extract  # noqa: E402
 import ingest  # noqa: E402
 import providers  # noqa: E402
+
 import rc  # noqa: E402
 
 SECRET = "Hunter2-xyz!9"
@@ -65,11 +66,25 @@ def fake_run(role, prompt, cwd, log, timeout=0, on_say=None, shared=None):
         digest = next(line[2:] for line in prompt.splitlines() if line.startswith("- knowledge/digests/"))
         source = digest.removeprefix("knowledge/digests/").removesuffix(".md")
         evidence = f"sources/{source}/text/README.md"
-        return "Here is the profile.\n\n```json\n" + json.dumps({
-            "summary": "A team building a Python service.",
-            "notes": [{"slug": "python-service", "kind": "stack", "title": "Python service", "summary": "The product is Python.",
-                       "body": f"Written in Python [{evidence}].", "evidence": [evidence]}],
-        }) + "\n```"
+        return (
+            "Here is the profile.\n\n```json\n"
+            + json.dumps(
+                {
+                    "summary": "A team building a Python service.",
+                    "notes": [
+                        {
+                            "slug": "python-service",
+                            "kind": "stack",
+                            "title": "Python service",
+                            "summary": "The product is Python.",
+                            "body": f"Written in Python [{evidence}].",
+                            "evidence": [evidence],
+                        }
+                    ],
+                }
+            )
+            + "\n```"
+        )
     raise AssertionError(f"unexpected role {role['id']}")
 
 
@@ -126,7 +141,9 @@ def check_guard(base: Path) -> None:
         except rc.RcError as error:
             assert "private" in str(error)
     ingest.guard(root, lambda slug: "PRIVATE" if slug == "acme/rc" else None)
-    subprocess.run(["git", "-C", str(root), "remote", "set-url", "origin", "https://gitlab.example.com/acme/rc.git"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "set-url", "origin", "https://gitlab.example.com/acme/rc.git"], check=True
+    )
     try:
         ingest.guard(root, lambda slug: "PRIVATE")
         raise AssertionError("an unverifiable remote must be refused")
@@ -150,20 +167,31 @@ def check_folder_ingest(base: Path) -> None:
     (corpus / "src").mkdir(parents=True)
     (corpus / "README.md").write_text("# Service\n\nA Python service.\n")
     (corpus / "src" / "app.py").write_text("print('hello')\n")
-    (corpus / "config.yaml").write_text(f"password: \"{SECRET}\"\n")
+    (corpus / "config.yaml").write_text(f'password: "{SECRET}"\n')
     (corpus / "logo.png").write_bytes(b"\x89PNG\0\0\0")
     (corpus / ".hidden").write_text("skip me\n")
     (corpus / "node_modules").mkdir()
     (corpus / "node_modules" / "x.js").write_text("x\n")
 
-    args = argparse.Namespace(**{"kind": "folder", "locators": [str(corpus)], "id": "corpus", "include": None, "exclude": None,
-                                 "depth": 1, "max_documents": 20, "note": "test corpus"})
+    args = argparse.Namespace(
+        kind="folder",
+        locators=[str(corpus)],
+        id="corpus",
+        include=None,
+        exclude=None,
+        depth=1,
+        max_documents=20,
+        note="test corpus",
+    )
     quiet(ingest.command_add, root, args)
     quiet(ingest.run_ingest, root, [], None, "auto", lambda slug: None)
     text_root = root / "sources" / "corpus" / "text"
     stored = sorted(path.relative_to(text_root).as_posix() for path in text_root.rglob("*") if path.is_file())
     assert stored == ["README.md", "config.yaml.txt", "src/app.py.txt"], stored
-    assert SECRET not in (text_root / "config.yaml.txt").read_text() and "[REDACTED:assigned-secret]" in (text_root / "config.yaml.txt").read_text()
+    assert (
+        SECRET not in (text_root / "config.yaml.txt").read_text()
+        and "[REDACTED:assigned-secret]" in (text_root / "config.yaml.txt").read_text()
+    )
     report = (root / "sources" / "corpus" / "redactions.md").read_text()
     assert "config.yaml.txt | 1 | assigned-secret" in report and SECRET not in report, report
     manifest = json.loads((root / "sources" / "corpus" / "manifest.json").read_text())
@@ -187,8 +215,9 @@ def check_folder_ingest(base: Path) -> None:
     (corpus / "config.yaml").unlink()
     quiet(ingest.run_ingest, root, [], None, "auto", lambda slug: None)
     assert CALLS == ["digester", "profiler"], CALLS
-    assert not (text_root / "config.yaml.txt").exists() and not (root / "sources" / "corpus" / "redactions.md").exists(), \
-        "a file gone from the origin leaves the committed text, and its redaction report goes with it"
+    assert (
+        not (text_root / "config.yaml.txt").exists() and not (root / "sources" / "corpus" / "redactions.md").exists()
+    ), "a file gone from the origin leaves the committed text, and its redaction report goes with it"
 
     # Budget: two sources need two digests; a budget of one keeps the first and stops.
     CALLS.clear()
@@ -202,9 +231,12 @@ def check_folder_ingest(base: Path) -> None:
         raise AssertionError("the budget must stop the run")
     except rc.BudgetExceeded:
         pass
-    assert CALLS == ["digester"] and ingest.digest_fresh(root, "corpus", ingest.read_manifest(root, "corpus")), \
+    assert CALLS == ["digester"] and ingest.digest_fresh(root, "corpus", ingest.read_manifest(root, "corpus")), (
         "the finished digest is kept"
-    assert (root / "sources" / "second" / "manifest.json").is_file() and not (root / "knowledge" / "digests" / "second.md").exists()
+    )
+    assert (root / "sources" / "second" / "manifest.json").is_file() and not (
+        root / "knowledge" / "digests" / "second.md"
+    ).exists()
 
     # The template refuses to hold data.
     template = base / "template"
@@ -216,17 +248,13 @@ def check_folder_ingest(base: Path) -> None:
     assert any("ships no data" in error for error in load_validator().validate(template))
 
 
-def main() -> int:
-    providers.run = fake_run
+def test_ingest(monkeypatch) -> None:
+    # Module state outlives a test; a rerun in the same process (mutation testing) starts clean.
+    CALLS.clear()
+    monkeypatch.setattr(providers, "run", fake_run)
     check_extract()
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)
         check_git_remote(base)
         check_guard(base)
         check_folder_ingest(base)
-    print("ingest test passed")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

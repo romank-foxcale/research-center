@@ -29,22 +29,38 @@ import shutil
 import subprocess
 import sys
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent / "runner"), str(HERE.parent / "sources"), str(HERE.parent)]
 import cards as carding  # noqa: E402
 import kit  # noqa: E402
 import licences  # noqa: E402
-import rc  # noqa: E402
 import sources as registry  # noqa: E402
 
-DEFAULTS = {"lookbackDays": 30, "perQuery": 10, "githubMinStars": 50, "cardsPerRun": 6, "calls": 12, "cadenceDays": 7,
-            "sources": ["github-new", "github-active", "arxiv", "openalex"]}
+import rc  # noqa: E402
+
+DEFAULTS = {
+    "lookbackDays": 30,
+    "perQuery": 10,
+    "githubMinStars": 50,
+    "cardsPerRun": 6,
+    "calls": 12,
+    "cadenceDays": 7,
+    "sources": ["github-new", "github-active", "arxiv", "openalex"],
+}
 ROLES = ("scoutTriage", "scoutEvaluator", "scoutSceptic")
 ARXIV = "http://export.arxiv.org/api/query"
-KINDS = {"github": "repository", "feed": "paper", "openalex": "paper", "crossref": "paper", "guardian": "article", "gdelt": "article"}
+KINDS = {
+    "github": "repository",
+    "feed": "paper",
+    "openalex": "paper",
+    "crossref": "paper",
+    "guardian": "article",
+    "gdelt": "article",
+}
 
 
 def settings(root: Path) -> dict[str, Any]:
@@ -69,11 +85,19 @@ def load(path: Path, empty: Any) -> Any:
 def arxiv_url(tag: str, limit: int) -> str:
     """The arXiv API's newest papers whose title or abstract carries the tag as a phrase."""
     phrase = f'"{tag}"'
-    return f"{ARXIV}?" + urllib.parse.urlencode({"search_query": f"ti:{phrase} OR abs:{phrase}", "sortBy": "submittedDate",
-                                                 "sortOrder": "descending", "max_results": limit})
+    return f"{ARXIV}?" + urllib.parse.urlencode(
+        {
+            "search_query": f"ti:{phrase} OR abs:{phrase}",
+            "sortBy": "submittedDate",
+            "sortOrder": "descending",
+            "max_results": limit,
+        }
+    )
 
 
-def queries(tag: str, since: str, config: dict[str, Any], enabled: set[str]) -> list[tuple[str, str, str, dict[str, str], str | None]]:
+def queries(
+    tag: str, since: str, config: dict[str, Any], enabled: set[str]
+) -> list[tuple[str, str, str, dict[str, str], str | None]]:
     """(source, adapter, query, filters, since) for one tag; a source whose adapter is not enabled is left out."""
     planned = {
         "github-new": ("github", tag, {"created": since, "sort": "stars"}, None),
@@ -82,7 +106,11 @@ def queries(tag: str, since: str, config: dict[str, Any], enabled: set[str]) -> 
         # Quoted: OpenAlex matches loose words otherwise ("TAR stopping rules" found mean-field games).
         "openalex": ("openalex", f'"{tag}"', {}, since),
     }
-    return [(source, *planned[source]) for source in config["sources"] if source in planned and planned[source][0] in enabled]
+    return [
+        (source, *planned[source])
+        for source in config["sources"]
+        if source in planned and planned[source][0] in enabled
+    ]
 
 
 def lend_github_token() -> bool:
@@ -92,7 +120,7 @@ def lend_github_token() -> bool:
     gh = shutil.which("gh")
     if not gh:
         return False
-    result = subprocess.run([gh, "auth", "token"], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([gh, "auth", "token"], capture_output=True, text=True, timeout=15, check=False)
     token = result.stdout.strip()
     if result.returncode == 0 and token:
         os.environ["GITHUB_TOKEN"] = token
@@ -102,13 +130,28 @@ def lend_github_token() -> bool:
 
 def candidate(item: dict[str, Any], tag: str, source: str, kind_of_profile: str, root: Path) -> dict[str, Any]:
     extra = item.get("extra", {})
-    found = {"key": item["key"], "title": item["title"], "url": item["url"], "kind": KINDS.get(item["adapter"], "item"),
-             "date": item.get("date", ""), "abstract": item.get("abstract", "")[:1200], "authors": item.get("authors", [])[:5],
-             "tags": [tag], "sources": [source]}
+    found = {
+        "key": item["key"],
+        "title": item["title"],
+        "url": item["url"],
+        "kind": KINDS.get(item["adapter"], "item"),
+        "date": item.get("date", ""),
+        "abstract": item.get("abstract", "")[:1200],
+        "authors": item.get("authors", [])[:5],
+        "tags": [tag],
+        "sources": [source],
+    }
     if found["kind"] == "repository":
-        found.update({"stars": extra.get("stars", 0), "language": extra.get("language"), "topics": extra.get("topics", []),
-                      "created": extra.get("created", ""), "archived": extra.get("archived", False),
-                      "licence": licences.verdict(root, extra.get("license"), kind_of_profile)})
+        found.update(
+            {
+                "stars": extra.get("stars", 0),
+                "language": extra.get("language"),
+                "topics": extra.get("topics", []),
+                "created": extra.get("created", ""),
+                "archived": extra.get("archived", False),
+                "licence": licences.verdict(root, extra.get("license"), kind_of_profile),
+            }
+        )
     if item.get("doi"):
         found["doi"] = item["doi"]
     return found
@@ -122,8 +165,12 @@ def stamp_for(directory: Path) -> str:
     return stamp
 
 
-def discover(root: Path, since: str | None = None, only: list[str] | None = None,
-             search: Callable[..., list[dict[str, Any]]] | None = None) -> dict[str, Any]:
+def discover(
+    root: Path,
+    since: str | None = None,
+    only: list[str] | None = None,
+    search: Callable[..., list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """Run discovery for the profile at root; return the run's summary."""
     search = search or registry.search
     meta = profile(root)
@@ -136,7 +183,11 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
         raise rc.RcError("no interest tags to scout for; add some with rc tags add, or rc tags suggest")
     directory = folder(root)
     state = load(directory / "state.json", {})
-    since = since or state.get("lastDiscovery") or (datetime.date.today() - datetime.timedelta(days=config["lookbackDays"])).isoformat()
+    since = (
+        since
+        or state.get("lastDiscovery")
+        or (datetime.date.today() - datetime.timedelta(days=config["lookbackDays"])).isoformat()
+    )
     datetime.date.fromisoformat(since)
     enabled = set(registry.descriptors(root))
     if "github" in enabled and not lend_github_token():
@@ -147,7 +198,9 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
     found: dict[str, dict[str, Any]] = {}
     failures: list[str] = []
     total = 0
-    skipped = sorted(set(config["sources"]) - {source for tag in tags[:1] for source, *_ in queries(tag, since, config, enabled)})
+    skipped = sorted(
+        set(config["sources"]) - {source for tag in tags[:1] for source, *_ in queries(tag, since, config, enabled)}
+    )
     for number, tag in enumerate(tags, 1):
         for source, adapter, query, filters, query_since in queries(tag, since, config, enabled):
             try:
@@ -170,8 +223,15 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
     today = datetime.date.today().isoformat()
     for item in candidates:
         seen[item["key"]] = {"title": item["title"], "firstSeen": today, "status": "candidate", "run": stamp}
-    summary = {"stamp": stamp, "since": since, "tags": tags, "results": total, "new": len(candidates),
-               "failures": failures, "sourcesSkipped": skipped}
+    summary = {
+        "stamp": stamp,
+        "since": since,
+        "tags": tags,
+        "results": total,
+        "new": len(candidates),
+        "failures": failures,
+        "sourcesSkipped": skipped,
+    }
     rc.write_json(directory / "candidates" / f"{stamp}.json", {**summary, "candidates": candidates})
     rc.write_json(directory / "seen.json", seen)
     rc.write_json(directory / "state.json", {**state, "lastDiscovery": today})
@@ -179,16 +239,25 @@ def discover(root: Path, since: str | None = None, only: list[str] | None = None
 
 
 def report_discovery(summary: dict[str, Any]) -> None:
-    print(f"{summary['new']} new candidates from {summary['results']} results since {summary['since']}: "
-          f"scout/candidates/{summary['stamp']}.json")
+    print(
+        f"{summary['new']} new candidates from {summary['results']} results since {summary['since']}: "
+        f"scout/candidates/{summary['stamp']}.json"
+    )
     for line in summary["failures"]:
         print(f"warning: {line}")
     if summary["sourcesSkipped"]:
         print(f"note: not searched, adapter not enabled: {', '.join(summary['sourcesSkipped'])} (rc sources packs)")
 
 
-TREND_TAGS = ("AI coding agent", "agent harness", "open-weight LLM", "local LLM inference", "LLM evaluation",
-              "RAG framework", "developer tooling")
+TREND_TAGS = (
+    "AI coding agent",
+    "agent harness",
+    "open-weight LLM",
+    "local LLM inference",
+    "LLM evaluation",
+    "RAG framework",
+    "developer tooling",
+)
 
 
 def command_init_trends(root: Path) -> None:
@@ -199,17 +268,31 @@ def command_init_trends(root: Path) -> None:
     if (root / "profile.json").is_file():
         raise rc.RcError("the trend feed already exists; edit its tags with rc trends tags")
     today = datetime.date.today().isoformat()
-    rc.write_json(root / "profile.json", {
-        "schemaVersion": 1, "id": carding.TRENDS, "name": "Trends across profiles", "type": "company", "createdAt": today,
-        "description": "Releases and research that may change how any profile works or builds its software, judged against "
-                       "every profile, under the strictest licence rule.",
-        "tags": [{"tag": tag, "why": "a default trend tag", "source": "user", "evidence": [], "added": today} for tag in TREND_TAGS]})
+    rc.write_json(
+        root / "profile.json",
+        {
+            "schemaVersion": 1,
+            "id": carding.TRENDS,
+            "name": "Trends across profiles",
+            "type": "company",
+            "createdAt": today,
+            "description": "Releases and research that may change how any profile works or builds its software, judged against "
+            "every profile, under the strictest licence rule.",
+            "tags": [
+                {"tag": tag, "why": "a default trend tag", "source": "user", "evidence": [], "added": today}
+                for tag in TREND_TAGS
+            ],
+        },
+    )
     print(f"started trends/ with the tags {', '.join(TREND_TAGS)}; edit them with rc trends tags, then rc trends")
 
 
 def all_cards(root: Path) -> list[dict[str, Any]]:
-    return sorted((json.loads(path.read_text(encoding="utf-8")) for path in (folder(root) / "cards").glob("*.json")),
-                  key=lambda card: (card["date"], card["id"]), reverse=True)
+    return sorted(
+        (json.loads(path.read_text(encoding="utf-8")) for path in (folder(root) / "cards").glob("*.json")),
+        key=lambda card: (card["date"], card["id"]),
+        reverse=True,
+    )
 
 
 def command_run(root: Path, find: bool = True) -> dict[str, Any]:
@@ -230,7 +313,9 @@ def command_run(root: Path, find: bool = True) -> dict[str, Any]:
     if not result["triaged"]:
         print("no open candidates to triage; run discovery first (rc scout discover)")
         return result
-    print(f"triaged {result['triaged']} candidates; {len(result['cards'])} cards in {result.get('calls', 0)} agent calls:")
+    print(
+        f"triaged {result['triaged']} candidates; {len(result['cards'])} cards in {result.get('calls', 0)} agent calls:"
+    )
     for card in all_cards(root):
         if card["id"] in result["cards"]:
             print(f"  [{card['verdict']}] {card['title']}: {card['headline']}  (scout/cards/{card['id']}.md)")
@@ -270,7 +355,9 @@ def command_dive(root: Path, identifier: str, topic: str | None = None) -> Path:
     if not path.is_file():
         raise rc.RcError(f"no card {identifier}; rc scout cards lists them")
     if carding.is_trends(root):
-        raise rc.RcError("a trend card belongs to every profile; dive into it from the profile it affects (rc -p <id> research new)")
+        raise rc.RcError(
+            "a trend card belongs to every profile; dive into it from the profile it affects (rc -p <id> research new)"
+        )
     card = json.loads(path.read_text(encoding="utf-8"))
     meta = profile(root)
     engineers, plan = card["engineers"], card["engineers"]["evaluation"]
@@ -279,41 +366,63 @@ def command_dive(root: Path, identifier: str, topic: str | None = None) -> Path:
     if directory.exists():
         raise rc.RcError(f"topic {topic} already exists; pass another id")
     licence = card.get("licence")
-    licence_line = (f" Its licence ({licence['spdx'] or 'none found'}, {licence['class']}) is "
-                    + ("usable by this profile." if licence["usable"] else f"not usable by this {meta.get('type')} profile: {licence['reason']}.")
-                    if licence else "")
+    licence_line = (
+        f" Its licence ({licence['spdx'] or 'none found'}, {licence['class']}) is "
+        + (
+            "usable by this profile."
+            if licence["usable"]
+            else f"not usable by this {meta.get('type')} profile: {licence['reason']}."
+        )
+        if licence
+        else ""
+    )
     sections = {
-        "Topic": (f"Whether {card['title']} ({card['url']}) should change {engineers['component']}. The scout's card ({card['date']}, "
-                  f"verdict: {card['verdict']}) says: {card['headline']} This study tests that verdict with cited evidence before "
-                  "anyone builds on it."),
-        "Questions": "\n".join([
-            # What the component does today stays in Our needs: pasted into a question it makes the question unreadable.
-            f"- Q1: Does {card['title']} do better than what {engineers['component']} does today, measured as "
-            f"{plan['metric'].rstrip('.')}, on data like ours?",
-            f"- Q2: Which constraints does it meet or break for us: licence, data residency, language, scale and maintenance?{licence_line}",
-            f"- Q3: What would integrating it take: what it replaces ({engineers['replaces']}), the effort and the risks?",
-            "- Q4: How does it compare with the alternatives named under Our needs?"]),
+        "Topic": (
+            f"Whether {card['title']} ({card['url']}) should change {engineers['component']}. The scout's card ({card['date']}, "
+            f"verdict: {card['verdict']}) says: {card['headline']} This study tests that verdict with cited evidence before "
+            "anyone builds on it."
+        ),
+        "Questions": "\n".join(
+            [
+                # What the component does today stays in Our needs: pasted into a question it makes the question unreadable.
+                f"- Q1: Does {card['title']} do better than what {engineers['component']} does today, measured as "
+                f"{plan['metric'].rstrip('.')}, on data like ours?",
+                f"- Q2: Which constraints does it meet or break for us: licence, data residency, language, scale and maintenance?{licence_line}",
+                f"- Q3: What would integrating it take: what it replaces ({engineers['replaces']}), the effort and the risks?",
+                "- Q4: How does it compare with the alternatives named under Our needs?",
+            ]
+        ),
         "Scope": f"{card['title']}, its documented results and independent evaluations, and the alternatives the card names. Recent work first.",
         "Out of scope": "Other uses of the technology that do not bear on the component above.",
-        "Our needs": (f"The component: {engineers['component']}. Today: {engineers['componentToday']} Alternatives: "
-                      f"{engineers['alternatives']} The card's evidence rests on "
-                      f"{card['evidence']}; the fit on {', '.join(card.get('profileBasis', []))}."),
-        "Success criteria": (f"A decision on the card's verdict. The card's evaluation plan is the bar: {plan['experiment']}; "
-                             f"metric {plan['metric']}; pass bar {plan['passBar']}; effort {plan['effort']}."),
+        "Our needs": (
+            f"The component: {engineers['component']}. Today: {engineers['componentToday']} Alternatives: "
+            f"{engineers['alternatives']} The card's evidence rests on "
+            f"{card['evidence']}; the fit on {', '.join(card.get('profileBasis', []))}."
+        ),
+        "Success criteria": (
+            f"A decision on the card's verdict. The card's evaluation plan is the bar: {plan['experiment']}; "
+            f"metric {plan['metric']}; pass bar {plan['passBar']}; effort {plan['effort']}."
+        ),
         "Source preferences": "The project's own documentation and code, peer-reviewed or reproduced evaluations, issue trackers for known "
-                              "problems; distrust vendor benchmarks without method.",
+        "problems; distrust vendor benchmarks without method.",
         "Living": "Cadence: none\nRetire when: the verdict is decided.",
     }
     template = (rc.instance(root) / "templates" / "brief.md").read_text(encoding="utf-8")
-    head = template.split("\n## ", 1)[0].replace("<topic-id>", topic).replace("<title>", f"Should {card['title']} change {engineers['component']}?")
+    head = (
+        template.split("\n## ", 1)[0]
+        .replace("<topic-id>", topic)
+        .replace("<title>", f"Should {card['title']} change {engineers['component']}?")
+    )
     text = head + "".join(f"\n## {name}\n\n{body}\n" for name, body in sections.items())
     text += "\n## Amendments\n\nNone. Log here every change made to the questions, scope or needs after acceptance, with its date; a changed brief redoes the research from plan.\n"
     rc.write_text(directory / "brief.md", text)
     card["status"] = "deep dive"
     card["research"] = topic
     carding.write_card(root, card)
-    print(f"drafted research/{topic}/brief.md from the card; review it with the grill-research-topic skill, then "
-          f"rc research accept {topic}")
+    print(
+        f"drafted research/{topic}/brief.md from the card; review it with the grill-research-topic skill, then "
+        f"rc research accept {topic}"
+    )
     return directory / "brief.md"
 
 

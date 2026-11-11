@@ -15,9 +15,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
-
+from typing import Any
 
 # Must match the role checks in scripts/validate-research-center.py.
 PROVIDERS = ("claude", "codex")
@@ -44,7 +44,15 @@ CONNECTOR_TOOLS = {
 
 # The Claude CLI cannot list models, so these are maintained here: aliases follow the newest model
 # of each tier, full ids pin one. Update when Anthropic releases models.
-CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"]
+CLAUDE_MODELS = [
+    "opus",
+    "sonnet",
+    "haiku",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-1",
+    "claude-haiku-4-5-20251001",
+]
 
 
 class ProviderError(RuntimeError):
@@ -63,7 +71,7 @@ def models(provider: str) -> list[str]:
         return []
     if provider == "claude":
         return list(CLAUDE_MODELS)
-    result = subprocess.run([executable("codex"), "debug", "models"], capture_output=True, **TEXT)
+    result = subprocess.run([executable("codex"), "debug", "models"], capture_output=True, **TEXT, check=False)
     try:
         catalog = json.loads(result.stdout)["models"]
     except (json.JSONDecodeError, KeyError, TypeError):
@@ -78,7 +86,7 @@ def login_status(provider: str) -> tuple[bool, str]:
     if shutil.which(BINARIES[provider]) is None:
         return False, f"{BINARIES[provider]} CLI is not installed"
     if provider == "claude":
-        result = subprocess.run([executable("claude"), "auth", "status"], capture_output=True, **TEXT)
+        result = subprocess.run([executable("claude"), "auth", "status"], capture_output=True, **TEXT, check=False)
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
@@ -86,7 +94,7 @@ def login_status(provider: str) -> tuple[bool, str]:
         if data.get("loggedIn"):
             return True, f"logged in ({data.get('authMethod', '?')})"
         return False, "not logged in; run: claude auth login"
-    result = subprocess.run([executable("codex"), "login", "status"], capture_output=True, **TEXT)
+    result = subprocess.run([executable("codex"), "login", "status"], capture_output=True, **TEXT, check=False)
     message = (result.stdout + result.stderr).strip().splitlines()
     if result.returncode == 0 and message and "logged in" in message[-1].lower():
         return True, message[-1].lower()
@@ -103,11 +111,14 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
         base = [
             "claude",
             "--print",
-            "--model", model,
-            "--permission-mode", "dontAsk",
+            "--model",
+            model,
+            "--permission-mode",
+            "dontAsk",
             "--no-session-persistence",
             # Streamed events let rc watch show what the agent is doing while it works.
-            "--output-format", "stream-json",
+            "--output-format",
+            "stream-json",
             "--verbose",
         ]
         if access == "connector-read":
@@ -116,8 +127,12 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
             connectors = role.get("connectors") or []
             unknown = [name for name in connectors if name not in CONNECTOR_TOOLS]
             if not connectors or unknown:
-                raise ProviderError(f"role {role.get('id')}: connectors must be a non-empty subset of {sorted(CONNECTOR_TOOLS)}")
-            allowed = ["Read", "Grep", "Glob", "ToolSearch"] + [tool for name in connectors for tool in CONNECTOR_TOOLS[name]]
+                raise ProviderError(
+                    f"role {role.get('id')}: connectors must be a non-empty subset of {sorted(CONNECTOR_TOOLS)}"
+                )
+            allowed = ["Read", "Grep", "Glob", "ToolSearch"] + [
+                tool for name in connectors for tool in CONNECTOR_TOOLS[name]
+            ]
             return [*base, "--allowedTools", *allowed]
         tools = CLAUDE_TOOLS[access]
         return [*base, "--strict-mcp-config", "--tools", *tools, "--allowedTools", *tools]
@@ -126,24 +141,36 @@ def command(role: dict[str, Any], cwd: Path, last_message: Path) -> list[str]:
         # 2026-10-16 with codex-cli 0.163.0), so codex roles work only on macOS, Linux and WSL for now.
         return [
             # --search turns on the native web_search tool; it is a top-level flag (probed with codex-cli 0.160.1).
-            "codex", *(["--search"] if access == "web-read" else []), "exec",
-            "--model", model,
-            "--sandbox", "read-only",
-            "--cd", str(cwd),
+            "codex",
+            *(["--search"] if access == "web-read" else []),
+            "exec",
+            "--model",
+            model,
+            "--sandbox",
+            "read-only",
+            "--cd",
+            str(cwd),
             "--skip-git-repo-check",
             "--ephemeral",
             "--ignore-user-config",
-            "--color", "never",
+            "--color",
+            "never",
             # JSONL events instead of the echoed prompt: the log shows commands and messages as they happen.
             "--json",
-            "--output-last-message", str(last_message),
+            "--output-last-message",
+            str(last_message),
             "-",
         ]
     raise ProviderError(f"unsupported provider: {provider}")
 
 
 def run(
-    role: dict[str, Any], prompt: str, cwd: Path, log: Path, timeout: int = 3600, on_say: Callable[[str], None] | None = None,
+    role: dict[str, Any],
+    prompt: str,
+    cwd: Path,
+    log: Path,
+    timeout: int = 3600,
+    on_say: Callable[[str], None] | None = None,
 ) -> str:
     """Run the role non-interactively in cwd; return its final message. The prompt goes on stdin.
 
@@ -166,8 +193,14 @@ def stream_call(
     with log.open("w", encoding="utf-8") as stream:
         stream.write(f"$ {' '.join(argv)}\n\n")
         stream.flush()
-        process = subprocess.Popen([executable(argv[0]), *argv[1:]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=stream, cwd=cwd, **TEXT)
+        process = subprocess.Popen(
+            [executable(argv[0]), *argv[1:]],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stream,
+            cwd=cwd,
+            **TEXT,
+        )
         timer = threading.Timer(timeout, process.kill)
         timer.start()
         try:
@@ -195,7 +228,9 @@ def stream_call(
 
 
 def message_text(event: dict[str, Any]) -> str:
-    return "".join(item.get("text", "") for item in event.get("message", {}).get("content", []) if item.get("type") == "text")
+    return "".join(
+        item.get("text", "") for item in event.get("message", {}).get("content", []) if item.get("type") == "text"
+    )
 
 
 def parse_claude_event(line: str) -> tuple[dict[str, Any], str]:
@@ -212,7 +247,9 @@ def parse_claude_event(line: str) -> tuple[dict[str, Any], str]:
     for item in event.get("message", {}).get("content", []):
         if item.get("type") == "tool_use":
             arguments = item.get("input", {})
-            target = next((str(arguments[key]) for key in ("file_path", "pattern", "path", "command") if key in arguments), "")
+            target = next(
+                (str(arguments[key]) for key in ("file_path", "pattern", "path", "command") if key in arguments), ""
+            )
             activity.append(f"tool: {item.get('name')} {target}".strip())
         elif item.get("type") == "text" and item.get("text", "").strip():
             activity.append("say: " + " ".join(item["text"].split())[:160])
@@ -263,8 +300,10 @@ def main() -> int:
                 reply = f"(provider error: {error})"
             wrote = (work / "probe.txt").exists() or (work / "existing.txt").read_text() != "unchanged\n"
             read = "unchanged" in reply
-            print(f"{sys.argv[2]} {sys.argv[3]}: {'WROTE FILES' if wrote else 'no writes'}, {'reads' if read else 'COULD NOT READ'}; "
-                  f"reply: {reply[:120]}")
+            print(
+                f"{sys.argv[2]} {sys.argv[3]}: {'WROTE FILES' if wrote else 'no writes'}, {'reads' if read else 'COULD NOT READ'}; "
+                f"reply: {reply[:120]}"
+            )
             return 1 if wrote or not read else 0
     print("usage: providers.py status | models | probe <provider> <model>", file=sys.stderr)
     return 2

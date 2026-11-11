@@ -18,8 +18,8 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "ingest"), str(HERE / "runner"), str(HERE / "sources")]
 import kit  # noqa: E402
-import secrets_scan  # noqa: E402
 import profiles  # noqa: E402
+import secrets_scan  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("validate_knowledge", HERE / "validate-knowledge.py")
 _knowledge = importlib.util.module_from_spec(_spec)
@@ -28,6 +28,7 @@ _spec.loader.exec_module(_knowledge)
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], dict[str, list[str]]]:
     return _knowledge.parse_frontmatter(Path("note.md"), text)
+
 
 PROVIDERS = ("claude", "codex")
 # The same lifecycle as a Control Center's control-center.json; rc-kit list shows it.
@@ -61,8 +62,19 @@ CERTAINTIES = ("very low", "low", "moderate", "high")
 DATA_DIRS = ("sources", "knowledge", "research", "catalog/sources", "profiles", "usecases", "trends")
 KINDS = ("folder", "git", "url", "notion", "gdrive")
 CLAIM = re.compile(r"\[(C\d+(?:\s*[,;]\s*C\d+)*)\]")
-ADAPTER_FIELDS = {"schemaVersion": int, "id": str, "module": str, "family": str, "covers": str, "evidenceTypes": list,
-                  "queryHelp": str, "filters": dict, "watchable": bool, "related": bool, "rateLimit": (int, float)}
+ADAPTER_FIELDS = {
+    "schemaVersion": int,
+    "id": str,
+    "module": str,
+    "family": str,
+    "covers": str,
+    "evidenceTypes": list,
+    "queryHelp": str,
+    "filters": dict,
+    "watchable": bool,
+    "related": bool,
+    "rateLimit": (int, float),
+}
 NOTE_FIELDS = ("id", "title", "status", "summary", "verified_at")
 
 
@@ -118,9 +130,13 @@ def check_settings(root: Path, settings: dict[str, Any], roles_dir: Path, errors
         slots += [(slot, item, access) for item in value]
     for slot, identifier, access in slots:
         if identifier not in roles:
-            errors.append(f"{label}: pipeline.{slot} names role {identifier!r}, which is not in {roles_dir.relative_to(root)}")
+            errors.append(
+                f"{label}: pipeline.{slot} names role {identifier!r}, which is not in {roles_dir.relative_to(root)}"
+            )
         elif roles[identifier].get("access") != access:
-            errors.append(f"{label}: pipeline.{slot} needs {access} access; role {identifier} has {roles[identifier].get('access')}")
+            errors.append(
+                f"{label}: pipeline.{slot} needs {access} access; role {identifier} has {roles[identifier].get('access')}"
+            )
     refresh = settings.get("budget", {}).get("refreshCalls", 16)
     if not isinstance(refresh, int) or isinstance(refresh, bool) or refresh <= 0:
         errors.append(f"{label}: budget.refreshCalls must be a positive integer")
@@ -142,11 +158,17 @@ def check_evidence_types(root: Path, path: Path, errors: list[str]) -> None:
         return
     ids = [item.get("id") for item in data["types"]]
     if sorted(ids) != sorted(kit.EVIDENCE_TYPES):
-        errors.append(f"{name}: types must be exactly {kit.EVIDENCE_TYPES}; tune their ceilings and half-lives, not the ids")
+        errors.append(
+            f"{name}: types must be exactly {kit.EVIDENCE_TYPES}; tune their ceilings and half-lives, not the ids"
+        )
     for item in data["types"]:
         if item.get("reliabilityCeiling") not in GRADES[:5]:
             errors.append(f"{name}: {item.get('id')}: reliabilityCeiling must be one of {GRADES[:5]}")
-        if not isinstance(item.get("halfLifeDays"), int) or isinstance(item.get("halfLifeDays"), bool) or item["halfLifeDays"] <= 0:
+        if (
+            not isinstance(item.get("halfLifeDays"), int)
+            or isinstance(item.get("halfLifeDays"), bool)
+            or item["halfLifeDays"] <= 0
+        ):
             errors.append(f"{name}: {item.get('id')}: halfLifeDays must be a positive whole number")
 
 
@@ -171,8 +193,12 @@ def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
             errors.append(f"{name}: evidenceTypes must be a non-empty subset of {kit.EVIDENCE_TYPES}")
         module = str(spec.get("module", ""))
         own = root / "catalog" / "adapters" / "code" / f"{module}.py"
-        if not re.fullmatch(r"[a-z0-9_]+", module) or not ((HERE / "sources" / "adapters" / f"{module}.py").is_file() or own.is_file()):
-            errors.append(f"{name}: module {module!r} is neither in scripts/sources/adapters/ nor in catalog/adapters/code/")
+        if not re.fullmatch(r"[a-z0-9_]+", module) or not (
+            (HERE / "sources" / "adapters" / f"{module}.py").is_file() or own.is_file()
+        ):
+            errors.append(
+                f"{name}: module {module!r} is neither in scripts/sources/adapters/ nor in catalog/adapters/code/"
+            )
         if not isinstance(spec.get("retractions", False), bool):
             errors.append(f"{name}: retractions must be true or false")
         for field in ("needsKeyEnv", "optionalKeyEnv"):
@@ -183,7 +209,11 @@ def check_adapters(root: Path, directory: Path, errors: list[str]) -> None:
 def check_sources(root: Path, errors: list[str]) -> None:
     catalog = {path.stem: load(path, errors, root) for path in sorted((root / "catalog" / "sources").glob("*.json"))}
     for identifier, descriptor in catalog.items():
-        if not isinstance(descriptor, dict) or descriptor.get("id") != identifier or descriptor.get("kind") not in KINDS:
+        if (
+            not isinstance(descriptor, dict)
+            or descriptor.get("id") != identifier
+            or descriptor.get("kind") not in KINDS
+        ):
             errors.append(f"catalog/sources/{identifier}.json: id must equal the file name and kind be one of {KINDS}")
     for directory in sorted(path for path in (root / "sources").glob("*") if path.is_dir()):
         name = directory.relative_to(root).as_posix()
@@ -194,7 +224,11 @@ def check_sources(root: Path, errors: list[str]) -> None:
             errors.append(f"{name}: manifest.json is missing")
             continue
         listed = set(manifest.get("files", {}))
-        present = {path.relative_to(directory / "text").as_posix() for path in (directory / "text").rglob("*") if path.is_file()}
+        present = {
+            path.relative_to(directory / "text").as_posix()
+            for path in (directory / "text").rglob("*")
+            if path.is_file()
+        }
         errors += [f"{name}/text/{stored}: in the manifest but missing" for stored in sorted(listed - present)]
         errors += [f"{name}/text/{stored}: not in the manifest" for stored in sorted(present - listed)]
         for path in sorted(directory.rglob("*")):
@@ -237,7 +271,9 @@ def check_reports(root: Path, errors: list[str]) -> None:
                 errors.append(f"{name}/judgement.json: the answer to {answer.get('question')} has no certainty")
             for entry in [*answer.get("downgrades", []), *answer.get("upgrades", [])]:
                 if not str(entry.get("reason", "")).strip():
-                    errors.append(f"{name}/judgement.json: a {entry.get('domain')} grade of {answer.get('question')} gives no reason")
+                    errors.append(
+                        f"{name}/judgement.json: a {entry.get('domain')} grade of {answer.get('question')} gives no reason"
+                    )
         cited = {claim for group in CLAIM.findall(body) for claim in re.split(r"\s*[,;]\s*", group)}
         for claim in sorted(cited):
             if claim not in known:
@@ -252,7 +288,9 @@ def check_profile(root: Path, space: Path, errors: list[str]) -> None:
     name = space.relative_to(root).as_posix()
     meta = load(space / profiles.META, errors, root)
     if meta is not None:
-        errors += [problem.replace(f"{space.name}/", f"{name}/", 1) for problem in profiles.meta_problems(meta, space.name)]
+        errors += [
+            problem.replace(f"{space.name}/", f"{name}/", 1) for problem in profiles.meta_problems(meta, space.name)
+        ]
     scope = space / "scope.md"
     if scope.is_file():
         text = scope.read_text(encoding="utf-8")
@@ -291,17 +329,25 @@ def validate(root: Path) -> list[str]:
             check_evidence_types(root, root / "catalog" / "evidence-types.json", errors)
         errors += secrets_scan.scan(root, ["catalog"])
         if (root / "usecases").is_dir():
-            errors.append("usecases/ is the layout from before profiles; run rc upgrade from the template to move it to profiles/")
+            errors.append(
+                "usecases/ is the layout from before profiles; run rc upgrade from the template to move it to profiles/"
+            )
         # The instance root holds data when it has no profiles; every profile holds its own (ADR 0015).
         trends = [root / "trends"] if (root / "trends" / profiles.META).is_file() else []
-        for space in [root, *sorted(path.parent for path in (root / profiles.FOLDER).glob(f"*/{profiles.META}")), *trends]:
+        for space in [
+            root,
+            *sorted(path.parent for path in (root / profiles.FOLDER).glob(f"*/{profiles.META}")),
+            *trends,
+        ]:
             if space != root:
                 check_profile(root, space, errors)
             check_sources(space, errors)
             check_notes(space, errors)
             check_reports(space, errors)
-            errors += [f"{space.relative_to(root).as_posix()}/{error}" if space != root else error
-                       for error in secrets_scan.scan(space, ["sources", "knowledge", "research", "catalog/sources"])]
+            errors += [
+                f"{space.relative_to(root).as_posix()}/{error}" if space != root else error
+                for error in secrets_scan.scan(space, ["sources", "knowledge", "research", "catalog/sources"])
+            ]
     else:
         template = load(root / "templates" / "research-center.json", errors, root)
         if isinstance(template, dict):
@@ -332,7 +378,9 @@ def main() -> int:
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
-    print(f"research center validation passed ({'instance' if (root / 'research-center.json').is_file() else 'template'})")
+    print(
+        f"research center validation passed ({'instance' if (root / 'research-center.json').is_file() else 'template'})"
+    )
     return 0
 
 

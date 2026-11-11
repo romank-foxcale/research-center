@@ -38,17 +38,26 @@ def authors(element: Element) -> list[str]:
     return [name for name in names if name]
 
 
-def search(query: str, filters: dict[str, str], since: str | None, limit: int, options: dict[str, Any]) -> list[dict[str, Any]]:
+def search(
+    query: str, filters: dict[str, str], since: str | None, limit: int, options: dict[str, Any]
+) -> list[dict[str, Any]]:
     if not query.startswith(("http://", "https://")):
         raise kit.AdapterError(f"{NAME}: the query must be the feed's http(s) URL")
     data, _ = kit.fetch(query, interval=options["interval"])
     root = kit.xml_root(data)
     items = [element for element in root.iter() if kit.local(element.tag) in ("item", "entry")]
     evidence = filters.get("evidenceType", "unknown")
-    results = kit.each(items[: max(limit, 1)], lambda item: kit.record(
-        NAME, text(item, "title") or link(item), link(item), evidence, authors=authors(item),
-        date=kit.iso_date(text(item, "pubDate", "published", "updated", "date")),
-        abstract=kit.strip_html(text(item, "description", "summary", "content", "encoded"))[:2000],
-        extra={"feed": query},
-    ))
+    results = kit.each(
+        items[: max(limit, 1)],
+        lambda item: kit.record(
+            NAME,
+            text(item, "title") or link(item),
+            link(item),
+            evidence,
+            authors=authors(item),
+            date=kit.iso_date(text(item, "pubDate", "published", "updated", "date")),
+            abstract=kit.strip_html(text(item, "description", "summary", "content", "encoded"))[:2000],
+            extra={"feed": query},
+        ),
+    )
     return kit.after(results, since)

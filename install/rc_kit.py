@@ -23,9 +23,9 @@ TOOLS = ("code", "cursor", "claude", "codex", "opencode")
 USAGE = f"""Usage: rc-kit <command> [arguments]
 
 Commands:
-  new <name>            Create {PROJECTS / '<name>_RC'} and prepare it for your AI tool
+  new <name>            Create {PROJECTS / "<name>_RC"} and prepare it for your AI tool
   list                  List Research Centers under {PROJECTS}
-  open <name> <tool>    Open an RC in {', '.join(TOOLS)}
+  open <name> <tool>    Open an RC in {", ".join(TOOLS)}
   upgrade <name> [--reset-roles]  Bring an RC's scripts, skills and templates up to this kit
   doctor                Check prerequisites, provider logins and AI tools
   update                Update the kit itself (then upgrade each RC you want on the new version)
@@ -41,28 +41,35 @@ def rc_dir(name: str) -> Path:
 
 
 def run(*argv: str, cwd: Path | None = None) -> int:
-    return subprocess.run([shutil.which(argv[0]) or argv[0], *argv[1:]], cwd=cwd).returncode
+    return subprocess.run([shutil.which(argv[0]) or argv[0], *argv[1:]], cwd=cwd, check=False).returncode
 
 
 def command_new(name: str) -> int:
     target = rc_dir(name)
     if target.exists() and any(target.iterdir()):
-        print(f"error: {target} already exists and is not empty.\n"
-              f'To migrate an existing research setup, see "Migrating an existing research setup" in {KIT / "GUIDE.md"}', file=sys.stderr)
+        print(
+            f"error: {target} already exists and is not empty.\n"
+            f'To migrate an existing research setup, see "Migrating an existing research setup" in {KIT / "GUIDE.md"}',
+            file=sys.stderr,
+        )
         return 1
     PROJECTS.mkdir(parents=True, exist_ok=True)
-    code = subprocess.run([sys.executable, "-B", str(KIT / "scripts" / "materialize-template.py"), str(target)]).returncode
+    code = subprocess.run(
+        [sys.executable, "-B", str(KIT / "scripts" / "materialize-template.py"), str(target)], check=False
+    ).returncode
     if code:
         return code
     run("git", "-C", str(target), "add", "-A")
     launcher = "rc" if os.name == "nt" else "./rc"
-    print(f"\nCreated {target}\n\nIt will hold the text of everything you ingest: give it a PRIVATE remote before ingesting.\n\n"
-          f"Next: open it in your AI tool and start the setup interview.\n"
-          f"  VS Code:   rc-kit open {target.name.removesuffix('_RC')} code\n"
-          f"  Claude:    rc-kit open {target.name.removesuffix('_RC')} claude\n"
-          f"  Claude desktop: open the folder {target}\n\n"
-          f"First prompt:  Set up this Research Center. Use the grill-rc-bootstrap skill.\n"
-          f"Check it any time with: {launcher} check")
+    print(
+        f"\nCreated {target}\n\nIt will hold the text of everything you ingest: give it a PRIVATE remote before ingesting.\n\n"
+        f"Next: open it in your AI tool and start the setup interview.\n"
+        f"  VS Code:   rc-kit open {target.name.removesuffix('_RC')} code\n"
+        f"  Claude:    rc-kit open {target.name.removesuffix('_RC')} claude\n"
+        f"  Claude desktop: open the folder {target}\n\n"
+        f"First prompt:  Set up this Research Center. Use the grill-rc-bootstrap skill.\n"
+        f"Check it any time with: {launcher} check"
+    )
     return 0
 
 
@@ -75,7 +82,9 @@ def command_list() -> int:
                 status = json.loads(settings.read_text(encoding="utf-8")).get("status", "unknown")
             except (OSError, ValueError):
                 status = "unreadable settings"
-            print(f"{directory.name:<40} {status}{'' if (directory / 'rc.py').is_file() else '  (old version: rc-kit upgrade)'}")
+            print(
+                f"{directory.name:<40} {status}{'' if (directory / 'rc.py').is_file() else '  (old version: rc-kit upgrade)'}"
+            )
             found = True
     if not found:
         print(f"No Research Centers in {PROJECTS} yet. Create one with: rc-kit new <name>")
@@ -97,7 +106,10 @@ def command_open(name: str, tool: str) -> int:
 
 
 def command_upgrade(name: str, *flags: str) -> int:
-    return subprocess.run([sys.executable, "-B", str(KIT / "scripts" / "upgrade-instance.py"), str(KIT), str(rc_dir(name)), *flags]).returncode
+    return subprocess.run(
+        [sys.executable, "-B", str(KIT / "scripts" / "upgrade-instance.py"), str(KIT), str(rc_dir(name)), *flags],
+        check=False,
+    ).returncode
 
 
 def command_doctor() -> int:
@@ -109,7 +121,9 @@ def command_doctor() -> int:
         failures += (not ok) and required
 
     def version(tool: str, *args: str) -> str:
-        result = subprocess.run([shutil.which(tool), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        result = subprocess.run(
+            [shutil.which(tool), *args], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
+        )
         return (result.stdout or result.stderr).strip().splitlines()[0] if result.stdout or result.stderr else "?"
 
     print("System")
@@ -120,9 +134,13 @@ def command_doctor() -> int:
         found = shutil.which(tool)
         report(bool(found), f"{tool}: {version(tool, *args) if found else 'missing; re-run the installer'}")
     gh = shutil.which("gh")
-    logged = bool(gh) and subprocess.run([gh, "auth", "status"], capture_output=True).returncode == 0
-    report(logged, "gh logged in (ingest checks that your RC's remote is private)" if logged
-           else "gh is missing or not logged in; run: gh auth login")
+    logged = bool(gh) and subprocess.run([gh, "auth", "status"], capture_output=True, check=False).returncode == 0
+    report(
+        logged,
+        "gh logged in (ingest checks that your RC's remote is private)"
+        if logged
+        else "gh is missing or not logged in; run: gh auth login",
+    )
     sys.path.insert(0, str(KIT / "scripts" / "runner"))
     import providers
 
@@ -130,12 +148,22 @@ def command_doctor() -> int:
     available, detail = providers.login_status("claude")
     report(available, f"claude: {detail}")
     available, detail = providers.login_status("codex")
-    note = " (its read-only sandbox cannot read files on native Windows; codex roles need macOS, Linux or WSL)" if os.name == "nt" else ""
+    note = (
+        " (its read-only sandbox cannot read files on native Windows; codex roles need macOS, Linux or WSL)"
+        if os.name == "nt"
+        else ""
+    )
     report(available, f"codex: {detail}{note}", required=False)
     print("\nOptional")
     for tool in ("code", "cursor", "opencode"):
-        report(bool(shutil.which(tool)), f"{tool} command {'found' if shutil.which(tool) else 'not on PATH'}", required=False)
-    commit = subprocess.run(["git", "-C", str(KIT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+        report(
+            bool(shutil.which(tool)),
+            f"{tool} command {'found' if shutil.which(tool) else 'not on PATH'}",
+            required=False,
+        )
+    commit = subprocess.run(
+        ["git", "-C", str(KIT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=False
+    ).stdout.strip()
     print(f"\nKit: {KIT} ({commit or 'not a git clone'})")
     print(f"{failures} required check(s) failed." if failures else "All required checks passed.")
     return 1 if failures else 0
@@ -158,7 +186,11 @@ def main(argv: list[str]) -> int:
         return command_doctor()
     if command == "update":
         code = run("git", "-C", str(KIT), "pull", "--ff-only")
-        print("Kit updated. Research Centers are separate repos: upgrade each one with rc-kit upgrade <name>." if code == 0 else "")
+        print(
+            "Kit updated. Research Centers are separate repos: upgrade each one with rc-kit upgrade <name>."
+            if code == 0
+            else ""
+        )
         return code
     print(f"error: unknown command or arguments: {' '.join(argv)}\n\n{USAGE}", file=sys.stderr)
     return 2

@@ -70,8 +70,15 @@ def command_add(root: Path, tag: str, why: str = "") -> None:
     proposal = find(pending, tag)
     if proposal:
         pending.remove(proposal)
-    tags.append({"tag": clean(tag), "why": " ".join(why.split()) or (proposal or {}).get("why", ""),
-                 "source": "user", "evidence": (proposal or {}).get("evidence", []), "added": rc.today()})
+    tags.append(
+        {
+            "tag": clean(tag),
+            "why": " ".join(why.split()) or (proposal or {}).get("why", ""),
+            "source": "user",
+            "evidence": (proposal or {}).get("evidence", []),
+            "added": rc.today(),
+        }
+    )
     meta["rejectedTags"] = [name for name in meta.get("rejectedTags", []) if name.casefold() != key(tag)]
     save(root, meta)
     print(f"added tag: {clean(tag)}")
@@ -139,26 +146,39 @@ def suggestion_problems(data: Any, root: Path, taken: set[str]) -> list[str]:
 def command_suggest(root: Path) -> list[dict[str, Any]]:
     meta = load(root)
     config = rc.settings(root)
-    taken = {name.casefold() for name in names(meta.get("tags", []))} | {name.casefold() for name in meta.get("rejectedTags", [])}
+    taken = {name.casefold() for name in names(meta.get("tags", []))} | {
+        name.casefold() for name in meta.get("rejectedTags", [])
+    }
     read = ["profile.json"] + (["scope.md"] if (root / "scope.md").is_file() else [])
     if (root / "knowledge" / "profile" / "index.md").is_file():
         read.append("knowledge/profile/index.md and the notes it links")
     if any((root / "knowledge" / "digests").glob("*.md")):
         read.append("knowledge/digests/")
     if len(read) == 1 and not meta.get("description"):
-        raise rc.RcError("nothing to propose tags from: describe the profile (rc profile edit --description) or ingest its material first")
-    body = (f"# Task\n\nPropose interest tags for the profile {meta.get('name', root.name)} ({meta.get('type')}). "
-            f"Read {', '.join(read)}.\n\n"
-            f"Current tags: {', '.join(names(meta.get('tags', []))) or 'none'}.\n"
-            f"Rejected before, never propose again: {', '.join(meta.get('rejectedTags', [])) or 'none'}.\n")
+        raise rc.RcError(
+            "nothing to propose tags from: describe the profile (rc profile edit --description) or ingest its material first"
+        )
+    body = (
+        f"# Task\n\nPropose interest tags for the profile {meta.get('name', root.name)} ({meta.get('type')}). "
+        f"Read {', '.join(read)}.\n\n"
+        f"Current tags: {', '.join(names(meta.get('tags', []))) or 'none'}.\n"
+        f"Rejected before, never propose again: {', '.join(meta.get('rejectedTags', [])) or 'none'}.\n"
+    )
 
     def check(reply: str) -> list[dict[str, Any]]:
         data = rc.extract_json(reply)
         problems = suggestion_problems(data, root, taken)
         if problems:
             raise ValueError("; ".join(problems[:15]))
-        return [{"tag": " ".join(str(item["tag"]).split()), "why": " ".join(str(item["why"]).split()),
-                 "source": "agent", "evidence": [str(path) for path in item["evidence"]]} for item in data["tags"]]
+        return [
+            {
+                "tag": " ".join(str(item["tag"]).split()),
+                "why": " ".join(str(item["why"]).split()),
+                "source": "agent",
+                "evidence": [str(path) for path in item["evidence"]],
+            }
+            for item in data["tags"]
+        ]
 
     with rc.Session(root, "tags", SUGGEST_BUDGET) as session:
         proposals = session.call_checked(config["pipeline"]["tagger"], body, "tags", check)
@@ -219,7 +239,7 @@ def command_list(root: Path) -> None:
         for item in meta["suggestedTags"]:
             print(f"  ? {item['tag']}  - {item['why']}")
     if not tags and not meta.get("suggestedTags"):
-        print("  none yet: rc tags add \"<tag>\", or rc tags suggest to propose them from the profile's material")
+        print('  none yet: rc tags add "<tag>", or rc tags suggest to propose them from the profile\'s material')
 
 
 def main() -> int:

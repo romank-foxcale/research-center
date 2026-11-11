@@ -58,7 +58,8 @@ Commands:
   scout --due    Scout every profile and the trend feed whose cadence (scout.cadenceDays) has passed; for a weekly schedule
   trends init | [run] | discover | cards | dismiss <card> | tags ...  The shared trend feed, judged against every profile"""
 
-# The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments.
+# The gate: what `rc check` runs, in order. Each entry is a label and the script with its arguments;
+# a *_test.py file runs under pytest, one process per file.
 CHECKS = [
     ("knowledge", ["validate-knowledge.py", "{root}"]),
     ("contract", ["validate-research-center.py", "{root}"]),
@@ -83,9 +84,18 @@ CHECKS = [
 ]
 # Commands that hand over to one script with the root and the remaining arguments.
 SCRIPT_COMMANDS = {
-    "ingest": "ingest/ingest.py", "research": "research/research.py", "sources": "sources/sources.py",
-    "watch": "runner/events.py", "roles": "roles.py", "plan": "plans.py", "agents": "agent-configs.py",
-    "home": "report/home.py", "profile": "profiles.py", "tags": "tags.py", "scout": "scout/scout.py", "report": "report/report.py",
+    "ingest": "ingest/ingest.py",
+    "research": "research/research.py",
+    "sources": "sources/sources.py",
+    "watch": "runner/events.py",
+    "roles": "roles.py",
+    "plan": "plans.py",
+    "agents": "agent-configs.py",
+    "home": "report/home.py",
+    "profile": "profiles.py",
+    "tags": "tags.py",
+    "scout": "scout/scout.py",
+    "report": "report/report.py",
 }
 # Commands whose data lives in a profile: they get its folder as their root (docs/decisions/0015-profiles.md).
 DATA_COMMANDS = {"ingest", "research", "watch", "report", "tags", "scout"}
@@ -101,10 +111,14 @@ def data_root(selected: str | None) -> Path:
     """The folder a data command works on: the chosen profile, or the instance itself when it has none."""
     names = profiles()
     if (ROOT / "usecases").is_dir():
-        raise SystemExit("error: this RC still has usecases/; run rc upgrade from the template to move them to profiles/")
+        raise SystemExit(
+            "error: this RC still has usecases/; run rc upgrade from the template to move them to profiles/"
+        )
     if not names:
         if selected:
-            raise SystemExit(f"error: no profile {selected}; create one with rc profile new {selected} --name \"...\" --type company")
+            raise SystemExit(
+                f'error: no profile {selected}; create one with rc profile new {selected} --name "..." --type company'
+            )
         return ROOT
     default = None
     settings = ROOT / "research-center.json"
@@ -123,7 +137,7 @@ def data_root(selected: str | None) -> Path:
 def script(name: str, *args: str, quiet: bool = False) -> int:
     """Run scripts/<name> with this interpreter; -B keeps __pycache__ out of the tree."""
     stream = subprocess.DEVNULL if quiet else None
-    return subprocess.run([sys.executable, "-B", str(SCRIPTS / name), *args], stdout=stream).returncode
+    return subprocess.run([sys.executable, "-B", str(SCRIPTS / name), *args], stdout=stream, check=False).returncode
 
 
 def check() -> int:
@@ -132,15 +146,26 @@ def check() -> int:
         if not (SCRIPTS / name).is_file():
             continue
         started = time.monotonic()
-        result = subprocess.run([sys.executable, "-B", str(SCRIPTS / name), *(arg.format(root=ROOT) for arg in args)],
-                                capture_output=True, text=True, encoding="utf-8", errors="replace")
+        runner = ["-m", "pytest", "-q"] if name.endswith("_test.py") else []
+        result = subprocess.run(
+            [sys.executable, "-B", *runner, str(SCRIPTS / name), *(arg.format(root=ROOT) for arg in args)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
         seconds = time.monotonic() - started
         if result.returncode == 0:
             print(f"pass  {label} ({seconds:.1f}s)")
         else:
             failed.append(label)
             print(f"FAIL  {label} ({seconds:.1f}s)\n{(result.stdout + result.stderr).strip()[-4000:]}\n")
-    print(f"\n{len(CHECKS) - len(failed)} of {len(CHECKS)} checks passed" if not failed else f"\nfailed: {', '.join(failed)}")
+    print(
+        f"\n{len(CHECKS) - len(failed)} of {len(CHECKS)} checks passed"
+        if not failed
+        else f"\nfailed: {', '.join(failed)}"
+    )
     return 1 if failed else 0
 
 
@@ -148,11 +173,17 @@ def doctor() -> int:
     print(f"python {sys.version.split()[0]} ({sys.executable})")
     for tool, args in (("git", ["--version"]), ("uv", ["--version"])):
         found = shutil.which(tool)
-        version = subprocess.run([found, *args], capture_output=True, text=True).stdout.strip() if found else ""
+        version = (
+            subprocess.run([found, *args], capture_output=True, text=True, check=False).stdout.strip() if found else ""
+        )
         print(f"{tool}: {version or 'missing'}")
     gh = shutil.which("gh")
-    logged_in = bool(gh) and subprocess.run([gh, "auth", "status"], capture_output=True).returncode == 0
-    print("gh: logged in" if logged_in else "note: gh is missing or not logged in; ingest cannot check that the remote is private")
+    logged_in = bool(gh) and subprocess.run([gh, "auth", "status"], capture_output=True, check=False).returncode == 0
+    print(
+        "gh: logged in"
+        if logged_in
+        else "note: gh is missing or not logged in; ingest cannot check that the remote is private"
+    )
     return script("runner/providers.py", "status")
 
 
@@ -192,7 +223,9 @@ def main(argv: list[str]) -> int:
     if command == "scout" and args[:1] == ["--due"] and not selected:
         # The weekly schedule: every profile whose cadence has passed, then the trend feed; one failing does not stop
         # the others (docs/decisions/0016-scouting.md).
-        roots = [ROOT / "profiles" / name for name in profiles()] + ([ROOT / "trends"] if (ROOT / "trends" / "profile.json").is_file() else [])
+        roots = [ROOT / "profiles" / name for name in profiles()] + (
+            [ROOT / "trends"] if (ROOT / "trends" / "profile.json").is_file() else []
+        )
         codes = [script(SCRIPT_COMMANDS["scout"], str(path), "due") for path in roots]
         return max(codes, default=0)
     if command == "trends":
