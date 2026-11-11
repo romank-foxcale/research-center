@@ -157,8 +157,8 @@ def main() -> int:
         assert not (root / "catalog" / "sources").exists(), "nothing lands in the instance root"
         quiet(research.command_new, alpha, argparse.Namespace(topic="ocr", title="Japanese OCR for review"))
         text = research.context(alpha, "ocr")
-        assert "Profile: profile.json" in text and "a company profile: only permissive licences" in text, text
-        assert "Scope: scope.md" in text and "alpha-docs" in text and "beta-notes" not in text, text
+        assert f"Profile: {(alpha / 'profile.json').resolve()}" in text and "a company profile: only permissive licences" in text, text
+        assert f"Scope: {(alpha / 'scope.md').resolve()}" in text and "alpha-docs" in text and "beta-notes" not in text, text
         assert "a personal profile: any licence" in research.context(beta, "x")
         assert (alpha / "research" / "ocr" / "brief.md").is_file() and not (root / "research").exists()
 

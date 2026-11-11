@@ -423,20 +423,26 @@ def require_profile(root: Path) -> None:
 
 
 def context(root: Path, topic: str) -> str:
-    """What every research role reads first: the profile, the brief, the profile notes, and the ingested sources."""
-    lines = []
+    """What every research role reads first: the profile, the brief, the profile notes, and the ingested sources.
+
+    The topic's files are named by absolute path. In a profile the agent runs in profiles/<id>/, and agents told only
+    the current directory still resolved research/<topic>/ against the repository root and missed the brief."""
+    folder = topic_dir(root, topic).resolve()
+    lines = [f"Files: research/{topic}/ in this task is the folder {folder}, and sources/ is {(root / 'sources').resolve()}. "
+             "Read them by these absolute paths."]
     meta = profile_meta(root)
     if meta is not None:
         rule = ("a company profile: only permissive licences (templates/licences.json) are usable in what it ships; "
                 "flag every other licence" if meta.get("type") == "company" else "a personal profile: any licence is usable")
-        lines.append(f"Profile: profile.json (read it first): {meta.get('name', root.name)}, {rule}. Its description and "
-                     "interest tags say whom this research serves.")
+        lines.append(f"Profile: {(root / 'profile.json').resolve()} (read it first): {meta.get('name', root.name)}, {rule}. "
+                     "Its description and interest tags say whom this research serves.")
     if (root / "scope.md").is_file():
-        lines.append("Scope: scope.md, the profile's longer context: its products and the components a new technology "
+        lines.append(f"Scope: {(root / 'scope.md').resolve()}, the profile's longer context: its products and the components a new technology "
                      "could plug into, the hard constraints every recommendation must meet, and how value is measured.")
-    lines.append(f"Topic: {topic}. Brief: research/{topic}/brief.md (read it first).")
+    lines.append(f"Topic: {topic}. Brief: {folder / 'brief.md'} (read it first).")
     if (root / "knowledge" / "profile" / "index.md").is_file():
-        lines.append("Profile notes, built from the ingested sources: knowledge/profile/index.md and the notes it links.")
+        lines.append(f"Profile notes, built from the ingested sources: {(root / 'knowledge' / 'profile' / 'index.md').resolve()} "
+                     "and the notes it links.")
     else:
         lines.append("No profile: nothing was ingested, so judge needs from the brief alone.")
     owned = [descriptor for descriptor in ingest.sources(root) if descriptor.get("origin", "user") == "user"]
