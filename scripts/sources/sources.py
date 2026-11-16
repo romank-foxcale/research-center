@@ -260,7 +260,10 @@ def search(
     """Run one adapter query and log it. A failing adapter is logged with status error and raises AdapterError;
     it never silently returns nothing."""
     spec = descriptor(root, identifier)
-    filters = dict(filters or {})
+    # Filters reach adapters as text, as on the command line; a source plan's JSON may give 50 or true instead.
+    filters = {
+        key: str(value).lower() if isinstance(value, bool) else str(value) for key, value in (filters or {}).items()
+    }
     unknown = sorted(set(filters) - set(spec.get("filters", {})))
     if unknown:
         raise ValueError(
