@@ -704,6 +704,15 @@ def test_research(monkeypatch) -> None:
         research.language_problems("## Q1: x\n\n- **Shares in use:**\n- It is unlikely to matter [C1].", {"Q1": "low"})
         == []
     ), "a bullet that is only a bold label heads the bullets after it"
+    labelled = (
+        "## Q7: x\n\n- **Log re-encoding.** Assessment: no idea applies directly.\n"
+        "- **Drums:** Assessment: test entropy cuts first.\n- **Embeddings.** int8 costs little."
+    )
+    problems = " ".join(research.language_problems(labelled, {"Q7": "low"}))
+    assert "Log re-encoding" not in problems and "Drums" not in problems, (
+        "a bold label before 'Assessment:' names the subject; the line is still an assessment"
+    )
+    assert "int8 costs little" in problems, "a bold label does not excuse an uncited statement"
     lead_ins = (
         "## Q1: x\n\nDense results are mixed:\n\n- one way [C1]\n- uncited bullet\n\n"
         "Assessment: what we would do:\n\n- hash the features\n- score in chunks\n\nAn uncited paragraph."
