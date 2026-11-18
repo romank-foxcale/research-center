@@ -298,11 +298,11 @@ def section_answers(topic: Topic) -> str:
             )
             continue
         reasons = "".join(
-            f'<li><span class="down">−{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
+            f'<li><span class="down">−{esc(item.get("levels", 1))} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
             for item in answer.get("downgrades", [])
         )
         reasons += "".join(
-            f'<li><span class="up">+{esc(item["levels"])} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
+            f'<li><span class="up">+{esc(item.get("levels", 1))} {esc(item["domain"])}</span> {linked_refs(topic, esc(item["reason"]))} {refs(topic, item.get("claims", []))}</li>'
             for item in answer.get("upgrades", [])
         )
         rows.append(

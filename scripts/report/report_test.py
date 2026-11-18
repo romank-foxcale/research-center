@@ -196,8 +196,12 @@ def fixture(root: Path) -> Path:
                 {
                     "question": "Q1",
                     "certainty": "low",
-                    "downgrades": [{"domain": "imprecision", "levels": 1, "reason": "one benchmark", "claims": ["C1"]}],
-                    "upgrades": [],
+                    "downgrades": [
+                        {"domain": "imprecision", "levels": 1, "reason": "one benchmark", "claims": ["C1"]},
+                        # The judge may leave out levels; the research runner reads that as 1, so the page must too.
+                        {"domain": "one-sided", "reason": "only the authors measured it"},
+                    ],
+                    "upgrades": [{"domain": "convergence", "reason": "independent sources agree"}],
                 }
             ],
             "contested": [{"claim": "C2", "refutedBy": ["Review b"]}],
@@ -297,6 +301,7 @@ def test_report() -> None:
             and "WEAKENED (2026-09-01) → SURVIVES (2026-10-16)" in page
         )
         assert "certainty-low" in page and "−1 imprecision" in page and "Do not overstate" in page
+        assert "−1 one-sided" in page and "+1 convergence" in page, "a missing levels counts as 1"
 
         # The matrix: H1 ranks first (C3, which is inconsistent with it, was refuted); the refuted row is struck out.
         ranking = page[page.find('<ol class="ranking">') :]
