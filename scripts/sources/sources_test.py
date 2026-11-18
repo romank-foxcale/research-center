@@ -110,6 +110,9 @@ def check_scholarly(log: Path) -> None:
     query = last_query()
     assert query["filter"] == "from_publication_date:2024-01-01,type:article" and query["search"] == "four-day week"
     assert "mailto" not in query, "no contact email is sent unless the user set one"
+    # A source plan's JSON can give filters as numbers or booleans; adapters receive them as command-line text.
+    sources.search(ROOT, "openalex", "four-day week", {"oa": True}, None, 5)
+    assert "is_oa:true" in last_query()["filter"], last_query()
 
     backward = sources.related(ROOT, "openalex", first, "backward", 50, log)
     assert [item["title"] for item in backward] == ["A meta-analysis of compressed schedules"] and backward[0][
